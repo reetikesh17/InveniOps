@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # 1. The Debouncing Engine Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ims-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # 2. The Message Queue (Shock Absorber)
+  rabbitmq:
+    # Using the 'management' tag so you get the visual web UI
+    image: rabbitmq:3-management-alpine
+    container_name: ims-rabbitmq
+    ports:
+      - "5672:5672" # AMQP protocol port for FastAPI to connect
+      - "15672:15672" # Visual Management UI port
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    restart: unless-stopped
+
+  # 3. The Data Lake (Raw Logs Sink)
+  mongodb:
+    image: mongo:6.0
+    container_name: ims-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
