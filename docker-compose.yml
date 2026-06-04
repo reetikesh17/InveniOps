@@ -32,5 +32,19 @@ services:
       - mongo_data:/data/db
     restart: unless-stopped
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: ims-postgres
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: ims_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   mongo_data:
+  pg_data:

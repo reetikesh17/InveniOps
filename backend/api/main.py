@@ -1,20 +1,33 @@
 import asyncio
 import json
 from datetime import datetime
-from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
+from sqlalchemy import select
+from fastapi import FastAPI, Request, HTTPException, Depends
+from api.models import init_db, AsyncSessionLocal, Incident, RCA, IncidentState, User
+from fastapi.middleware.cors import CORSMiddleware
 import redis.asyncio as redis
 import aio_pika
+import uuid
+from api.auth import hash_password, verify_password, create_access_token, get_current_user, require_admin
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Mission-Critical IMS Ingestion API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:5174"], # Allows your React frontend to connect
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 request_counter = 0
 
@@ -29,6 +42,18 @@ class IncidentSignal(BaseModel):
     message: str = Field(..., description="Error description", examples=["Redis timeout"])
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
+class RCASubmission(BaseModel):
+    root_cause_category: str = Field(..., description="e.g., Database, Network, Code")
+    fix_applied: str = Field(..., description="What was done to fix it")
+    prevention_steps: str = Field(..., description="How to prevent this in the future")
+
+class UserAuthSchema(BaseModel):
+    username: str
+    password: str
+
+class UserRegisterSchema(UserAuthSchema):
+    role: str = "SRE_USER" 
+
 async def log_throughput():
     global request_counter
     while True:
@@ -40,19 +65,19 @@ async def log_throughput():
 async def startup_event():
     global redis_client, rmq_connection, rmq_channel
     
-    # 1. Connect to Redis
+    # Initialize PostgreSQL Tables
+    await init_db()
+    
     redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
     
-    # 2. Connect to RabbitMQ
     rmq_connection = await aio_pika.connect_robust("amqp://guest:guest@localhost/")
     rmq_channel = await rmq_connection.channel()
     
-    # 3. Declare our durable queues
     await rmq_channel.declare_queue("raw_signals", durable=True)
     await rmq_channel.declare_queue("incidents", durable=True)
     
     asyncio.create_task(log_throughput())
-    print("IMS Ingestion Engine Started with Redis & RabbitMQ.")
+    print("IMS Ingestion Engine Started with PostgreSQL, Redis & RabbitMQ.")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -96,3 +121,72 @@ async def ingest_signal(request: Request, signal: IncidentSignal):
     else:
         # Step 4: We've already seen this in the last 10 seconds. Debounce it.
         return {"status": "accepted", "message": "Signal debounced", "signal_id": signal.component_id}
+
+@app.get("/incidents")
+async def get_incidents(current_user: dict = Depends(get_current_user)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Incident).order_by(Incident.created_at.desc()))
+        incidents = result.scalars().all()
+        return {"incidents": incidents}
+
+@app.post("/incidents/{incident_id}/close")
+async def close_incident_with_rca(incident_id: str, rca_data: RCASubmission, current_user: dict = Depends(require_admin)):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Incident).where(Incident.id == incident_id))
+        incident = result.scalars().first()
+
+        if not incident:
+            raise HTTPException(status_code=404, detail="Incident not found")
+        
+        if incident.state == IncidentState.CLOSED:
+            raise HTTPException(status_code=400, detail="Incident is already closed")
+
+        new_rca = RCA(
+            id=f"RCA-{incident_id}",
+            incident_id=incident_id,
+            root_cause_category=rca_data.root_cause_category,
+            fix_applied=rca_data.fix_applied,
+            prevention_steps=rca_data.prevention_steps
+        )
+        
+        incident.state = IncidentState.CLOSED
+        
+        session.add(new_rca)
+        await session.commit()
+        
+        return {
+            "status": "success", 
+            "message": f"Incident {incident_id} successfully CLOSED by {current_user['username']}.",
+            "rca_id": new_rca.id
+        }
+
+@app.post("/auth/register")
+async def register(user_data: UserRegisterSchema):
+    async with AsyncSessionLocal() as session:
+        # Check if username exists
+        result = await session.execute(select(User).where(User.username == user_data.username))
+        if result.scalars().first():
+            raise HTTPException(status_code=400, detail="Username already registered")
+        
+        new_user = User(
+            id=str(uuid.uuid4())[:8],
+            username=user_data.username,
+            hashed_password=hash_password(user_data.password),
+            role=user_data.role
+        )
+        session.add(new_user)
+        await session.commit()
+        return {"status": "success", "message": f"User {user_data.username} created as {user_data.role}."}
+
+@app.post("/auth/login")
+async def login(user_data: UserAuthSchema):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(User).where(User.username == user_data.username))
+        user = result.scalars().first()
+        
+        if not user or not verify_password(user_data.password, user.hashed_password):
+            raise HTTPException(status_code=401, detail="Incorrect username or password")
+        
+        # Issue JWT signed with the user's role
+        token = create_access_token(data={"sub": user.username, "role": user.role.value})
+        return {"access_token": token, "token_type": "bearer", "role": user.role.value}
