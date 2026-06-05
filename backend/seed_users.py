@@ -4,7 +4,9 @@ from sqlalchemy.orm import sessionmaker
 from api.models import Base, User, UserRole
 from api.auth import hash_password
 
-DATABASE_URL = "postgresql+asyncpg://admin:password@localhost:5432/ims_db"
+import os
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://admin:password@localhost:5432/ims_db")
 engine = create_async_engine(DATABASE_URL, echo=True)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
