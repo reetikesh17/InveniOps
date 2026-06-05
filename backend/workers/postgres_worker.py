@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import uuid
 import aio_pika
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +28,8 @@ async def process_incident(message: aio_pika.IncomingMessage):
             print(f"New Incident Created in PostgreSQL: {ticket_id} | State: {IncidentState.OPEN.value}")
 
 async def main():
-    connection = await aio_pika.connect_robust("amqp://guest:guest@localhost/")
+    RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
+    connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
     
     # Listen strictly to the debounced 'incidents' queue

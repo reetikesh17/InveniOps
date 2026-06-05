@@ -1,10 +1,11 @@
 import asyncio
 import json
+import os
 import aio_pika
 from motor.motor_asyncio import AsyncIOMotorClient
 
 # MongoDB Connection
-MONGO_DETAILS = "mongodb://localhost:27017"
+MONGO_DETAILS = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
 client = AsyncIOMotorClient(MONGO_DETAILS)
 database = client.ims_data_lake
 raw_logs_collection = database.get_collection("raw_signals")
@@ -21,7 +22,8 @@ async def process_message(message: aio_pika.IncomingMessage):
 
 async def main():
     # Connect to RabbitMQ
-    connection = await aio_pika.connect_robust("amqp://guest:guest@localhost/")
+    RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@localhost/")
+    connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
     
     # Connect to the exact same queue the API is publishing to

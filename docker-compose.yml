@@ -59,14 +59,45 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # 5. React/Vite Frontend (NEW)
+  # 5. PostgreSQL Incident Worker
+  postgres-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ims-postgres-worker
+    command: ["python", "-m", "workers.postgres_worker"]
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/ims_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 6. MongoDB Data Lake Worker
+  mongodb-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ims-mongodb-worker
+    command: ["python", "-m", "workers.mongodb_worker"]
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # 7. React/Vite Frontend
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: ims-frontend
     ports:
-      # Maps Nginx's internal port 80 to your familiar local port 5173
       - "5173:80"
     depends_on:
       - api
