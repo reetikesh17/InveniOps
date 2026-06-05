@@ -1,63 +1,70 @@
 version: '3.8'
 
 services:
-  # 1. The Debouncing Engine Cache
+  # 1. PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: ims-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ims_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis Cache
   redis:
     image: redis:7-alpine
     container_name: ims-redis
     ports:
       - "6379:6379"
-    restart: unless-stopped
 
-  # 2. The Message Queue (Shock Absorber)
+  # 3. RabbitMQ Message Broker
   rabbitmq:
-    # Using the 'management' tag so you get the visual web UI
     image: rabbitmq:3-management-alpine
     container_name: ims-rabbitmq
     ports:
-      - "5672:5672" # AMQP protocol port for FastAPI to connect
-      - "15672:15672" # Visual Management UI port
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    restart: unless-stopped
+      - "5672:5672" # Queue port
+      - "15672:15672" # Management UI port
 
-  # 3. The Data Lake (Raw Logs Sink)
-  mongodb:
-    image: mongo:6.0
-    container_name: ims-mongodb
+  # 4. FastAPI Backend (NEW)
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ims-api
     ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    restart: unless-stopped
-
-  postgres:
-    image: postgres:15-alpine
-    container_name: ims-postgres
+      - "8000:8000"
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: ims_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-  # 5. PostgreSQL Web UI (pgAdmin)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: ims-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@ims.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
-    ports:
-      - "5050:80"
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/ims_db
+      - REDIS_URL=redis://redis:6379/0
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
     depends_on:
-      - postgres
-    restart: unless-stopped
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+
+  # 5. React/Vite Frontend (NEW)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ims-frontend
+    ports:
+      # Maps Nginx's internal port 80 to your familiar local port 5173
+      - "5173:80"
+    depends_on:
+      - api
 
 volumes:
-  mongo_data:
-  pg_data:
+  pgdata:
