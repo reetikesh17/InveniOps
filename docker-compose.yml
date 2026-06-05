@@ -45,6 +45,19 @@ services:
       - pg_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  # 5. PostgreSQL Web UI (pgAdmin)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ims-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ims.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
 volumes:
   mongo_data:
   pg_data:
