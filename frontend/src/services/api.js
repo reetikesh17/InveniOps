@@ -1,5 +1,7 @@
 // src/services/api.js
-const API_URL = 'http://localhost:8000';
+const API_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:8000'
+    : `http://${window.location.hostname}:8000`;
 
 // Helper function to grab the token and format the header
 const getAuthHeaders = () => {

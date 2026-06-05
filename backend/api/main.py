@@ -25,7 +25,7 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"], # Allows your React frontend to connect
+    allow_origins=["*"],  # Allow all origins for now (restrict in production)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
