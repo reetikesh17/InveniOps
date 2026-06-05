@@ -33,6 +33,11 @@ services:
     ports:
       - "5672:5672" # Queue port
       - "15672:15672" # Management UI port
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # 4. FastAPI Backend (NEW)
   api:
@@ -52,7 +57,7 @@ services:
       redis:
         condition: service_started
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
 
   # 5. React/Vite Frontend (NEW)
   frontend:

@@ -1,5 +1,4 @@
 from api import models
-from api import models
 import asyncio
 import json
 import os
@@ -71,13 +70,24 @@ async def startup_event():
     # Initialize PostgreSQL Tables
     await init_db()
     
-    redis_client = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
     
+    # Connect to RabbitMQ with retry logic
     RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
-    rmq_connection = await aio_pika.connect_robust(RABBITMQ_URL)
-    rmq_channel = await rmq_connection.channel()
-    await rmq_channel.declare_queue("raw_signals", durable=True)
-    await rmq_channel.declare_queue("incidents", durable=True)
+    max_retries = 10
+    for attempt in range(1, max_retries + 1):
+        try:
+            rmq_connection = await aio_pika.connect_robust(RABBITMQ_URL)
+            rmq_channel = await rmq_connection.channel()
+            await rmq_channel.declare_queue("raw_signals", durable=True)
+            await rmq_channel.declare_queue("incidents", durable=True)
+            print(f"RabbitMQ connected successfully on attempt {attempt}.")
+            break
+        except Exception as e:
+            print(f"RabbitMQ connection attempt {attempt}/{max_retries} failed: {e}")
+            if attempt == max_retries:
+                raise RuntimeError(f"Could not connect to RabbitMQ after {max_retries} attempts") from e
+            await asyncio.sleep(min(2 ** attempt, 30))  # Exponential backoff, max 30s
     
     asyncio.create_task(log_throughput())
     print("IMS Ingestion Engine Started with PostgreSQL, Redis & RabbitMQ.")
