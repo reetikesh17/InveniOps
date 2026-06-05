@@ -1,5 +1,8 @@
+from api import models
+from api import models
 import asyncio
 import json
+import os
 from datetime import datetime
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -68,10 +71,10 @@ async def startup_event():
     # Initialize PostgreSQL Tables
     await init_db()
     
-    redis_client = redis.Redis(host="localhost", port=6379, db=0, decode_responses=True)
+    redis_client = os.getenv("REDIS_URL", "redis://redis:6379/0")
     
-    rmq_connection = await aio_pika.connect_robust("amqp://guest:guest@localhost/")
-    rmq_channel = await rmq_connection.channel()
+    RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
+    rmq_connection = await aio_pika.connect_robust(RABBITMQ_URL)
     
     await rmq_channel.declare_queue("raw_signals", durable=True)
     await rmq_channel.declare_queue("incidents", durable=True)
