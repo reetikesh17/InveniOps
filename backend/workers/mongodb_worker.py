@@ -27,7 +27,7 @@ async def main():
     # Connect to the exact same queue the API is publishing to
     queue = await channel.declare_queue("raw_signals", durable=True)
     
-    print("🌊 MongoDB Worker Started. Waiting for raw signals to save to the Data Lake...")
+    print("MongoDB Worker Started. Waiting for raw signals to save to the Data Lake...")
     
     # Start consuming messages
     await queue.consume(process_message)
