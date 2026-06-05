@@ -75,7 +75,7 @@ async def startup_event():
     
     RABBITMQ_URL = os.getenv("RABBITMQ_URL", "amqp://guest:guest@rabbitmq:5672/")
     rmq_connection = await aio_pika.connect_robust(RABBITMQ_URL)
-    
+    rmq_channel = await rmq_connection.channel()
     await rmq_channel.declare_queue("raw_signals", durable=True)
     await rmq_channel.declare_queue("incidents", durable=True)
     
