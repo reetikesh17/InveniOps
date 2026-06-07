@@ -65,7 +65,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ims-postgres-worker
-    command: ["python", "-m", "workers.postgres_worker"]
+    command: [ "python", "-m", "workers.postgres_worker" ]
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/ims_db
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
@@ -82,7 +82,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ims-mongodb-worker
-    command: ["python", "-m", "workers.mongodb_worker"]
+    command: [ "python", "-m", "workers.mongodb_worker" ]
     environment:
       - MONGODB_URL=mongodb://mongodb:27017
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
@@ -98,7 +98,7 @@ services:
       dockerfile: Dockerfile
     container_name: ims-frontend
     ports:
-      - "5173:80"
+      - "8080:80"
     depends_on:
       - api
 
