@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 class UserRole(str, enum.Enum):
-    ADMIN = "ADMIN"
+    ADMIN = "admin_user"
     SRE_USER = "SRE_USER"
 
 # 1. Database Connection Setup
