@@ -25,7 +25,12 @@ app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for now (restrict in production)
+    allow_origins=[
+        "https://inveniops.duckdns.org",
+        "https://inveniops-be.duckdns.org",
+        "http://localhost:5173",
+        "http://localhost:5137",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
