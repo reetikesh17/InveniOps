@@ -1,0 +1,28 @@
+name: Production Deployment
+
+# This tells GitHub to run this script every time you push to the 'main' branch
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: SSH into AWS and Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 1. Go to the project folder
+            cd /home/ubuntu/Incident_Mmgt_System_SRE_project
+            
+            # 2. Pull the newest code
+            git pull origin main
+            
+            # 3. Rebuild and restart the containers silently
+            sudo docker compose up -d --build
