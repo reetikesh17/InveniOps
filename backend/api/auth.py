@@ -36,7 +36,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Security(securi
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 # Dependency to strictly enforce Admin-only endpoints
+from api.models import UserRole
+
 def require_admin(current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") != "ADMIN":
+    if current_user.get("role") != UserRole.ADMIN.value:
         raise HTTPException(status_code=403, detail="Access denied. Administrator privileges required.")
     return current_user
