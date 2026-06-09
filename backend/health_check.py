@@ -12,7 +12,7 @@ async def check_all():
 
     # 1. PostgreSQL
     try:
-        engine = create_async_engine("postgresql+asyncpg://admin:password@localhost:5432/ims_db")
+        engine = create_async_engine("postgresql+asyncpg://postgres:postgres@localhost:5432/ims_db")
         async with engine.connect() as conn:
             users = (await conn.execute(text("SELECT count(*) FROM users"))).scalar()
             incidents = (await conn.execute(text("SELECT count(*) FROM incidents"))).scalar()

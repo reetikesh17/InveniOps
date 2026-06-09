@@ -1,6 +1,5 @@
 from api import models
 import asyncio
-import json
 import os
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -18,19 +17,18 @@ import uuid
 from api.auth import hash_password, verify_password, create_access_token, get_current_user, require_admin
 from prometheus_fastapi_instrumentator import Instrumentator
 
-Instrumentator().instrument(app).expose(app)
-
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Mission-Critical IMS Ingestion API")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
+# Prometheus metrics — must be after app is created
+Instrumentator().instrument(app).expose(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://inveniops.duckdns.org",
-        "https://inveniops-be.duckdns.org",
         "http://localhost:5173",
         "http://localhost:5137",
     ],

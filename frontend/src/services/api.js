@@ -1,7 +1,7 @@
 // src/services/api.js
 const API_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8000'
-    : 'https://inveniops-be.duckdns.org';
+    : '';
 
 // Helper function to grab the token and format the header
 const getAuthHeaders = () => {
