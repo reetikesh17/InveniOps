@@ -95,5 +95,5 @@ resource "aws_instance" "ims-production-server" {
 
 # 4. Print the new IP address when finished
 output "server_public_ip" {
-  value = aws_instance.sre_production_server.public_ip
+  value = aws_instance.ims-production-server.public_ip
 }
