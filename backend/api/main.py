@@ -16,6 +16,9 @@ import redis.asyncio as redis
 import aio_pika
 import uuid
 from api.auth import hash_password, verify_password, create_access_token, get_current_user, require_admin
+from prometheus_fastapi_instrumentator import Instrumentator
+
+Instrumentator().instrument(app).expose(app)
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Mission-Critical IMS Ingestion API")
