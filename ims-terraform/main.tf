@@ -73,11 +73,19 @@ resource "aws_security_group" "sre_control_room_sg" {
   }
 }
 
+# Create a default subnet in the default VPC (in case it was deleted)
+resource "aws_default_subnet" "default_az1" {
+  availability_zone = "us-east-1a"
+}
+
 # 3. Automate the EC2 Server
 resource "aws_instance" "ims-production-server" {
   ami           = "ami-091138d0f0d41ff90" # Ubuntu 24.04 in us-east-1 (verify this matches yours)
   instance_type = "t3.small"
   key_name      = "ims-prod-key"          # MUST match the exact name of your existing .pem key in AWS
+
+  # Use the default subnet
+  subnet_id = aws_default_subnet.default_az1.id
 
   # Attach the security group we created above
   vpc_security_group_ids = [aws_security_group.sre_control_room_sg.id]
