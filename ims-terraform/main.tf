@@ -4,8 +4,8 @@ provider "aws" {
 }
 
 # 2. Automate the Security Group (The Firewall)
-resource "aws_security_group" "launch-wizard-4" {
-  name        = "launch-wizard-4"
+resource "aws_security_group" "sre_control_room_sg" {
+  name        = "ims_security_group_automated"
   description = "Security group for SRE IMS project"
 
   ingress {
@@ -80,7 +80,7 @@ resource "aws_instance" "ims-production-server" {
   key_name      = "ims-prod-key"          # MUST match the exact name of your existing .pem key in AWS
 
   # Attach the security group we created above
-  vpc_security_group_ids = [aws_security_group.launch-wizard-4.id]
+  vpc_security_group_ids = [aws_security_group.ims_security_group_automated.id]
 
   # Automate the EBS Volume Expansion (no more ENOSPC errors!)
   root_block_device {
