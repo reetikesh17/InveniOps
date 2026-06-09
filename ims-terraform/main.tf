@@ -80,7 +80,7 @@ resource "aws_instance" "ims-production-server" {
   key_name      = "ims-prod-key"          # MUST match the exact name of your existing .pem key in AWS
 
   # Attach the security group we created above
-  vpc_security_group_ids = [aws_security_group.ims_security_group_automated.id]
+  vpc_security_group_ids = [aws_security_group.sre_control_room_sg.id]
 
   # Automate the EBS Volume Expansion (no more ENOSPC errors!)
   root_block_device {
