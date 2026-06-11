@@ -9,32 +9,32 @@ InveniOps is a SRE incident ingestion, debouncing, and tracking platform designe
 ```mermaid
 graph TD
     %% Clients & Sources
-    subgraph Signal Sources
+    subgraph signal_sources ["Signal Sources"]
         L[generate_load.py] -->|1. Ingest Alerts| API[FastAPI Ingestion Engine]
         A[External Alerts / Prometheus] -->|1. Ingest Alerts| API
     end
 
     %% Ingestion API & Cache
-    subgraph Core API (FastAPI)
+    subgraph core_api ["Core API (FastAPI)"]
         API -->|2. Check Duplicates| Redis[(Redis Debouncer)]
         Redis -.->|Debounce < 10s| API
         API -->|3. Route Raw Signal| RMQ[RabbitMQ Message Broker]
     end
 
     %% Messaging & Processing Layer
-    subgraph Message Broker (RabbitMQ)
+    subgraph message_broker ["Message Broker (RabbitMQ)"]
         RMQ -->|raw_signals queue| MW[MongoDB Data Lake Worker]
         RMQ -->|incidents queue| PW[PostgreSQL Incident Worker]
     end
 
     %% Storage Paradigm
-    subgraph Database Layer
+    subgraph database_layer ["Database Layer"]
         MW -->|4a. Insert Raw Log| Mongo[(MongoDB Data Lake)]
         PW -->|4b. Create Incident Ticket| Postgres[(PostgreSQL DB)]
     end
 
     %% SRE Access
-    subgraph SRE Control Room
+    subgraph sre_control_room ["SRE Control Room"]
         FE[React/Vite Dashboard] -->|Get Tickets| API
         API -->|Query Relational Data| Postgres
         FE -->|Submit RCA & Close Ticket| API
@@ -42,7 +42,7 @@ graph TD
     end
 
     %% Monitoring
-    subgraph Observability
+    subgraph observability_sub ["Observability"]
         Prom[Prometheus] -->|Scrape Metrics| API
         Graf[Grafana] -->|Query Visualizations| Prom
     end
