@@ -1,15 +1,16 @@
 from api import models
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from fastapi import FastAPI, Request, HTTPException, Depends
-from api.models import init_db, AsyncSessionLocal, Incident, RCA, IncidentState, User
+from api.models import init_db, AsyncSessionLocal, Incident, RCA, IncidentState, User, UserRole
 from fastapi.middleware.cors import CORSMiddleware
 import redis.asyncio as redis
 import aio_pika
@@ -45,7 +46,7 @@ class IncidentSignal(BaseModel):
     component_id: str = Field(..., description="ID of the failing component", examples=["CACHE_CLUSTER_01"])
     severity: str = Field(..., description="Severity level (e.g., P0, P1, P2)", examples=["P2"])
     message: str = Field(..., description="Error description", examples=["Redis timeout"])
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 class RCASubmission(BaseModel):
     root_cause_category: str = Field(..., description="e.g., Database, Network, Code")
@@ -57,13 +58,13 @@ class UserAuthSchema(BaseModel):
     password: str
 
 class UserRegisterSchema(UserAuthSchema):
-    role: str = "SRE_USER" 
+    role: UserRole = UserRole.SRE_USER
 
 async def log_throughput():
     global request_counter
     while True:
         await asyncio.sleep(5)
-        print(f"[{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}] Throughput: {request_counter / 5:.2f} signals/sec (Total: {request_counter} in last 5s)")
+        print(f"[{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}] Throughput: {request_counter / 5:.2f} signals/sec (Total: {request_counter} in last 5s)")
         request_counter = 0
 
 @app.on_event("startup")
@@ -102,7 +103,7 @@ async def shutdown_event():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "ims-ingestion-engine", "timestamp": datetime.utcnow()}
+    return {"status": "healthy", "service": "ims-ingestion-engine", "timestamp": datetime.now(timezone.utc).replace(tzinfo=None)}
 
 @app.post("/ingest")
 @limiter.limit("10000/minute")
@@ -141,7 +142,11 @@ async def ingest_signal(request: Request, signal: IncidentSignal):
 @app.get("/incidents")
 async def get_incidents(current_user: dict = Depends(get_current_user)):
     async with AsyncSessionLocal() as session:
-        result = await session.execute(select(Incident).order_by(Incident.created_at.desc()))
+        result = await session.execute(
+            select(Incident)
+            .options(selectinload(Incident.rca))
+            .order_by(Incident.created_at.desc())
+        )
         incidents = result.scalars().all()
         return {"incidents": incidents}
 
@@ -194,6 +199,18 @@ async def register(user_data: UserRegisterSchema):
         await session.commit()
         return {"status": "success", "message": f"User {user_data.username} created as {user_data.role}."}
 
+@app.post("/auth/reset-password")
+async def reset_password(user_data: UserAuthSchema):
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(User).where(User.username == user_data.username))
+        user = result.scalars().first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Operator username not found")
+        
+        user.hashed_password = hash_password(user_data.password)
+        await session.commit()
+        return {"status": "success", "message": f"Password reset successfully for operator {user_data.username}."}
+
 @app.post("/auth/login")
 async def login(user_data: UserAuthSchema):
     async with AsyncSessionLocal() as session:
@@ -205,4 +222,4 @@ async def login(user_data: UserAuthSchema):
         
         # Issue JWT signed with the user's role
         token = create_access_token(data={"sub": user.username, "role": user.role.value})
-        return {"access_token": token, "token_type": "bearer", "role": user.role.value}
+        return {"access_token": token, "token_type": "bearer", "role": user.role.value, "username": user.username}

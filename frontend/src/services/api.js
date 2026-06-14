@@ -22,6 +22,32 @@ export const loginUser = async (credentials) => {
     return response.json();
 };
 
+export const registerUser = async (user_data) => {
+    const response = await fetch(`${API_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user_data),
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || 'Failed to register operator');
+    }
+    return response.json();
+};
+
+export const resetPassword = async (reset_data) => {
+    const response = await fetch(`${API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reset_data),
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || 'Failed to reset password');
+    }
+    return response.json();
+};
+
 export const fetchIncidents = async () => {
     const response = await fetch(`${API_URL}/incidents`, {
         headers: getAuthHeaders(),

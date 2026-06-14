@@ -10,20 +10,23 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const token = localStorage.getItem('token');
         const role = localStorage.getItem('role');
+        const username = localStorage.getItem('username');
         if (token) {
-            setUser({ token, role });
+            setUser({ token, role, username });
         }
     }, []);
 
-    const login = (token, role) => {
+    const login = (token, role, username) => {
         localStorage.setItem('token', token);
         localStorage.setItem('role', role);
-        setUser({ token, role });
+        localStorage.setItem('username', username);
+        setUser({ token, role, username });
     };
 
     const logout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('role');
+        localStorage.removeItem('username');
         setUser(null);
     };
 

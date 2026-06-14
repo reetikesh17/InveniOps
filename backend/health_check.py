@@ -33,7 +33,7 @@ async def check_all():
         rc = aioredis.Redis(host="localhost", port=6379)
         await rc.ping()
         keys = await rc.dbsize()
-        await rc.close()
+        await rc.aclose()
         print(f"\n  [OK] Redis")
         print(f"       Keys in DB: {keys}")
     except Exception as e:
@@ -86,8 +86,8 @@ async def check_all():
     # 6. Frontend
     try:
         import urllib.request
-        req = urllib.request.urlopen("http://localhost:5173", timeout=3)
-        print(f"\n  [OK] Frontend (port 5173)")
+        req = urllib.request.urlopen("http://localhost:5137", timeout=3)
+        print(f"\n  [OK] Frontend (port 5137)")
     except Exception as e:
         print(f"\n  [FAIL] Frontend: {e}")
 

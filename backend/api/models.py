@@ -1,13 +1,13 @@
 import enum
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, ForeignKey, Enum, Text
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 class UserRole(str, enum.Enum):
-    ADMIN = "admin_user"
+    ADMIN = "ADMIN"
     SRE_USER = "SRE_USER"
 
 # 1. Database Connection Setup
@@ -35,8 +35,8 @@ class Incident(Base):
     message = Column(Text, nullable=False)
     state = Column(Enum(IncidentState), default=IncidentState.OPEN, nullable=False)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     # Relationship to the RCA table
     rca = relationship("RCA", back_populates="incident", uselist=False)
@@ -52,7 +52,7 @@ class RCA(Base):
     fix_applied = Column(Text, nullable=False)
     prevention_steps = Column(Text, nullable=False)
     
-    submitted_at = Column(DateTime, default=datetime.utcnow)
+    submitted_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     incident = relationship("Incident", back_populates="rca")
 
@@ -69,4 +69,4 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole), default=UserRole.SRE_USER, nullable=False)
     
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
