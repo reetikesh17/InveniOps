@@ -1,4 +1,5 @@
 import type { Logger } from "pino";
+import type { BufferStats } from "../services/ingestion/buffer.js";
 
 export interface ThroughputCounter {
   increment(amount?: number): void;
@@ -32,9 +33,11 @@ export function createThroughputCounter(): ThroughputCounter {
 export interface MetricsReporterOptions {
   readonly logger: Logger;
   readonly intervalMs?: number;
+  /** Pulled once per tick, not pushed — keeps this module decoupled from the buffer's internals. */
+  readonly getBufferStats?: () => BufferStats;
 }
 
-/** Logs signals/sec on a fixed interval and returns a function to stop the reporter. */
+/** Logs signals/sec (and, if provided, buffer depth/shed state) on a fixed interval; returns a function to stop it. */
 export function startMetricsReporter(
   counter: ThroughputCounter,
   options: MetricsReporterOptions,
@@ -44,7 +47,12 @@ export function startMetricsReporter(
   const timer = setInterval(() => {
     const total = counter.reset();
     const signalsPerSecond = total / (intervalMs / 1000);
-    options.logger.info({ signalsPerSecond }, "throughput");
+    const bufferStats = options.getBufferStats?.();
+
+    options.logger.info(
+      bufferStats ? { signalsPerSecond, buffer: bufferStats } : { signalsPerSecond },
+      "throughput",
+    );
   }, intervalMs);
 
   timer.unref();

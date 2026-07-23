@@ -29,3 +29,29 @@ export function isTransientPrismaError(error: unknown): boolean {
   // than retry something we can't positively classify as safe to retry.
   return false;
 }
+
+/**
+ * True for a P2002 unique-violation whose target includes the given index
+ * name. Used by the debouncer (src/services/ingestion/debouncer.ts) to
+ * recognize "another worker already created the active work item for this
+ * component" — expected, correct-path contention, not a real failure — as
+ * distinct from any other unique-constraint violation.
+ */
+export function isUniqueConstraintViolation(error: unknown, indexName: string): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+    return false;
+  }
+  const target = error.meta?.["target"];
+  if (typeof target === "string") {
+    return target.includes(indexName);
+  }
+  if (Array.isArray(target)) {
+    return target.includes(indexName);
+  }
+  // Some drivers/versions omit meta.target entirely for raw-SQL-created
+  // indexes (this one isn't expressible in schema.prisma) — a P2002 on
+  // work_items with no target info is still overwhelmingly likely to be
+  // this index, since it's the only unique constraint create/insert paths
+  // on this table can hit. Treat it as a match rather than as unclassified.
+  return target === undefined;
+}

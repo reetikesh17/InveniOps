@@ -13,7 +13,34 @@ const envSchema = z.object({
   RATE_LIMIT_IP_REFILL_PER_SECOND: z.coerce.number().int().positive().default(20),
   RATE_LIMIT_GLOBAL_CAPACITY: z.coerce.number().int().positive().default(5000),
   RATE_LIMIT_GLOBAL_REFILL_PER_SECOND: z.coerce.number().int().positive().default(2000),
-});
+  // In-memory ingestion buffer (src/services/ingestion/buffer.ts)
+  BUFFER_CAPACITY: z.coerce.number().int().positive().default(20_000),
+  BUFFER_HIGH_WATER_MARK_FRACTION: z.coerce.number().gt(0).lte(1).default(0.8),
+  BUFFER_LOW_WATER_MARK_FRACTION: z.coerce.number().gte(0).lt(1).default(0.5),
+  BUFFER_SHED_CEILING_P1_FRACTION: z.coerce.number().gt(0).lte(1).default(0.7),
+  BUFFER_SHED_CEILING_P2_FRACTION: z.coerce.number().gt(0).lte(1).default(0.4),
+  BUFFER_SHED_CEILING_P3_FRACTION: z.coerce.number().gt(0).lte(1).default(0.15),
+  BUFFER_DRAIN_BATCH_SIZE: z.coerce.number().int().positive().default(200),
+  BUFFER_DRAIN_INTERVAL_MS: z.coerce.number().int().positive().default(50),
+  BUFFER_SHUTDOWN_DRAIN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  // Signal debouncing (src/services/ingestion/debouncer.ts)
+  DEBOUNCE_WINDOW_SECONDS: z.coerce.number().int().positive().default(10),
+  DEBOUNCE_THRESHOLD: z.coerce.number().int().positive().default(100),
+  DEBOUNCE_LOCK_TTL_MS: z.coerce.number().int().positive().default(5_000),
+  DEBOUNCE_LOCK_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(1_000),
+  DEBOUNCE_LOCK_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(20),
+}).refine((env) => env.BUFFER_LOW_WATER_MARK_FRACTION < env.BUFFER_HIGH_WATER_MARK_FRACTION, {
+  message: "BUFFER_LOW_WATER_MARK_FRACTION must be less than BUFFER_HIGH_WATER_MARK_FRACTION",
+  path: ["BUFFER_LOW_WATER_MARK_FRACTION"],
+}).refine(
+  (env) =>
+    env.BUFFER_SHED_CEILING_P3_FRACTION < env.BUFFER_SHED_CEILING_P2_FRACTION &&
+    env.BUFFER_SHED_CEILING_P2_FRACTION < env.BUFFER_SHED_CEILING_P1_FRACTION,
+  {
+    message: "shed ceiling fractions must satisfy P3 < P2 < P1 — lower severities must have less headroom",
+    path: ["BUFFER_SHED_CEILING_P2_FRACTION"],
+  },
+);
 
 export interface AppConfig {
   readonly env: "development" | "test" | "production";
@@ -34,6 +61,22 @@ export interface AppConfig {
   readonly rateLimit: {
     readonly ip: { readonly capacity: number; readonly refillPerSecond: number };
     readonly global: { readonly capacity: number; readonly refillPerSecond: number };
+  };
+  readonly buffer: {
+    readonly capacity: number;
+    readonly highWaterMarkFraction: number;
+    readonly lowWaterMarkFraction: number;
+    readonly shedCeilingFractions: { readonly p1: number; readonly p2: number; readonly p3: number };
+    readonly drainBatchSize: number;
+    readonly drainIntervalMs: number;
+    readonly shutdownDrainTimeoutMs: number;
+  };
+  readonly debounce: {
+    readonly windowSeconds: number;
+    readonly threshold: number;
+    readonly lockTtlMs: number;
+    readonly lockWaitTimeoutMs: number;
+    readonly lockPollIntervalMs: number;
   };
 }
 
@@ -70,6 +113,26 @@ function loadConfig(): AppConfig {
         capacity: env.RATE_LIMIT_GLOBAL_CAPACITY,
         refillPerSecond: env.RATE_LIMIT_GLOBAL_REFILL_PER_SECOND,
       }),
+    }),
+    buffer: Object.freeze({
+      capacity: env.BUFFER_CAPACITY,
+      highWaterMarkFraction: env.BUFFER_HIGH_WATER_MARK_FRACTION,
+      lowWaterMarkFraction: env.BUFFER_LOW_WATER_MARK_FRACTION,
+      shedCeilingFractions: Object.freeze({
+        p1: env.BUFFER_SHED_CEILING_P1_FRACTION,
+        p2: env.BUFFER_SHED_CEILING_P2_FRACTION,
+        p3: env.BUFFER_SHED_CEILING_P3_FRACTION,
+      }),
+      drainBatchSize: env.BUFFER_DRAIN_BATCH_SIZE,
+      drainIntervalMs: env.BUFFER_DRAIN_INTERVAL_MS,
+      shutdownDrainTimeoutMs: env.BUFFER_SHUTDOWN_DRAIN_TIMEOUT_MS,
+    }),
+    debounce: Object.freeze({
+      windowSeconds: env.DEBOUNCE_WINDOW_SECONDS,
+      threshold: env.DEBOUNCE_THRESHOLD,
+      lockTtlMs: env.DEBOUNCE_LOCK_TTL_MS,
+      lockWaitTimeoutMs: env.DEBOUNCE_LOCK_WAIT_TIMEOUT_MS,
+      lockPollIntervalMs: env.DEBOUNCE_LOCK_POLL_INTERVAL_MS,
     }),
   });
 }

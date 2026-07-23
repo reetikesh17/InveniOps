@@ -2,9 +2,9 @@ import { ComponentType, Severity } from "@prisma/client";
 import { z } from "zod";
 
 // signalId is optional: most producers won't have one, and the ingestion
-// API assigns one at receipt time (see ingestion/signalBuffer.ts). It's
-// accepted when supplied so a source system's own event ID can be
-// preserved as the canonical signalId for downstream idempotency/dedup.
+// route (signals.ts) assigns one at receipt time if absent. It's accepted
+// when supplied so a source system's own event ID can be preserved as the
+// canonical signalId for downstream idempotency/dedup.
 export const signalInputSchema = z.object({
   signalId: z.string().min(1).max(200).optional(),
   componentId: z.string().min(1).max(200),

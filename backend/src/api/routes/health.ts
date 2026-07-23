@@ -1,15 +1,18 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { prisma, getMongoDb, redis } from "../../repositories/clients.js";
+import type { BufferStats } from "../../services/ingestion/buffer.js";
+import { signalBuffer } from "../../services/ingestion/signalBufferInstance.js";
 
 type DependencyStatus = "up" | "down";
 
 interface HealthResponseBody {
-  status: "healthy" | "unhealthy";
+  status: "healthy" | "degraded" | "unhealthy";
   dependencies: {
     postgres: DependencyStatus;
     mongo: DependencyStatus;
     redis: DependencyStatus;
   };
+  buffer: BufferStats;
 }
 
 async function checkPostgres(): Promise<DependencyStatus> {
@@ -48,11 +51,15 @@ async function handleHealthCheck(res: Response<HealthResponseBody>): Promise<voi
 
   const dependencies = { postgres, mongo, redis: redisStatus };
   const allUp = Object.values(dependencies).every((status) => status === "up");
+  const buffer = signalBuffer.getStats();
 
-  res.status(allUp ? 200 : 503).json({
-    status: allUp ? "healthy" : "unhealthy",
-    dependencies,
-  });
+  // Shedding isn't a dependency outage — the service is still serving
+  // traffic (P0 still gets through), just under pressure. 200, not 503, so
+  // load balancers keep routing to it; "degraded" is there for whoever's
+  // watching to notice.
+  const status = !allUp ? "unhealthy" : buffer.state === "shedding" ? "degraded" : "healthy";
+
+  res.status(allUp ? 200 : 503).json({ status, dependencies, buffer });
 }
 
 export const healthRouter = Router();

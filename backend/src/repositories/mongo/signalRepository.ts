@@ -11,6 +11,9 @@ export interface SignalDocument {
   readonly componentType: string;
   readonly severity: string;
   readonly rawPayload: unknown;
+  /** When the signal source says the underlying event happened — client-reported, may lag or skew. */
+  readonly occurredAt: Date;
+  /** When the ingestion API actually received it — server-controlled. */
   readonly receivedAt: Date;
   readonly workItemId: string | null;
 }

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { config } from "../../config/index.js";
 import { redis } from "../../repositories/clients.js";
 import { throughputCounter } from "../../utils/metrics.js";
-import { bufferSignal, type IngestionSignal } from "../../ingestion/signalBuffer.js";
+import type { IngestionSignal } from "../../services/ingestion/buffer.js";
+import { signalBuffer } from "../../services/ingestion/signalBufferInstance.js";
 import { checkTokenBuckets, secondsUntilAvailable, type TokenBucketResult } from "../../rateLimit/tokenBucket.js";
 import { parseSignalBatch, type ValidationFieldError } from "./signalValidation.js";
 
@@ -13,6 +14,8 @@ interface ErrorResponseBody {
   readonly error: string;
   readonly message: string;
   readonly details?: readonly ValidationFieldError[];
+  readonly accepted?: number;
+  readonly dropped?: number;
 }
 
 interface IngestResponseBody {
@@ -30,20 +33,40 @@ function setRateLimitHeaders(res: Response, result: TokenBucketResult): void {
 }
 
 /**
- * Buffers every signal (currently a no-op stub, see ingestion/signalBuffer.ts)
- * and reports 503 if any of them were shed for buffer saturation.
- * Returns true if the caller should stop (a 503 was already sent).
+ * Submits every signal to the in-memory buffer (src/services/ingestion/buffer.ts).
+ * If any of them were dropped (shed under backpressure, or the buffer is at
+ * hard capacity), the whole request is rejected with 503 — the ones that
+ * did get in are already safely buffered, so a retry of the full batch is
+ * safe, if possibly duplicative. Returns the accepted subset, or undefined
+ * if a 503 was already sent.
  */
-function bufferOrReject(res: Response<IngestResponseBody | ErrorResponseBody>, signals: readonly IngestionSignal[]): boolean {
-  const results = signals.map((signal) => bufferSignal(signal));
-  const isSaturated = results.some((result) => !result.accepted);
+function submitOrReject(
+  res: Response<IngestResponseBody | ErrorResponseBody>,
+  signals: readonly IngestionSignal[],
+): readonly IngestionSignal[] | undefined {
+  const accepted: IngestionSignal[] = [];
+  let dropped = 0;
 
-  if (isSaturated) {
-    res.status(503).json({ error: "buffer_saturated", message: "ingestion buffer is saturated, try again shortly" });
-    return true;
+  for (const signal of signals) {
+    const result = signalBuffer.submit(signal);
+    if (result.accepted) {
+      accepted.push(signal);
+    } else {
+      dropped += 1;
+    }
   }
 
-  return false;
+  if (dropped > 0) {
+    res.status(503).json({
+      error: "buffer_saturated",
+      message: "ingestion buffer is saturated, try again shortly",
+      accepted: accepted.length,
+      dropped,
+    });
+    return undefined;
+  }
+
+  return accepted;
 }
 
 async function handleIngest(
@@ -100,18 +123,16 @@ async function handleIngest(
     receivedAt,
   }));
 
-  if (bufferOrReject(res, ingestionSignals)) {
+  const accepted = submitOrReject(res, ingestionSignals);
+  if (!accepted) {
     return;
   }
 
-  // Counted here, not inside the stub — the stub is a placeholder for
-  // buffering, but "accepted" for throughput purposes means "acked to the
-  // caller", which happens regardless of what the buffer eventually does.
-  throughputCounter.increment(ingestionSignals.length);
+  throughputCounter.increment(accepted.length);
 
   res.status(202).json({
-    accepted: ingestionSignals.length,
-    signalIds: ingestionSignals.map((signal) => signal.signalId),
+    accepted: accepted.length,
+    signalIds: accepted.map((signal) => signal.signalId),
   });
 }
 
@@ -181,13 +202,14 @@ function handleBulkTest(req: Request, res: Response<IngestResponseBody | ErrorRe
     generateSyntheticSignal(index, { componentId, componentType, severity }, now),
   );
 
-  if (bufferOrReject(res, signals)) {
+  const accepted = submitOrReject(res, signals);
+  if (!accepted) {
     return;
   }
 
-  throughputCounter.increment(signals.length);
+  throughputCounter.increment(accepted.length);
 
-  res.status(202).json({ accepted: signals.length });
+  res.status(202).json({ accepted: accepted.length });
 }
 
 export const signalsRouter = Router();

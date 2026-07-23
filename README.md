@@ -156,9 +156,20 @@ InveniOps/
 
 ## Backpressure Handling
 
-**TODO (Phase 2):** document the in-memory buffer's overflow policy, how the ingestion
-API sheds or delays load under sustained 10k signals/sec bursts, and how BullMQ backlog
-is monitored/bounded.
+Full design writeup: [docs/backpressure.md](docs/backpressure.md).
+
+In short: `POST /api/v1/signals` never blocks on Postgres, Mongo, or Redis — it hands
+each signal to a bounded in-memory buffer (`src/services/ingestion/buffer.ts`) and acks
+immediately. The buffer is four fixed-capacity ring buffers, one per severity, sharing
+one hard capacity so memory usage is a fixed, known constant regardless of arrival
+rate. A high/low watermark pair (with hysteresis) decides when to start and stop
+shedding; while shedding, each non-P0 severity is capped at a configurable fraction of
+total capacity — smallest for P3, largest for P1 — so low-severity signals run out of
+room and get dropped first, while P0 is never ceiling-shed. Every drop is counted by
+severity and reason and surfaced on `GET /health` and the 5-second console report — no
+signal is ever silently lost. A consumer loop drains batches in strict priority order to
+a pluggable sink (a stub today; BullMQ wiring is later work), and a graceful-shutdown
+hook drains the buffer before the process exits.
 
 ## API Reference
 

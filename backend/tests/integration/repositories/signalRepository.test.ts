@@ -34,6 +34,7 @@ function makeSignal(overrides: Partial<SignalDocument> = {}): SignalDocument {
     componentType: "CACHE",
     severity: "P2",
     rawPayload: { message: "connection refused" },
+    occurredAt: new Date("2026-01-01T00:00:00.000Z"),
     receivedAt: new Date("2026-01-01T00:00:00.000Z"),
     workItemId: null,
     ...overrides,
