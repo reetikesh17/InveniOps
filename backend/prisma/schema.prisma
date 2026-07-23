@@ -1,0 +1,23 @@
+// Bootstrap-only schema: just enough for `prisma generate` to produce a
+// PrismaClient for connectivity checks (see src/api/routes/health.ts).
+// The actual WorkItem / RcaRecord / StateTransition models are a separate
+// design decision still awaiting approval — do not add models here until
+// that schema is confirmed.
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+/// Placeholder — Prisma refuses to generate a client with zero models.
+/// Not used anywhere in application code. Delete this once the real
+/// WorkItem / RcaRecord / StateTransition schema is approved and added.
+model BootstrapPlaceholder {
+  id Int @id @default(autoincrement())
+
+  @@map("_bootstrap_placeholder")
+}
