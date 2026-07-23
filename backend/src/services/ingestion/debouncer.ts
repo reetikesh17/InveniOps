@@ -32,6 +32,20 @@ export interface DebounceResult {
   readonly created: boolean;
 }
 
+/** Pure field mapping — shared by the debouncer's own persistence and the worker's bulk path. */
+export function signalToDocument(signal: IngestionSignal, workItemId: string | null): SignalDocument {
+  return {
+    signalId: signal.signalId,
+    componentId: signal.componentId,
+    componentType: signal.componentType,
+    severity: signal.severity,
+    rawPayload: signal.rawPayload,
+    occurredAt: signal.occurredAt,
+    receivedAt: signal.receivedAt,
+    workItemId,
+  };
+}
+
 export interface SignalDebouncerOptions {
   /** How long a Redis-cached session is trusted before re-verifying against Postgres. */
   readonly windowSeconds: number;
@@ -80,10 +94,37 @@ export class SignalDebouncer {
     private readonly options: SignalDebouncerOptions,
   ) {}
 
+  /** Resolves and persists one signal — decision plus the Mongo insert and Postgres increment. */
   async processSignal(signal: IngestionSignal): Promise<DebounceResult> {
+    const result = await this.resolve(signal);
+    await this.persist(signal, result);
+    return result;
+  }
+
+  /**
+   * Resolves a whole batch's work-item associations — decision only, no
+   * Mongo/Postgres writes. Used by the worker (src/workers/), which does
+   * its own bulk-insert + grouped-increment pass over the results instead
+   * of N individual round trips per signal; see processBatch.ts for why
+   * (and why that requires the decision + persistence steps to be
+   * separable in the first place).
+   */
+  async resolveBatch(signals: readonly IngestionSignal[]): Promise<readonly DebounceResult[]> {
+    const results: DebounceResult[] = [];
+    for (const signal of signals) {
+      results.push(await this.resolve(signal));
+    }
+    return results;
+  }
+
+  private async persist(signal: IngestionSignal, result: DebounceResult): Promise<void> {
+    await this.signalStore.insertMany([signalToDocument(signal, result.workItemId)]);
+    await this.workItemStore.incrementSignalCount(result.workItemId, 1);
+  }
+
+  private async resolve(signal: IngestionSignal): Promise<DebounceResult> {
     const cached = await this.readValidSession(signal.componentId);
     if (cached) {
-      await this.linkSignal(cached.workItemId, signal);
       await this.bumpSessionCount(signal.componentId);
       return { workItemId: cached.workItemId, created: false };
     }
@@ -109,7 +150,6 @@ export class SignalDebouncer {
 
     const waited = await this.pollForSession(componentId);
     if (waited) {
-      await this.linkSignal(waited.workItemId, signal);
       await this.bumpSessionCount(componentId);
       return { workItemId: waited.workItemId, created: false };
     }
@@ -127,14 +167,12 @@ export class SignalDebouncer {
 
     if (existing) {
       await this.seedSession(componentId, existing.id);
-      await this.linkSignal(existing.id, signal);
       return { workItemId: existing.id, created: false };
     }
 
     try {
       const created = await this.workItemStore.createWorkItem(this.toCreateInput(signal));
       await this.seedSession(componentId, created.id);
-      await this.signalStore.insertMany([this.toSignalDocument(signal, created.id)]);
       return { workItemId: created.id, created: true };
     } catch (error) {
       if (!this.isConflictError(error)) {
@@ -150,14 +188,8 @@ export class SignalDebouncer {
         );
       }
       await this.seedSession(componentId, winner.id);
-      await this.linkSignal(winner.id, signal);
       return { workItemId: winner.id, created: false };
     }
-  }
-
-  private async linkSignal(workItemId: string, signal: IngestionSignal): Promise<void> {
-    await this.signalStore.insertMany([this.toSignalDocument(signal, workItemId)]);
-    await this.workItemStore.incrementSignalCount(workItemId, 1);
   }
 
   private async pollForSession(componentId: string): Promise<Session | null> {
@@ -217,19 +249,16 @@ export class SignalDebouncer {
       // RCA validation both anchor on this timestamp, and a client-supplied
       // one is trusted input, not a safe basis for it.
       firstSignalAt: signal.receivedAt,
-    };
-  }
-
-  private toSignalDocument(signal: IngestionSignal, workItemId: string | null): SignalDocument {
-    return {
-      signalId: signal.signalId,
-      componentId: signal.componentId,
-      componentType: signal.componentType,
-      severity: signal.severity,
-      rawPayload: signal.rawPayload,
-      occurredAt: signal.occurredAt,
-      receivedAt: signal.receivedAt,
-      workItemId,
+      // 0, not the schema's default of 1: persist() always increments by 1
+      // for every signal it durably persists — including the one that
+      // triggered creation — so counting starts uniformly from zero here.
+      // This is what makes the worker's batch persistence idempotent under
+      // retry without needing to special-case "the creating signal": the
+      // only thing that ever adds to the count is "a signal was newly
+      // written to Mongo," never "a signal happened to create the work
+      // item," which stops being knowable once a job crosses a retry
+      // boundary (see processBatch.ts).
+      signalCount: 0,
     };
   }
 

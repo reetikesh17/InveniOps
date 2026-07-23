@@ -29,6 +29,13 @@ const envSchema = z.object({
   DEBOUNCE_LOCK_TTL_MS: z.coerce.number().int().positive().default(5_000),
   DEBOUNCE_LOCK_WAIT_TIMEOUT_MS: z.coerce.number().int().positive().default(1_000),
   DEBOUNCE_LOCK_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(20),
+  // Async signal-processing queue (src/workers/)
+  QUEUE_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
+  QUEUE_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
+  QUEUE_BACKOFF_DELAY_MS: z.coerce.number().int().positive().default(1_000),
+  QUEUE_REMOVE_ON_COMPLETE_COUNT: z.coerce.number().int().positive().default(1_000),
+  QUEUE_REMOVE_ON_FAIL_COUNT: z.coerce.number().int().positive().default(1_000),
+  QUEUE_SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
 }).refine((env) => env.BUFFER_LOW_WATER_MARK_FRACTION < env.BUFFER_HIGH_WATER_MARK_FRACTION, {
   message: "BUFFER_LOW_WATER_MARK_FRACTION must be less than BUFFER_HIGH_WATER_MARK_FRACTION",
   path: ["BUFFER_LOW_WATER_MARK_FRACTION"],
@@ -77,6 +84,14 @@ export interface AppConfig {
     readonly lockTtlMs: number;
     readonly lockWaitTimeoutMs: number;
     readonly lockPollIntervalMs: number;
+  };
+  readonly queue: {
+    readonly workerConcurrency: number;
+    readonly maxAttempts: number;
+    readonly backoffDelayMs: number;
+    readonly removeOnCompleteCount: number;
+    readonly removeOnFailCount: number;
+    readonly shutdownTimeoutMs: number;
   };
 }
 
@@ -133,6 +148,14 @@ function loadConfig(): AppConfig {
       lockTtlMs: env.DEBOUNCE_LOCK_TTL_MS,
       lockWaitTimeoutMs: env.DEBOUNCE_LOCK_WAIT_TIMEOUT_MS,
       lockPollIntervalMs: env.DEBOUNCE_LOCK_POLL_INTERVAL_MS,
+    }),
+    queue: Object.freeze({
+      workerConcurrency: env.QUEUE_WORKER_CONCURRENCY,
+      maxAttempts: env.QUEUE_MAX_ATTEMPTS,
+      backoffDelayMs: env.QUEUE_BACKOFF_DELAY_MS,
+      removeOnCompleteCount: env.QUEUE_REMOVE_ON_COMPLETE_COUNT,
+      removeOnFailCount: env.QUEUE_REMOVE_ON_FAIL_COUNT,
+      shutdownTimeoutMs: env.QUEUE_SHUTDOWN_TIMEOUT_MS,
     }),
   });
 }

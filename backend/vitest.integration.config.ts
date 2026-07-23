@@ -15,5 +15,6 @@ export default defineConfig({
     // file's still-running test depends on. Force files to run one at a
     // time; within a file, tests are still fast enough sequentially.
     fileParallelism: false,
+    setupFiles: ["./tests/integration/setupEnv.ts"],
   },
 });

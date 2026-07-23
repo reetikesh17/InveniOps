@@ -166,6 +166,7 @@ export class SignalBuffer {
   private state: BufferState = "normal";
   private timer: NodeJS.Timeout | undefined;
   private draining = false;
+  private sink: SignalSink;
 
   constructor(private readonly options: SignalBufferOptions) {
     this.queues = {
@@ -174,6 +175,20 @@ export class SignalBuffer {
       [Severity.P2]: new RingBuffer(options.capacity),
       [Severity.P3]: new RingBuffer(options.capacity),
     };
+    this.sink = options.sink;
+  }
+
+  /**
+   * Swaps the sink after construction — needed because the real sink (a
+   * BullMQ producer, see src/workers/bullMqSink.ts) needs a live Redis
+   * connection and is only safe to construct after src/index.ts's
+   * connectClients() has run, while this buffer's singleton
+   * (signalBufferInstance.ts) is constructed eagerly at module load with
+   * noopSignalSink. index.ts calls this once during bootstrap, before
+   * start().
+   */
+  setSink(sink: SignalSink): void {
+    this.sink = sink;
   }
 
   get totalSize(): number {
@@ -283,7 +298,7 @@ export class SignalBuffer {
     this.recomputeState();
 
     try {
-      await this.options.sink.drain(batch);
+      await this.sink.drain(batch);
       return { drained: batch.length, failed: 0 };
     } catch (error) {
       for (const signal of batch) {
