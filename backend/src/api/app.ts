@@ -9,6 +9,7 @@ import cors from "cors";
 import { httpLogger } from "../utils/logger.js";
 import { healthRouter } from "./routes/health.js";
 import { signalsRouter } from "./routes/signals.js";
+import { workitemsRouter } from "./routes/workitems.js";
 
 export function createApp(): Express {
   const app = express();
@@ -20,6 +21,7 @@ export function createApp(): Express {
 
   app.use("/health", healthRouter);
   app.use("/api/v1/signals", signalsRouter);
+  app.use("/api/v1/incidents", workitemsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

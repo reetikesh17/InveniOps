@@ -36,6 +36,11 @@ const envSchema = z.object({
   QUEUE_REMOVE_ON_COMPLETE_COUNT: z.coerce.number().int().positive().default(1_000),
   QUEUE_REMOVE_ON_FAIL_COUNT: z.coerce.number().int().positive().default(1_000),
   QUEUE_SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  // Dashboard read path (src/services/dashboard/, src/api/routes/workitems.ts)
+  DASHBOARD_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(3_600),
+  DASHBOARD_LIST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(50),
+  DASHBOARD_LIST_MAX_LIMIT: z.coerce.number().int().positive().default(200),
+  DASHBOARD_REPOPULATE_CAP: z.coerce.number().int().positive().default(1_000),
 }).refine((env) => env.BUFFER_LOW_WATER_MARK_FRACTION < env.BUFFER_HIGH_WATER_MARK_FRACTION, {
   message: "BUFFER_LOW_WATER_MARK_FRACTION must be less than BUFFER_HIGH_WATER_MARK_FRACTION",
   path: ["BUFFER_LOW_WATER_MARK_FRACTION"],
@@ -92,6 +97,12 @@ export interface AppConfig {
     readonly removeOnCompleteCount: number;
     readonly removeOnFailCount: number;
     readonly shutdownTimeoutMs: number;
+  };
+  readonly dashboard: {
+    readonly cacheTtlSeconds: number;
+    readonly listDefaultLimit: number;
+    readonly listMaxLimit: number;
+    readonly repopulateCap: number;
   };
 }
 
@@ -156,6 +167,12 @@ function loadConfig(): AppConfig {
       removeOnCompleteCount: env.QUEUE_REMOVE_ON_COMPLETE_COUNT,
       removeOnFailCount: env.QUEUE_REMOVE_ON_FAIL_COUNT,
       shutdownTimeoutMs: env.QUEUE_SHUTDOWN_TIMEOUT_MS,
+    }),
+    dashboard: Object.freeze({
+      cacheTtlSeconds: env.DASHBOARD_CACHE_TTL_SECONDS,
+      listDefaultLimit: env.DASHBOARD_LIST_DEFAULT_LIMIT,
+      listMaxLimit: env.DASHBOARD_LIST_MAX_LIMIT,
+      repopulateCap: env.DASHBOARD_REPOPULATE_CAP,
     }),
   });
 }

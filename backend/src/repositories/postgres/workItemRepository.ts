@@ -59,7 +59,7 @@ export interface SubmitRcaResult {
   readonly rca: RcaRecord;
 }
 
-type WorkItemWithRca = WorkItem & { rca: RcaRecord | null };
+export type WorkItemWithRca = WorkItem & { rca: RcaRecord | null };
 
 async function applyGuardedTransition(
   tx: Prisma.TransactionClient,

@@ -21,7 +21,7 @@ export interface BatchWorkItemStore {
 }
 
 export interface BatchCache {
-  upsertActiveIncident(workItem: WorkItem): Promise<void>;
+  upsertActiveIncident(workItem: WorkItem): Promise<unknown>;
 }
 
 export interface ProcessBatchDeps {

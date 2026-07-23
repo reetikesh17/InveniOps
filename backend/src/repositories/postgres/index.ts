@@ -8,4 +8,5 @@ export {
   type SubmitRcaInput,
   type SubmitRcaResult,
   type Pagination,
+  type WorkItemWithRca,
 } from "./workItemRepository.js";

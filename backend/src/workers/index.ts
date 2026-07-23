@@ -42,7 +42,7 @@ export async function startWorkerSystem(): Promise<WorkerSystem> {
   // ingestion hot path via the cache-refresh step, not just RCA/detail
   // views.
   await signalStore.ensureIndexes();
-  const cache = new DashboardCacheRepository(redis);
+  const cache = new DashboardCacheRepository(redis, config.dashboard.cacheTtlSeconds);
 
   const debouncer = new SignalDebouncer(workItemStore, signalStore, redis, {
     windowSeconds: config.debounce.windowSeconds,
