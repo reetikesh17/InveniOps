@@ -1,9 +1,3 @@
-// Bootstrap-only schema: just enough for `prisma generate` to produce a
-// PrismaClient for connectivity checks (see src/api/routes/health.ts).
-// The actual WorkItem / RcaRecord / StateTransition models are a separate
-// design decision still awaiting approval — do not add models here until
-// that schema is confirmed.
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -13,11 +7,93 @@ generator client {
   provider = "prisma-client-js"
 }
 
-/// Placeholder — Prisma refuses to generate a client with zero models.
-/// Not used anywhere in application code. Delete this once the real
-/// WorkItem / RcaRecord / StateTransition schema is approved and added.
-model BootstrapPlaceholder {
-  id Int @id @default(autoincrement())
+enum ComponentType {
+  API
+  MCP_HOST
+  CACHE
+  QUEUE
+  RDBMS
+  NOSQL
+}
 
-  @@map("_bootstrap_placeholder")
+enum Severity {
+  P0
+  P1
+  P2
+  P3
+}
+
+// Named WorkItemStatus, not WorkItemState — the domain layer
+// (src/domain/state/) already has an interface named WorkItemState (the
+// State-pattern classes). Same name, different meaning; renaming the enum
+// avoids a collision the moment both are imported in the same file, which
+// is exactly what the repository layer needs to do.
+enum WorkItemStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  CLOSED
+}
+
+// Mirrors src/domain/rca/types.ts's ROOT_CAUSE_CATEGORIES exactly.
+enum RootCauseCategory {
+  CODE_DEFECT
+  INFRASTRUCTURE_FAILURE
+  CONFIGURATION_ERROR
+  CAPACITY_EXHAUSTION
+  EXTERNAL_DEPENDENCY
+  NETWORK
+  HUMAN_ERROR
+  UNKNOWN
+}
+
+model WorkItem {
+  id            String         @id @default(uuid())
+  componentId   String         @map("component_id")
+  componentType ComponentType  @map("component_type")
+  severity      Severity
+  state         WorkItemStatus @default(OPEN)
+  title         String
+  firstSignalAt DateTime       @map("first_signal_at")
+  resolvedAt    DateTime?      @map("resolved_at")
+  closedAt      DateTime?      @map("closed_at")
+  signalCount   Int            @default(1) @map("signal_count")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  rca         RcaRecord?
+  transitions StateTransition[]
+
+  @@index([state, severity, firstSignalAt], map: "idx_work_items_active_feed")
+  @@index([componentId, firstSignalAt], map: "idx_work_items_component_window")
+  @@map("work_items")
+}
+
+model RcaRecord {
+  id                   String            @id @default(uuid())
+  workItemId           String            @unique @map("work_item_id")
+  workItem             WorkItem          @relation(fields: [workItemId], references: [id])
+  incidentStartTime    DateTime          @map("incident_start_time")
+  incidentEndTime      DateTime          @map("incident_end_time")
+  rootCauseCategory    RootCauseCategory @map("root_cause_category")
+  rootCauseDescription String            @map("root_cause_description") @db.Text
+  fixApplied           String            @map("fix_applied") @db.Text
+  preventionSteps      String            @map("prevention_steps") @db.Text
+  mttrSeconds          Int               @map("mttr_seconds")
+  submittedAt          DateTime          @default(now()) @map("submitted_at")
+
+  @@map("rca_records")
+}
+
+model StateTransition {
+  id         String         @id @default(uuid())
+  workItemId String         @map("work_item_id")
+  workItem   WorkItem       @relation(fields: [workItemId], references: [id])
+  fromState  WorkItemStatus @map("from_state")
+  toState    WorkItemStatus @map("to_state")
+  actor      String
+  occurredAt DateTime       @default(now()) @map("occurred_at")
+
+  @@index([workItemId, occurredAt], map: "idx_state_transitions_work_item")
+  @@map("state_transitions")
 }

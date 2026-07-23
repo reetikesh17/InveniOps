@@ -9,10 +9,19 @@ export interface RetryOptions {
   readonly jitter?: boolean;
   /** Called before each retry sleep, useful for logging. Not called after the final attempt. */
   readonly onRetry?: (error: unknown, attempt: number, delayMs: number) => void;
+  /** Only retry when this returns true. Omitted = retry on any error (previous behavior). */
+  readonly shouldRetry?: (error: unknown) => boolean;
 }
 
 export async function retry<T>(fn: () => Promise<T>, options: RetryOptions): Promise<T> {
-  const { attempts, baseDelayMs, maxDelayMs = Number.POSITIVE_INFINITY, jitter = true, onRetry } = options;
+  const {
+    attempts,
+    baseDelayMs,
+    maxDelayMs = Number.POSITIVE_INFINITY,
+    jitter = true,
+    onRetry,
+    shouldRetry,
+  } = options;
 
   if (attempts < 1) {
     throw new Error("retry: attempts must be at least 1");
@@ -26,7 +35,8 @@ export async function retry<T>(fn: () => Promise<T>, options: RetryOptions): Pro
     } catch (error) {
       lastError = error;
 
-      if (attempt === attempts) {
+      const isRetryable = shouldRetry ? shouldRetry(error) : true;
+      if (!isRetryable || attempt === attempts) {
         break;
       }
 

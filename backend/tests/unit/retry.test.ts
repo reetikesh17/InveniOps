@@ -60,4 +60,41 @@ describe("retry", () => {
 
     expect(delays).toEqual([100, 200, 400]);
   });
+
+  it("does not retry when shouldRetry returns false, rethrowing immediately", async () => {
+    const fn = vi.fn().mockRejectedValue(new Error("non-transient"));
+
+    const promise = retry(fn, {
+      attempts: 5,
+      baseDelayMs: 10,
+      shouldRetry: () => false,
+    });
+    const assertion = expect(promise).rejects.toThrow("non-transient");
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries only errors shouldRetry approves, giving up on the first disapproved one", async () => {
+    class TransientError extends Error {}
+    class FatalError extends Error {}
+
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(new TransientError("try again"))
+      .mockRejectedValueOnce(new FatalError("stop"));
+
+    const promise = retry(fn, {
+      attempts: 5,
+      baseDelayMs: 10,
+      jitter: false,
+      shouldRetry: (error) => error instanceof TransientError,
+    });
+    const assertion = expect(promise).rejects.toThrow("stop");
+    await vi.runAllTimersAsync();
+    await assertion;
+
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
 });
