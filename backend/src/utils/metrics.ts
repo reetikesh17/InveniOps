@@ -6,6 +6,14 @@ export interface ThroughputCounter {
   reset(): number;
 }
 
+/**
+ * Shared across the process: the signals route increments it on every
+ * accepted signal, and the reporter started in src/index.ts reads it every
+ * 5s. Kept alongside the factory (still used directly by tests) rather than
+ * replacing it.
+ */
+export const throughputCounter: ThroughputCounter = createThroughputCounter();
+
 export function createThroughputCounter(): ThroughputCounter {
   let count = 0;
 

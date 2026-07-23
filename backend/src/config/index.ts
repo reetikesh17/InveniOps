@@ -6,6 +6,13 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   MONGODB_URI: z.string().url(),
   REDIS_URL: z.string().url(),
+  // Signal ingestion (src/api/routes/signals.ts)
+  INGESTION_MAX_BATCH_SIZE: z.coerce.number().int().positive().default(500),
+  INGESTION_BULK_TEST_MAX_COUNT: z.coerce.number().int().positive().default(20_000),
+  RATE_LIMIT_IP_CAPACITY: z.coerce.number().int().positive().default(50),
+  RATE_LIMIT_IP_REFILL_PER_SECOND: z.coerce.number().int().positive().default(20),
+  RATE_LIMIT_GLOBAL_CAPACITY: z.coerce.number().int().positive().default(5000),
+  RATE_LIMIT_GLOBAL_REFILL_PER_SECOND: z.coerce.number().int().positive().default(2000),
 });
 
 export interface AppConfig {
@@ -19,6 +26,14 @@ export interface AppConfig {
   };
   readonly redis: {
     readonly url: string;
+  };
+  readonly ingestion: {
+    readonly maxBatchSize: number;
+    readonly bulkTestMaxCount: number;
+  };
+  readonly rateLimit: {
+    readonly ip: { readonly capacity: number; readonly refillPerSecond: number };
+    readonly global: { readonly capacity: number; readonly refillPerSecond: number };
   };
 }
 
@@ -42,6 +57,20 @@ function loadConfig(): AppConfig {
     postgres: Object.freeze({ url: env.DATABASE_URL }),
     mongo: Object.freeze({ uri: env.MONGODB_URI }),
     redis: Object.freeze({ url: env.REDIS_URL }),
+    ingestion: Object.freeze({
+      maxBatchSize: env.INGESTION_MAX_BATCH_SIZE,
+      bulkTestMaxCount: env.INGESTION_BULK_TEST_MAX_COUNT,
+    }),
+    rateLimit: Object.freeze({
+      ip: Object.freeze({
+        capacity: env.RATE_LIMIT_IP_CAPACITY,
+        refillPerSecond: env.RATE_LIMIT_IP_REFILL_PER_SECOND,
+      }),
+      global: Object.freeze({
+        capacity: env.RATE_LIMIT_GLOBAL_CAPACITY,
+        refillPerSecond: env.RATE_LIMIT_GLOBAL_REFILL_PER_SECOND,
+      }),
+    }),
   });
 }
 

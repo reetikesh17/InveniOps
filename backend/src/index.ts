@@ -1,6 +1,6 @@
 import { config } from "./config/index.js";
 import { logger } from "./utils/logger.js";
-import { createThroughputCounter, startMetricsReporter } from "./utils/metrics.js";
+import { startMetricsReporter, throughputCounter } from "./utils/metrics.js";
 import { connectClients, registerShutdownHooks } from "./repositories/clients.js";
 import { createApp } from "./api/app.js";
 
@@ -9,7 +9,6 @@ async function main(): Promise<void> {
 
   const app = createApp();
 
-  const throughputCounter = createThroughputCounter();
   const stopMetricsReporter = startMetricsReporter(throughputCounter, { logger });
 
   const server = app.listen(config.port, () => {

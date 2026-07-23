@@ -5,3 +5,5 @@ export const TEST_DATABASE_URL: string =
   process.env.TEST_DATABASE_URL ?? "postgresql://ims_user:ims_password@localhost:5432/ims";
 
 export const TEST_MONGODB_URI: string = process.env.TEST_MONGODB_URI ?? "mongodb://localhost:27017/ims";
+
+export const TEST_REDIS_URL: string = process.env.TEST_REDIS_URL ?? "redis://localhost:6379";

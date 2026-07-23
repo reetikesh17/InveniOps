@@ -8,6 +8,7 @@ import helmet from "helmet";
 import cors from "cors";
 import { httpLogger } from "../utils/logger.js";
 import { healthRouter } from "./routes/health.js";
+import { signalsRouter } from "./routes/signals.js";
 
 export function createApp(): Express {
   const app = express();
@@ -18,6 +19,7 @@ export function createApp(): Express {
   app.use(httpLogger);
 
   app.use("/health", healthRouter);
+  app.use("/api/v1/signals", signalsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
@@ -37,6 +39,13 @@ interface ErrorResponseBody {
 function errorHandler(err: unknown, req: Request, res: Response<ErrorResponseBody>, next: NextFunction): void {
   if (res.headersSent) {
     next(err);
+    return;
+  }
+
+  // body-parser throws a SyntaxError with status 400 for malformed JSON
+  // bodies — surface that as a client error, not a 500.
+  if (err instanceof SyntaxError && (err as SyntaxError & { status?: number }).status === 400) {
+    res.status(400).json({ error: "invalid_json", message: "request body is not valid JSON" });
     return;
   }
 
