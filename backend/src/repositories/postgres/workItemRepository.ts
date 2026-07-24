@@ -217,4 +217,20 @@ export class PostgresWorkItemRepository {
       }),
     );
   }
+
+  /**
+   * Work item counts by state for one component — a real GROUP BY pushed
+   * to Postgres via Prisma's groupBy, not a findMany + count in Node.
+   * Feeds the per-component health summary (src/api/routes/analytics.ts),
+   * which composes this with the Mongo aggregation-store metrics rather
+   * than sourcing everything from one place.
+   */
+  async countByComponentIdGroupedByState(componentId: string): Promise<Readonly<Record<string, number>>> {
+    const rows = await this.prisma.workItem.groupBy({
+      by: ["state"],
+      where: { componentId },
+      _count: { _all: true },
+    });
+    return Object.fromEntries(rows.map((row) => [row.state, row._count._all]));
+  }
 }

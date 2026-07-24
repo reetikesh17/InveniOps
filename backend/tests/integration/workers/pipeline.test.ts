@@ -60,6 +60,12 @@ afterAll(async () => {
 
   await assertionPrisma.workItem.deleteMany({ where: { componentId: { startsWith: COMPONENT_PREFIX } } });
   await assertionDb.collection("signals").deleteMany({ componentId: { $regex: `^${COMPONENT_PREFIX}` } });
+  // signal_volume_metrics carries componentId as a dim, so this run's
+  // contribution is cleanly identifiable — workitem_created_metrics
+  // doesn't (by design, see docs/data-model.md), so its handful of
+  // CACHE/P2 points from this run are left for the collection's own TTL
+  // to expire, same as any other real aggregation write would be.
+  await assertionDb.collection("signal_volume_metrics").deleteMany({ "dims.componentId": { $regex: `^${COMPONENT_PREFIX}` } });
 
   await assertionPrisma.$disconnect();
   await assertionMongoClient.close();

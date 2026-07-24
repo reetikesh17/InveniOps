@@ -6,7 +6,11 @@ import { createDefaultAlertStrategyRegistry } from "../../../src/domain/alerting
 import { NotifierRegistry } from "../../../src/services/alerting/notifierRegistry.js";
 import { InMemoryNotifier } from "../../../src/services/alerting/notifiers/inMemory.js";
 import { ConsoleNotifier } from "../../../src/services/alerting/notifiers/console.js";
-import { AlertDispatcher, type AlertDispatcherOptions } from "../../../src/services/alerting/dispatcher.js";
+import {
+  AlertDispatcher,
+  type AlertDispatcherOptions,
+  type AlertDispatchMetricsWriter,
+} from "../../../src/services/alerting/dispatcher.js";
 import { createAlertMetricsRecorder } from "../../../src/utils/metrics.js";
 import { TEST_REDIS_URL } from "../testEnv.js";
 
@@ -56,7 +60,11 @@ function buildChannels(shouldFail: (name: string) => boolean = () => false): Cha
 
 const DEFAULT_OPTIONS: AlertDispatcherOptions = { maxAttempts: 2, backoffDelayMs: 5, suppressionWindowSeconds: 60 };
 
-function buildDispatcher(channels: Channels, options: AlertDispatcherOptions = DEFAULT_OPTIONS): AlertDispatcher {
+function buildDispatcher(
+  channels: Channels,
+  options: AlertDispatcherOptions = DEFAULT_OPTIONS,
+  metricsWriterProvider?: () => AlertDispatchMetricsWriter | undefined,
+): AlertDispatcher {
   return new AlertDispatcher(
     createDefaultAlertStrategyRegistry(),
     channels.registry,
@@ -64,7 +72,24 @@ function buildDispatcher(channels: Channels, options: AlertDispatcherOptions = D
     options,
     createAlertMetricsRecorder(),
     noopLogger,
+    metricsWriterProvider,
   );
+}
+
+interface RecordedDispatch {
+  readonly channel: string;
+  readonly outcome: "delivered" | "failed";
+}
+
+function fakeMetricsWriter(): AlertDispatchMetricsWriter & { readonly recorded: RecordedDispatch[] } {
+  const recorded: RecordedDispatch[] = [];
+  return {
+    recorded,
+    recordAlertDispatches(points: readonly { channel: string; outcome: "delivered" | "failed" }[]): Promise<void> {
+      recorded.push(...points.map((p) => ({ channel: p.channel, outcome: p.outcome })));
+      return Promise.resolve();
+    },
+  };
 }
 
 describe("AlertDispatcher", () => {
@@ -166,6 +191,35 @@ describe("AlertDispatcher", () => {
     ]);
 
     expect(channels.slack.sent).toHaveLength(1);
+  });
+
+  it("records a delivered/failed metrics point per channel via the metrics writer provider", async () => {
+    const channels = buildChannels((name) => name === "pagerduty");
+    const metricsWriter = fakeMetricsWriter();
+    const dispatcher = buildDispatcher(channels, DEFAULT_OPTIONS, () => metricsWriter);
+    const workItem = makeWorkItem({ componentType: ComponentType.API }); // channels: pagerduty (fails), slack (succeeds)
+
+    await dispatcher.dispatch(workItem, "created");
+
+    expect(metricsWriter.recorded).toEqual(
+      expect.arrayContaining([
+        { channel: "console", outcome: "delivered" },
+        { channel: "slack", outcome: "delivered" },
+        { channel: "pagerduty", outcome: "failed" },
+      ]),
+    );
+  });
+
+  it("never throws when the provided metrics writer itself throws", async () => {
+    const channels = buildChannels();
+    const throwingWriter: AlertDispatchMetricsWriter = {
+      recordAlertDispatches: (): Promise<void> => Promise.reject(new Error("metrics store down")),
+    };
+    const dispatcher = buildDispatcher(channels, DEFAULT_OPTIONS, () => throwingWriter);
+    const workItem = makeWorkItem({ componentType: ComponentType.CACHE });
+
+    await expect(dispatcher.dispatch(workItem, "created")).resolves.toBeUndefined();
+    expect(channels.slack.sent).toHaveLength(1); // delivery itself was unaffected
   });
 
   describe("dispatchEscalation", () => {

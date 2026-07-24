@@ -14,6 +14,7 @@ import {
 import type { Notifier } from "./notifiers/types.js";
 import type { NotifierRegistry } from "./notifierRegistry.js";
 import { claimAlertDelivery, claimEscalationLevel } from "./suppression.js";
+import type { AlertDispatchPoint } from "../../repositories/metrics/index.js";
 
 export type AlertEventType = "created" | WorkItemStateName;
 
@@ -35,6 +36,11 @@ export interface AlertDispatcherOptions {
   readonly maxAttempts: number;
   readonly backoffDelayMs: number;
   readonly suppressionWindowSeconds: number;
+}
+
+/** Never throws — see src/services/aggregation/metricsWriter.ts. */
+export interface AlertDispatchMetricsWriter {
+  recordAlertDispatches(points: readonly AlertDispatchPoint[]): Promise<void>;
 }
 
 function toContext(workItem: WorkItem): AlertContext {
@@ -74,6 +80,15 @@ export class AlertDispatcher {
     private readonly options: AlertDispatcherOptions,
     private readonly metrics?: AlertMetricsRecorder,
     private readonly logger?: Pick<Logger, "info" | "warn" | "error">,
+    // A *provider*, not a MetricsWriter instance directly: this class is
+    // constructed eagerly at module load (services/alerting/alertingInstance.ts),
+    // before src/index.ts's connectClients() has run, but the real
+    // MetricsWriter needs a live Mongo connection (see
+    // services/aggregation/aggregationInstance.ts). Deferring resolution to
+    // dispatch time — well after boot — sidesteps that ordering problem
+    // without making this class eager about a dependency it doesn't need
+    // until the first alert actually goes out.
+    private readonly metricsWriterProvider?: () => AlertDispatchMetricsWriter | undefined,
   ) {}
 
   async dispatch(workItem: WorkItem, eventType: AlertEventType): Promise<void> {
@@ -151,14 +166,34 @@ export class AlertDispatcher {
         baseDelayMs: this.options.backoffDelayMs,
       });
       this.metrics?.recordDeliverySuccess(notifier.name);
+      await this.recordDispatchMetric(notifier.name, "delivered");
     } catch (error) {
       this.metrics?.recordDeliveryFailure(notifier.name);
+      await this.recordDispatchMetric(notifier.name, "failed");
       this.logger?.error(
         { error, channel: notifier.name, workItemId },
         "alert delivery failed after exhausting retries",
       );
       // Swallow — never rethrow. One channel failing must never affect the
       // others (this runs inside a Promise.all) or the caller.
+    }
+  }
+
+  /**
+   * The real MetricsWriter never throws (it drops and logs internally),
+   * but this guarantee shouldn't depend on that discipline holding for
+   * every possible implementation of the interface — wrapped here too, so
+   * a misbehaving metrics writer still can't affect alert delivery.
+   */
+  private async recordDispatchMetric(channel: string, outcome: "delivered" | "failed"): Promise<void> {
+    const writer = this.metricsWriterProvider?.();
+    if (!writer) {
+      return;
+    }
+    try {
+      await writer.recordAlertDispatches([{ ts: new Date(), channel, outcome }]);
+    } catch (error) {
+      this.logger?.error({ error, channel }, "alert dispatch metrics write failed unexpectedly");
     }
   }
 }

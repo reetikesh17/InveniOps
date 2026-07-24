@@ -4,6 +4,7 @@ import {
   WorkflowService,
   type WorkItemWorkflowStore,
   type WorkflowCache,
+  type WorkflowMetricsWriter,
 } from "../../../../src/services/workitems/workflowService.js";
 import type {
   TransitionStateInput,
@@ -12,6 +13,7 @@ import type {
 } from "../../../../src/repositories/postgres/workItemRepository.js";
 import type { WorkItemWithRca } from "../../../../src/repositories/postgres/index.js";
 import { OptimisticConcurrencyError } from "../../../../src/repositories/postgres/index.js";
+import type { MttrPoint, StateTransitionPoint } from "../../../../src/repositories/metrics/index.js";
 
 const FIRST_SIGNAL_AT = new Date("2026-01-01T00:00:00.000Z");
 const VALID_TEXT = "Restarted the connection pool after exhausting max connections.";
@@ -138,6 +140,26 @@ function fakeDispatcher(): { dispatch(workItem: WorkItem, eventType: string): Pr
   };
 }
 
+function fakeMetricsWriter(): WorkflowMetricsWriter & {
+  readonly transitionCalls: StateTransitionPoint[][];
+  readonly mttrCalls: MttrPoint[][];
+} {
+  const transitionCalls: StateTransitionPoint[][] = [];
+  const mttrCalls: MttrPoint[][] = [];
+  return {
+    transitionCalls,
+    mttrCalls,
+    recordStateTransitions(points: readonly StateTransitionPoint[]): Promise<void> {
+      transitionCalls.push([...points]);
+      return Promise.resolve();
+    },
+    recordMttr(points: readonly MttrPoint[]): Promise<void> {
+      mttrCalls.push([...points]);
+      return Promise.resolve();
+    },
+  };
+}
+
 describe("WorkflowService.transitionWorkItem", () => {
   it("transitions OPEN -> INVESTIGATING and writes through to the cache", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }));
@@ -199,6 +221,30 @@ describe("WorkflowService.transitionWorkItem", () => {
 
     expect(result.outcome).toBe("conflict");
   });
+
+  it("records a state-transition metrics point with time-in-state measured from the prior updatedAt", async () => {
+    const enteredOpenAt = new Date("2026-01-01T00:00:00.000Z");
+    const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN, updatedAt: enteredOpenAt }));
+    const metricsWriter = fakeMetricsWriter();
+    const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), metricsWriter);
+    const now = new Date("2026-01-01T00:10:00.000Z"); // 10 minutes later
+
+    await service.transitionWorkItem("wi-1", "INVESTIGATING", "alice", now);
+
+    expect(metricsWriter.transitionCalls).toEqual([
+      [{ ts: now, fromState: "OPEN", toState: "INVESTIGATING", timeInStateMs: 10 * 60 * 1000 }],
+    ]);
+  });
+
+  it("does not record a metrics point for a rejected (illegal) transition", async () => {
+    const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }));
+    const metricsWriter = fakeMetricsWriter();
+    const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), metricsWriter);
+
+    await service.transitionWorkItem("wi-1", "RESOLVED", "alice");
+
+    expect(metricsWriter.transitionCalls).toHaveLength(0);
+  });
 });
 
 describe("WorkflowService.submitIncidentRca", () => {
@@ -253,6 +299,45 @@ describe("WorkflowService.submitIncidentRca", () => {
     expect(dispatcher.calls).toHaveLength(1);
     expect(dispatcher.calls[0]?.workItem.id).toBe("wi-1");
     expect(dispatcher.calls[0]?.eventType).toBe("CLOSED");
+  });
+
+  it("records both a RESOLVED->CLOSED state-transition point and an MTTR point on close", async () => {
+    const resolvedAt = new Date("2026-01-01T02:00:00.000Z");
+    const store = fakeWorkItemStore(
+      makeWorkItem({ state: WorkItemStatus.RESOLVED, firstSignalAt: FIRST_SIGNAL_AT, updatedAt: resolvedAt }),
+    );
+    const metricsWriter = fakeMetricsWriter();
+    const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), metricsWriter);
+    const submittedAt = new Date("2026-01-01T02:30:00.000Z"); // 2.5h after firstSignalAt, 30min after resolvedAt
+
+    const result = await service.submitIncidentRca("wi-1", validRcaInput(), "alice", submittedAt);
+
+    expect(result.outcome).toBe("closed");
+    expect(metricsWriter.transitionCalls).toEqual([
+      [{ ts: submittedAt, fromState: "RESOLVED", toState: "CLOSED", timeInStateMs: 30 * 60 * 1000 }],
+    ]);
+    expect(metricsWriter.mttrCalls).toEqual([
+      [
+        {
+          ts: submittedAt,
+          componentType: ComponentType.CACHE,
+          severity: Severity.P2,
+          componentId: "CACHE_CLUSTER_01",
+          mttrMs: 2.5 * 3600 * 1000,
+        },
+      ],
+    ]);
+  });
+
+  it("does not record metrics for a rejected RCA submission", async () => {
+    const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }));
+    const metricsWriter = fakeMetricsWriter();
+    const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), metricsWriter);
+
+    await service.submitIncidentRca("wi-1", validRcaInput(), "alice");
+
+    expect(metricsWriter.transitionCalls).toHaveLength(0);
+    expect(metricsWriter.mttrCalls).toHaveLength(0);
   });
 
   it("returns not_found for a nonexistent work item", async () => {

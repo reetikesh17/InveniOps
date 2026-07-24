@@ -4,6 +4,7 @@ import { createAlertMetricsRecorder, type AlertMetricsRecorder } from "../../uti
 import { redis, prisma } from "../../repositories/clients.js";
 import { PostgresWorkItemRepository } from "../../repositories/postgres/workItemRepository.js";
 import { createDefaultAlertStrategyRegistry } from "../../domain/alerting/index.js";
+import { getMetricsWriter } from "../aggregation/aggregationInstance.js";
 import { createNotifierRegistry } from "./notifierRegistry.js";
 import { AlertDispatcher } from "./dispatcher.js";
 import { EscalationScheduler } from "./escalationScheduler.js";
@@ -41,6 +42,12 @@ export const alertDispatcher: AlertDispatcher = new AlertDispatcher(
   },
   alertMetrics,
   logger,
+  // A provider, not getMetricsWriter() called here directly: this module
+  // is imported (and this const constructed) before connectClients() has
+  // run, but getMetricsWriter() needs a live Mongo connection — see its
+  // own comment in aggregationInstance.ts. Passing the function itself
+  // defers that call to first dispatch, well after boot.
+  getMetricsWriter,
 );
 
 export const escalationScheduler: EscalationScheduler = new EscalationScheduler(

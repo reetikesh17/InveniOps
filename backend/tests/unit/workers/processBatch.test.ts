@@ -7,10 +7,12 @@ import {
   type BatchSignalStore,
   type BatchWorkItemStore,
   type BatchCache,
+  type BatchMetricsWriter,
 } from "../../../src/workers/processBatch.js";
 import type { DebounceResult } from "../../../src/services/ingestion/debouncer.js";
 import type { IngestionSignal } from "../../../src/services/ingestion/buffer.js";
 import type { SignalDocument, InsertManyIdempotentResult } from "../../../src/repositories/mongo/signalRepository.js";
+import type { SignalVolumePoint, WorkItemCreatedPoint } from "../../../src/repositories/metrics/index.js";
 
 function makeSignal(componentId: string, overrides: Partial<IngestionSignal> = {}): IngestionSignal {
   const now = new Date("2026-01-01T00:00:00.000Z");
@@ -91,6 +93,26 @@ function fakeCache(): BatchCache & { readonly upserted: WorkItem[] } {
     upserted,
     upsertActiveIncident(workItem: WorkItem): Promise<void> {
       upserted.push(workItem);
+      return Promise.resolve();
+    },
+  };
+}
+
+function fakeMetricsWriter(): BatchMetricsWriter & {
+  readonly signalVolumeCalls: SignalVolumePoint[][];
+  readonly workItemCreatedCalls: WorkItemCreatedPoint[][];
+} {
+  const signalVolumeCalls: SignalVolumePoint[][] = [];
+  const workItemCreatedCalls: WorkItemCreatedPoint[][] = [];
+  return {
+    signalVolumeCalls,
+    workItemCreatedCalls,
+    recordSignalVolume(points: readonly SignalVolumePoint[]): Promise<void> {
+      signalVolumeCalls.push([...points]);
+      return Promise.resolve();
+    },
+    recordWorkItemsCreated(points: readonly WorkItemCreatedPoint[]): Promise<void> {
+      workItemCreatedCalls.push([...points]);
       return Promise.resolve();
     },
   };
@@ -185,5 +207,51 @@ describe("processBatch", () => {
     expect(result).toEqual({ totalSignals: 2, newlyPersisted: 0, workItemsTouched: 0 });
     expect(workItemStore.incrementCalls).toHaveLength(0);
     expect(cache.upserted).toHaveLength(0);
+  });
+
+  it("writes batched signal-volume metrics grouped by (componentId, severity), and work-item-created metrics only for newly-created work items", async () => {
+    const signalA1 = makeSignal("COMPONENT_A", { severity: Severity.P1 });
+    const signalA2 = makeSignal("COMPONENT_A", { severity: Severity.P1 });
+    const signalB1 = makeSignal("COMPONENT_B", { severity: Severity.P3 });
+
+    const signalStore = fakeSignalStore();
+    const workItemStore = fakeWorkItemStore();
+    const cache = fakeCache();
+    const metricsWriter = fakeMetricsWriter();
+
+    // Component B's resolution is "created" this batch; A's is not — proves
+    // recordWorkItemsCreated only gets the genuinely-new one, not every
+    // work item touched.
+    const debouncer: BatchDebouncer = {
+      resolveBatch(signals: readonly IngestionSignal[]): Promise<readonly DebounceResult[]> {
+        return Promise.resolve(
+          signals.map((signal) => ({
+            workItemId: signal.componentId === "COMPONENT_A" ? "work-item-a" : "work-item-b",
+            created: signal.componentId === "COMPONENT_B",
+          })),
+        );
+      },
+    };
+
+    await processBatch([signalA1, signalA2, signalB1], {
+      debouncer,
+      signalStore,
+      workItemStore,
+      cache,
+      metricsWriter,
+    });
+
+    expect(metricsWriter.signalVolumeCalls).toHaveLength(1);
+    expect(metricsWriter.signalVolumeCalls[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ componentId: "COMPONENT_A", severity: Severity.P1, count: 2 }),
+        expect.objectContaining({ componentId: "COMPONENT_B", severity: Severity.P3, count: 1 }),
+      ]),
+    );
+    expect(metricsWriter.signalVolumeCalls[0]).toHaveLength(2);
+
+    expect(metricsWriter.workItemCreatedCalls).toHaveLength(1);
+    expect(metricsWriter.workItemCreatedCalls[0]).toHaveLength(1);
+    expect(metricsWriter.workItemCreatedCalls[0]?.[0]).toMatchObject({ componentType: ComponentType.CACHE, severity: Severity.P2 });
   });
 });

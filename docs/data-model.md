@@ -89,3 +89,69 @@ now-populated (or genuinely-empty) cache. This bounds recovery to one
 extra Postgres round trip on a miss, capped at a configurable page size
 for the list-repopulation case — see that file's comments for the exact
 cap and its limitation for a pathologically large active set.
+
+## MongoDB — aggregation sink (time-series collections)
+
+Backs assignment section 2B ("Sink (Aggregations): Support timeseries
+aggregations"). Deliberately a *second* role for the same MongoDB instance
+already used as the raw signal audit log, not a new engine — see the chat
+proposal that preceded this implementation for the full comparison against
+Redis TimeSeries / TimescaleDB / a dedicated store (InfluxDB/Prometheus)
+and why native time-series collections won for this project's scope.
+Implementation: `src/repositories/metrics/metricsRepository.ts` (write +
+query), `src/services/aggregation/` (batched, drop-on-failure write path
+and the read-side query service), `src/api/routes/analytics.ts` (the
+query API).
+
+Five native time-series collections (`timeField: "ts"`, `metaField: "dims"`),
+provisioned idempotently by `MongoMetricsRepository.ensureCollections()`
+at worker startup, same posture as `MongoSignalRepository.ensureIndexes()`:
+
+| Collection | dims | value field(s) | written from | retention |
+|---|---|---|---|---|
+| `signal_volume_metrics` | `componentId`, `severity` | `count` | worker (`processBatch.ts`), batched per tick | 30 days |
+| `workitem_created_metrics` | `componentType`, `severity` | `count` (always 1) | worker (`processBatch.ts`), batched per tick | 90 days |
+| `state_transition_metrics` | `fromState`, `toState` | `count` (always 1), `timeInStateMs` | `WorkflowService`, per transition | 30 days |
+| `mttr_metrics` | `componentType`, `severity`, `componentId` | `mttrMs` | `WorkflowService.submitIncidentRca`, per closed incident | 90 days |
+| `alert_dispatch_metrics` | `channel`, `outcome` (`delivered`\|`failed`) | `count` (always 1) | `AlertDispatcher`, per channel per delivery attempt | 30 days |
+
+**Retention policy.** Enforced via each collection's native
+`expireAfterSeconds`, set at creation — no separate cleanup job. High
+write-volume, short-lived-value series (raw signal throughput, every state
+transition, every alert delivery attempt) get 30 days; lower-volume,
+longer-value series (one row per work item created or closed) get 90 days
+for a meaningful longer trend line. Hardcoded as named constants in
+`metricsRepository.ts` rather than exposed as env vars, unlike most of this
+project's other tunables — retention here is a fixed policy decision, not
+an operational knob comparable to buffer sizing or queue concurrency.
+
+**Write granularity: pre-aggregated at write time, bucketed further at
+query time.** The worker doesn't write one document per raw signal — it
+groups a processed batch by `(componentId, severity)` and writes one point
+per group with that batch's count (see `processBatch.ts`'s
+`buildSignalVolumePoints`). Query-time `$group`/`$dateTrunc` bucketing sums
+these correctly regardless of write-side granularity, and this keeps write
+volume proportional to distinct dimensions per tick, not signal count.
+
+**Write path never blocks or fails signal persistence.**
+`services/aggregation/metricsWriter.ts`'s `MetricsWriter` wraps every write
+in a try/catch: a failure is logged and the point is dropped, not retried
+— an indefinite retry loop here is exactly what could turn a metrics-store
+hiccup into back-pressure on the signal-persistence path it's called
+from. `AlertDispatcher`'s dependency on this is a *provider function*
+(`() => MetricsWriter`), not a direct instance — `AlertDispatcher` is
+constructed eagerly at module load (`alertingInstance.ts`), before
+`connectClients()` has run, while the real `MetricsWriter` needs a live
+Mongo connection; deferring resolution to first dispatch sidesteps that
+ordering problem.
+
+**Query API pushes every bucket into the aggregation pipeline** — no route
+handler or service pulls raw metric documents into Node and sums/averages
+them there. `$dateTrunc` buckets by time; `$setWindowFields` computes the
+MTTR trend's rolling average (a trailing window over the last 5 per-bucket
+averages) server-side. `GET /api/v1/analytics/components/:id` is the one
+endpoint that composes across stores: recent signal volume and average MTTR
+from this Mongo aggregation layer, current open-item counts by state from a
+Postgres `GROUP BY` (`PostgresWorkItemRepository.countByComponentIdGroupedByState`)
+— each half is still a real aggregate query pushed to its own store, just
+composed at the service layer rather than sourced from one place.

@@ -9,6 +9,8 @@ import { DashboardCacheRepository } from "../repositories/redis/dashboardCache.j
 import { SignalDebouncer } from "../services/ingestion/debouncer.js";
 import type { SignalSink } from "../services/ingestion/buffer.js";
 import { alertDispatcher } from "../services/alerting/alertingInstance.js";
+import { getMetricsWriter } from "../services/aggregation/aggregationInstance.js";
+import { MongoMetricsRepository } from "../repositories/metrics/index.js";
 import { queueConnection } from "./connection.js";
 import { createSignalBatchQueue, createDeadLetterQueue, type SignalBatchJobData, type DeadLetterJobData } from "./queue.js";
 import { createSignalWorker } from "./signalWorker.js";
@@ -43,6 +45,9 @@ export async function startWorkerSystem(): Promise<WorkerSystem> {
   // ingestion hot path via the cache-refresh step, not just RCA/detail
   // views.
   await signalStore.ensureIndexes();
+  // Idempotent, same reasoning — provisions the 5 time-series collections
+  // (src/repositories/metrics/) the aggregation write path below needs.
+  await new MongoMetricsRepository(getMongoDb()).ensureCollections();
   const cache = new DashboardCacheRepository(redis, config.dashboard.cacheTtlSeconds);
 
   const debouncer = new SignalDebouncer(workItemStore, signalStore, redis, {
@@ -62,6 +67,7 @@ export async function startWorkerSystem(): Promise<WorkerSystem> {
     workItemStore,
     cache,
     alertDispatcher,
+    metricsWriter: getMetricsWriter(),
     deadLetterQueue,
     metrics,
     logger,

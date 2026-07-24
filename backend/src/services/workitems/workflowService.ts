@@ -20,6 +20,7 @@ import type {
 } from "../../repositories/postgres/workItemRepository.js";
 import type { WorkItemWithRca } from "../../repositories/postgres/index.js";
 import type { AlertEventType } from "../alerting/index.js";
+import type { MttrPoint, StateTransitionPoint } from "../../repositories/metrics/index.js";
 
 // Narrow, structural interfaces — the real PostgresWorkItemRepository /
 // DashboardCacheRepository satisfy these without an adapter, but a unit
@@ -41,6 +42,17 @@ export interface WorkflowCache {
 export interface WorkflowAlertDispatcher {
   dispatch(workItem: WorkItem, eventType: AlertEventType): Promise<void>;
 }
+
+/** Never throws — see src/services/aggregation/metricsWriter.ts. Optional (defaults to a no-op below) so existing tests/callers don't need to supply one. */
+export interface WorkflowMetricsWriter {
+  recordStateTransitions(points: readonly StateTransitionPoint[]): Promise<void>;
+  recordMttr(points: readonly MttrPoint[]): Promise<void>;
+}
+
+const noopMetricsWriter: WorkflowMetricsWriter = {
+  recordStateTransitions: (): Promise<void> => Promise.resolve(),
+  recordMttr: (): Promise<void> => Promise.resolve(),
+};
 
 export type TransitionOutcome =
   | { readonly outcome: "not_found" }
@@ -96,6 +108,7 @@ export class WorkflowService {
     private readonly workItemStore: WorkItemWorkflowStore,
     private readonly cache: WorkflowCache,
     private readonly alertDispatcher: WorkflowAlertDispatcher,
+    private readonly metricsWriter: WorkflowMetricsWriter = noopMetricsWriter,
   ) {}
 
   async transitionWorkItem(
@@ -142,6 +155,18 @@ export class WorkflowService {
       // worker fires a "created" alert instead of this file (that path
       // never touches WorkflowService). Never throws.
       await this.alertDispatcher.dispatch(updated, toState);
+      // workItem.updatedAt (fetched before this transition) reflects when
+      // the row last changed, i.e. when it entered snapshot.state — every
+      // state entry is accompanied by a row update, so this is a reliable
+      // time-in-state measurement. Never throws.
+      await this.metricsWriter.recordStateTransitions([
+        {
+          ts: now,
+          fromState: snapshot.state,
+          toState,
+          timeInStateMs: Math.max(0, now.getTime() - workItem.updatedAt.getTime()),
+        },
+      ]);
       return { outcome: "transitioned", workItem: updated };
     } catch (error) {
       if (error instanceof OptimisticConcurrencyError) {
@@ -222,6 +247,25 @@ export class WorkflowService {
       // active-incident cache (see docs/data-model.md) — remove, not upsert.
       await this.cache.removeIncident(workItemId);
       await this.alertDispatcher.dispatch(closedWorkItem, "CLOSED");
+      await Promise.all([
+        this.metricsWriter.recordStateTransitions([
+          {
+            ts: now,
+            fromState: snapshot.state,
+            toState: "CLOSED",
+            timeInStateMs: Math.max(0, now.getTime() - workItem.updatedAt.getTime()),
+          },
+        ]),
+        this.metricsWriter.recordMttr([
+          {
+            ts: now,
+            componentType: closedWorkItem.componentType,
+            severity: closedWorkItem.severity,
+            componentId: closedWorkItem.componentId,
+            mttrMs: mttrResult.mttrSeconds * 1000,
+          },
+        ]),
+      ]);
 
       return { outcome: "closed", workItem: closedWorkItem, mttrSeconds: mttrResult.mttrSeconds };
     } catch (error) {
