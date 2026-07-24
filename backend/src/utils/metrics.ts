@@ -92,6 +92,60 @@ export interface QueueReportSnapshot {
   readonly averageEndToEndLatencyMs: number | null;
 }
 
+/**
+ * Per-channel delivered/failed counts plus a running escalation-fired
+ * total, reset on each read (same "raw counts, reporter computes rates"
+ * posture as QueueMetricsRecorder). Kept per-channel (not a single
+ * aggregate) since "which channel is failing" is the actionable signal
+ * here, not just "something is failing."
+ */
+export interface AlertChannelCounts {
+  readonly delivered: number;
+  readonly failed: number;
+}
+
+export interface AlertMetricsSnapshot {
+  readonly byChannel: Readonly<Record<string, AlertChannelCounts>>;
+  readonly escalationsTriggered: number;
+}
+
+export interface AlertMetricsRecorder {
+  recordDeliverySuccess(channel: string): void;
+  recordDeliveryFailure(channel: string): void;
+  recordEscalation(): void;
+  /** Returns the accumulated counts and resets them to zero. */
+  reset(): AlertMetricsSnapshot;
+}
+
+export function createAlertMetricsRecorder(): AlertMetricsRecorder {
+  let counts = new Map<string, { delivered: number; failed: number }>();
+  let escalationsTriggered = 0;
+
+  function bump(channel: string, key: "delivered" | "failed"): void {
+    const entry = counts.get(channel) ?? { delivered: 0, failed: 0 };
+    entry[key] += 1;
+    counts.set(channel, entry);
+  }
+
+  return {
+    recordDeliverySuccess(channel: string): void {
+      bump(channel, "delivered");
+    },
+    recordDeliveryFailure(channel: string): void {
+      bump(channel, "failed");
+    },
+    recordEscalation(): void {
+      escalationsTriggered += 1;
+    },
+    reset(): AlertMetricsSnapshot {
+      const snapshot: AlertMetricsSnapshot = { byChannel: Object.fromEntries(counts), escalationsTriggered };
+      counts = new Map();
+      escalationsTriggered = 0;
+      return snapshot;
+    },
+  };
+}
+
 export interface MetricsReporterOptions {
   readonly logger: Logger;
   readonly intervalMs?: number;
@@ -99,6 +153,8 @@ export interface MetricsReporterOptions {
   readonly getBufferStats?: () => BufferStats;
   /** Async because it queries BullMQ/Redis directly — unlike the buffer, queue depth isn't kept in local memory. */
   readonly getQueueStats?: () => Promise<QueueReportSnapshot>;
+  /** Synchronous — alert metrics live in local memory, same as the throughput counter. */
+  readonly getAlertStats?: () => AlertMetricsSnapshot;
 }
 
 /** Logs signals/sec (and, if provided, buffer and queue stats) on a fixed interval; returns a function to stop it. */
@@ -125,12 +181,14 @@ export function startMetricsReporter(
             averageEndToEndLatencyMs: queueSnapshot.averageEndToEndLatencyMs,
           }
         : undefined;
+      const alertStats = options.getAlertStats?.();
 
       options.logger.info(
         {
           signalsPerSecond,
           ...(bufferStats ? { buffer: bufferStats } : {}),
           ...(queueStats ? { queue: queueStats } : {}),
+          ...(alertStats ? { alerts: alertStats } : {}),
         },
         "throughput",
       );

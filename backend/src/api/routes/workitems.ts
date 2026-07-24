@@ -12,6 +12,7 @@ import {
   type SignalDto,
 } from "../../services/dashboard/dashboardProjection.js";
 import { WorkflowService } from "../../services/workitems/workflowService.js";
+import { alertDispatcher } from "../../services/alerting/alertingInstance.js";
 
 interface Services {
   readonly dashboard: DashboardProjectionService;
@@ -39,7 +40,7 @@ function getServices(): Services {
       dashboard: new DashboardProjectionService(workItemStore, signalStore, cache, {
         repopulateCap: config.dashboard.repopulateCap,
       }),
-      workflow: new WorkflowService(workItemStore, cache),
+      workflow: new WorkflowService(workItemStore, cache, alertDispatcher),
     };
   }
   return services;

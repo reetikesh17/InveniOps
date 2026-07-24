@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { MongoClient, type Db } from "mongodb";
 import { randomUUID } from "node:crypto";
 import { MongoSignalRepository, type SignalDocument } from "../../../src/repositories/mongo/index.js";
@@ -17,6 +17,15 @@ beforeAll(async () => {
   // repository layer) — created here only so the ordered:false test below
   // has a real constraint to violate.
   await db.collection("signals").createIndex({ signalId: 1 }, { unique: true });
+});
+
+// Both directions: beforeEach so this file doesn't depend on inheriting a
+// pristine collection from whatever integration test file happened to run
+// before it (this file's own assertions are unscoped countDocuments({})
+// calls), afterEach so it doesn't leave anything behind for whatever runs
+// after it either.
+beforeEach(async () => {
+  await db.collection("signals").deleteMany({});
 });
 
 afterEach(async () => {

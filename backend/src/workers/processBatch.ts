@@ -2,6 +2,7 @@ import type { WorkItem } from "@prisma/client";
 import type { IngestionSignal } from "../services/ingestion/buffer.js";
 import { signalToDocument, type DebounceResult } from "../services/ingestion/debouncer.js";
 import type { InsertManyIdempotentResult, SignalDocument } from "../repositories/mongo/signalRepository.js";
+import type { AlertEventType } from "../services/alerting/index.js";
 
 // Narrow, structural interfaces — the real SignalDebouncer /
 // MongoSignalRepository / PostgresWorkItemRepository / DashboardCacheRepository
@@ -24,11 +25,17 @@ export interface BatchCache {
   upsertActiveIncident(workItem: WorkItem): Promise<unknown>;
 }
 
+/** Never throws — see src/services/alerting/dispatcher.ts. Optional so existing tests/callers that don't care about alerting are unaffected. */
+export interface BatchAlertDispatcher {
+  dispatch(workItem: WorkItem, eventType: AlertEventType): Promise<void>;
+}
+
 export interface ProcessBatchDeps {
   readonly debouncer: BatchDebouncer;
   readonly signalStore: BatchSignalStore;
   readonly workItemStore: BatchWorkItemStore;
   readonly cache: BatchCache;
+  readonly alertDispatcher?: BatchAlertDispatcher;
 }
 
 export interface ProcessBatchResult {
@@ -54,6 +61,18 @@ export interface ProcessBatchResult {
  *    "this signal just found the work item another attempt already
  *    created" once a job crosses a retry boundary — see debouncer.ts's
  *    toCreateInput comment for why signalCount starts at 0, not 1).
+ *
+ * Alert dispatch (step 5, if alertDispatcher is provided) fires exactly
+ * once per work item *creation*, not per signal — debouncing already
+ * collapsed the burst into one work item, and `created: true` from
+ * resolveBatch is reliable for "a createWorkItem call happened during
+ * *this* invocation" (unlike its use for signal counting above, this
+ * doesn't need to survive a retry boundary: once a work item exists, every
+ * later resolution — this attempt or a retry — sees it as existing and
+ * returns created: false, so created: true can only ever appear once
+ * across a work item's lifetime). The dispatcher's own Redis claim (see
+ * services/alerting/suppression.ts) is what actually guarantees no
+ * double-send, not this flag alone.
  */
 export async function processBatch(
   signals: readonly IngestionSignal[],
@@ -85,6 +104,13 @@ export async function processBatch(
   );
 
   await Promise.all(updatedWorkItems.map((workItem) => deps.cache.upsertActiveIncident(workItem)));
+
+  const { alertDispatcher } = deps;
+  if (alertDispatcher) {
+    const createdWorkItemIds = new Set(resolutions.filter((result) => result.created).map((result) => result.workItemId));
+    const createdWorkItems = updatedWorkItems.filter((workItem) => createdWorkItemIds.has(workItem.id));
+    await Promise.all(createdWorkItems.map((workItem) => alertDispatcher.dispatch(workItem, "created")));
+  }
 
   return {
     totalSignals: signals.length,

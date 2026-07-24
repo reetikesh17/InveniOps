@@ -4,6 +4,7 @@ import { startMetricsReporter, throughputCounter } from "./utils/metrics.js";
 import { connectClients, registerShutdownHooks } from "./repositories/clients.js";
 import { createApp } from "./api/app.js";
 import { signalBuffer } from "./services/ingestion/signalBufferInstance.js";
+import { escalationScheduler, alertMetrics } from "./services/alerting/alertingInstance.js";
 import { startWorkerSystem, stopWorkerSystem } from "./workers/index.js";
 
 async function main(): Promise<void> {
@@ -17,11 +18,13 @@ async function main(): Promise<void> {
   const workerSystem = await startWorkerSystem();
   signalBuffer.setSink(workerSystem.sink);
   signalBuffer.start();
+  escalationScheduler.start();
 
   const stopMetricsReporter = startMetricsReporter(throughputCounter, {
     logger,
     getBufferStats: () => signalBuffer.getStats(),
     getQueueStats: () => workerSystem.getQueueStats(),
+    getAlertStats: () => alertMetrics.reset(),
   });
 
   const server = app.listen(config.port, () => {
@@ -30,6 +33,7 @@ async function main(): Promise<void> {
 
   registerShutdownHooks(async () => {
     stopMetricsReporter();
+    escalationScheduler.stop();
     signalBuffer.stop();
     const drainResult = await signalBuffer.drainAll(config.buffer.shutdownDrainTimeoutMs);
     logger.info({ drainResult }, "drained ingestion buffer on shutdown");

@@ -19,6 +19,7 @@ import type {
   SubmitRcaResult,
 } from "../../repositories/postgres/workItemRepository.js";
 import type { WorkItemWithRca } from "../../repositories/postgres/index.js";
+import type { AlertEventType } from "../alerting/index.js";
 
 // Narrow, structural interfaces — the real PostgresWorkItemRepository /
 // DashboardCacheRepository satisfy these without an adapter, but a unit
@@ -34,6 +35,11 @@ export interface WorkItemWorkflowStore {
 export interface WorkflowCache {
   upsertActiveIncident(workItem: WorkItem): Promise<unknown>;
   removeIncident(workItemId: string): Promise<unknown>;
+}
+
+/** Never throws — see src/services/alerting/dispatcher.ts. */
+export interface WorkflowAlertDispatcher {
+  dispatch(workItem: WorkItem, eventType: AlertEventType): Promise<void>;
 }
 
 export type TransitionOutcome =
@@ -89,6 +95,7 @@ export class WorkflowService {
   constructor(
     private readonly workItemStore: WorkItemWorkflowStore,
     private readonly cache: WorkflowCache,
+    private readonly alertDispatcher: WorkflowAlertDispatcher,
   ) {}
 
   async transitionWorkItem(
@@ -131,6 +138,10 @@ export class WorkflowService {
         ...(toState === "RESOLVED" ? { data: { resolvedAt: now } } : {}),
       });
       await this.cache.upsertActiveIncident(updated);
+      // Re-alert on transition, not per signal — see docs on why the
+      // worker fires a "created" alert instead of this file (that path
+      // never touches WorkflowService). Never throws.
+      await this.alertDispatcher.dispatch(updated, toState);
       return { outcome: "transitioned", workItem: updated };
     } catch (error) {
       if (error instanceof OptimisticConcurrencyError) {
@@ -210,6 +221,7 @@ export class WorkflowService {
       // CLOSED work items are intentionally excluded from the
       // active-incident cache (see docs/data-model.md) — remove, not upsert.
       await this.cache.removeIncident(workItemId);
+      await this.alertDispatcher.dispatch(closedWorkItem, "CLOSED");
 
       return { outcome: "closed", workItem: closedWorkItem, mttrSeconds: mttrResult.mttrSeconds };
     } catch (error) {

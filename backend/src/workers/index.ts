@@ -8,6 +8,7 @@ import { MongoSignalRepository } from "../repositories/mongo/signalRepository.js
 import { DashboardCacheRepository } from "../repositories/redis/dashboardCache.js";
 import { SignalDebouncer } from "../services/ingestion/debouncer.js";
 import type { SignalSink } from "../services/ingestion/buffer.js";
+import { alertDispatcher } from "../services/alerting/alertingInstance.js";
 import { queueConnection } from "./connection.js";
 import { createSignalBatchQueue, createDeadLetterQueue, type SignalBatchJobData, type DeadLetterJobData } from "./queue.js";
 import { createSignalWorker } from "./signalWorker.js";
@@ -60,6 +61,7 @@ export async function startWorkerSystem(): Promise<WorkerSystem> {
     signalStore,
     workItemStore,
     cache,
+    alertDispatcher,
     deadLetterQueue,
     metrics,
     logger,

@@ -195,4 +195,26 @@ export class PostgresWorkItemRepository {
       }),
     );
   }
+
+  /** Work items still OPEN whose first signal is at least this old — the escalation scheduler's candidate query (src/services/alerting/escalationScheduler.ts). */
+  async findOpenWorkItemsOlderThan(cutoff: Date): Promise<WorkItem[]> {
+    return this.prisma.workItem.findMany({
+      where: { state: WorkItemStatus.OPEN, firstSignalAt: { lte: cutoff } },
+    });
+  }
+
+  /**
+   * Records an escalation on the existing state_transitions audit trail
+   * without a schema change — fromState/toState are both OPEN (a harmless
+   * no-op state update), distinguishable from a real transition by actor.
+   * Not run through applyGuardedTransition: escalation doesn't change
+   * state, so there's nothing for optimistic concurrency to guard here.
+   */
+  async recordEscalation(workItemId: string, actor: string): Promise<void> {
+    await withPostgresRetry(() =>
+      this.prisma.stateTransition.create({
+        data: { workItemId, fromState: WorkItemStatus.OPEN, toState: WorkItemStatus.OPEN, actor },
+      }),
+    );
+  }
 }

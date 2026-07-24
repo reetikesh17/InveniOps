@@ -41,6 +41,17 @@ const envSchema = z.object({
   DASHBOARD_LIST_DEFAULT_LIMIT: z.coerce.number().int().positive().default(50),
   DASHBOARD_LIST_MAX_LIMIT: z.coerce.number().int().positive().default(200),
   DASHBOARD_REPOPULATE_CAP: z.coerce.number().int().positive().default(1_000),
+  // Alert delivery (src/services/alerting/). Webhook URLs are optional —
+  // missing config disables that channel with a startup warning, never a
+  // crash (see notifierRegistry.ts).
+  ALERT_SLACK_WEBHOOK_URL: z.string().url().optional(),
+  ALERT_PAGERDUTY_WEBHOOK_URL: z.string().url().optional(),
+  ALERT_EMAIL_WEBHOOK_URL: z.string().url().optional(),
+  ALERT_CHANNEL_TIMEOUT_MS: z.coerce.number().int().positive().default(5_000),
+  ALERT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  ALERT_BACKOFF_DELAY_MS: z.coerce.number().int().positive().default(500),
+  ALERT_SUPPRESSION_WINDOW_SECONDS: z.coerce.number().int().positive().default(86_400),
+  ESCALATION_CHECK_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
 }).refine((env) => env.BUFFER_LOW_WATER_MARK_FRACTION < env.BUFFER_HIGH_WATER_MARK_FRACTION, {
   message: "BUFFER_LOW_WATER_MARK_FRACTION must be less than BUFFER_HIGH_WATER_MARK_FRACTION",
   path: ["BUFFER_LOW_WATER_MARK_FRACTION"],
@@ -103,6 +114,18 @@ export interface AppConfig {
     readonly listDefaultLimit: number;
     readonly listMaxLimit: number;
     readonly repopulateCap: number;
+  };
+  readonly alerting: {
+    readonly slackWebhookUrl: string | undefined;
+    readonly pagerdutyWebhookUrl: string | undefined;
+    readonly emailWebhookUrl: string | undefined;
+    readonly channelTimeoutMs: number;
+    readonly maxAttempts: number;
+    readonly backoffDelayMs: number;
+    readonly suppressionWindowSeconds: number;
+  };
+  readonly escalation: {
+    readonly checkIntervalMs: number;
   };
 }
 
@@ -173,6 +196,18 @@ function loadConfig(): AppConfig {
       listDefaultLimit: env.DASHBOARD_LIST_DEFAULT_LIMIT,
       listMaxLimit: env.DASHBOARD_LIST_MAX_LIMIT,
       repopulateCap: env.DASHBOARD_REPOPULATE_CAP,
+    }),
+    alerting: Object.freeze({
+      slackWebhookUrl: env.ALERT_SLACK_WEBHOOK_URL,
+      pagerdutyWebhookUrl: env.ALERT_PAGERDUTY_WEBHOOK_URL,
+      emailWebhookUrl: env.ALERT_EMAIL_WEBHOOK_URL,
+      channelTimeoutMs: env.ALERT_CHANNEL_TIMEOUT_MS,
+      maxAttempts: env.ALERT_MAX_ATTEMPTS,
+      backoffDelayMs: env.ALERT_BACKOFF_DELAY_MS,
+      suppressionWindowSeconds: env.ALERT_SUPPRESSION_WINDOW_SECONDS,
+    }),
+    escalation: Object.freeze({
+      checkIntervalMs: env.ESCALATION_CHECK_INTERVAL_MS,
     }),
   });
 }

@@ -122,11 +122,28 @@ function fakeCache(): WorkflowCache & { upsertCalls: WorkItem[]; removeCalls: st
   };
 }
 
+interface DispatchCall {
+  readonly workItem: WorkItem;
+  readonly eventType: string;
+}
+
+function fakeDispatcher(): { dispatch(workItem: WorkItem, eventType: string): Promise<void>; calls: DispatchCall[] } {
+  const calls: DispatchCall[] = [];
+  return {
+    calls,
+    dispatch(workItem: WorkItem, eventType: string): Promise<void> {
+      calls.push({ workItem, eventType });
+      return Promise.resolve();
+    },
+  };
+}
+
 describe("WorkflowService.transitionWorkItem", () => {
   it("transitions OPEN -> INVESTIGATING and writes through to the cache", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }));
     const cache = fakeCache();
-    const service = new WorkflowService(store, cache);
+    const dispatcher = fakeDispatcher();
+    const service = new WorkflowService(store, cache, dispatcher);
 
     const result = await service.transitionWorkItem("wi-1", "INVESTIGATING", "alice");
 
@@ -135,24 +152,29 @@ describe("WorkflowService.transitionWorkItem", () => {
       { workItemId: "wi-1", fromState: "OPEN", toState: "INVESTIGATING", actor: "alice" },
     ]);
     expect(cache.upsertCalls).toHaveLength(1);
+    expect(dispatcher.calls).toHaveLength(1);
+    expect(dispatcher.calls[0]?.workItem.id).toBe("wi-1");
+    expect(dispatcher.calls[0]?.eventType).toBe("INVESTIGATING");
   });
 
   it("rejects an illegal transition (OPEN -> RESOLVED, skipping INVESTIGATING) without touching persistence", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }));
     const cache = fakeCache();
-    const service = new WorkflowService(store, cache);
+    const dispatcher = fakeDispatcher();
+    const service = new WorkflowService(store, cache, dispatcher);
 
     const result = await service.transitionWorkItem("wi-1", "RESOLVED", "alice");
 
     expect(result.outcome).toBe("invalid_transition");
     expect(store.transitionCalls).toHaveLength(0);
     expect(cache.upsertCalls).toHaveLength(0);
+    expect(dispatcher.calls).toHaveLength(0);
   });
 
   it("rejects CLOSED unconditionally — no RCA payload is ever supplied through this method, regardless of current state", async () => {
     for (const state of [WorkItemStatus.OPEN, WorkItemStatus.INVESTIGATING, WorkItemStatus.RESOLVED] as const) {
       const store = fakeWorkItemStore(makeWorkItem({ state }));
-      const service = new WorkflowService(store, fakeCache());
+      const service = new WorkflowService(store, fakeCache(), fakeDispatcher());
 
       const result = await service.transitionWorkItem("wi-1", "CLOSED", "alice");
 
@@ -162,7 +184,7 @@ describe("WorkflowService.transitionWorkItem", () => {
   });
 
   it("returns not_found for a nonexistent work item", async () => {
-    const service = new WorkflowService(fakeWorkItemStore(null), fakeCache());
+    const service = new WorkflowService(fakeWorkItemStore(null), fakeCache(), fakeDispatcher());
     const result = await service.transitionWorkItem("missing", "INVESTIGATING", "alice");
     expect(result).toEqual({ outcome: "not_found" });
   });
@@ -171,7 +193,7 @@ describe("WorkflowService.transitionWorkItem", () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }), {
       throwOnTransition: new OptimisticConcurrencyError("wi-1", "OPEN"),
     });
-    const service = new WorkflowService(store, fakeCache());
+    const service = new WorkflowService(store, fakeCache(), fakeDispatcher());
 
     const result = await service.transitionWorkItem("wi-1", "INVESTIGATING", "alice");
 
@@ -183,7 +205,7 @@ describe("WorkflowService.submitIncidentRca", () => {
   it("rejects RCA submission when the work item was never RESOLVED — even with a fully valid RCA payload", async () => {
     for (const state of [WorkItemStatus.OPEN, WorkItemStatus.INVESTIGATING] as const) {
       const store = fakeWorkItemStore(makeWorkItem({ state }));
-      const service = new WorkflowService(store, fakeCache());
+      const service = new WorkflowService(store, fakeCache(), fakeDispatcher());
 
       const result = await service.submitIncidentRca("wi-1", validRcaInput(), "alice");
 
@@ -194,7 +216,7 @@ describe("WorkflowService.submitIncidentRca", () => {
 
   it("rejects an incomplete RCA for a RESOLVED work item with field-level errors", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.RESOLVED }));
-    const service = new WorkflowService(store, fakeCache());
+    const service = new WorkflowService(store, fakeCache(), fakeDispatcher());
 
     const result = await service.submitIncidentRca(
       "wi-1",
@@ -214,7 +236,8 @@ describe("WorkflowService.submitIncidentRca", () => {
   it("closes a RESOLVED work item given a valid RCA, computing MTTR from firstSignalAt to submission time, and evicts it from the active cache", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.RESOLVED, firstSignalAt: FIRST_SIGNAL_AT }));
     const cache = fakeCache();
-    const service = new WorkflowService(store, cache);
+    const dispatcher = fakeDispatcher();
+    const service = new WorkflowService(store, cache, dispatcher);
     const submittedAt = new Date("2026-01-01T02:30:00.000Z"); // 2.5h after firstSignalAt
 
     const result = await service.submitIncidentRca("wi-1", validRcaInput(), "alice", submittedAt);
@@ -227,10 +250,13 @@ describe("WorkflowService.submitIncidentRca", () => {
     expect(store.submitRcaCalls).toHaveLength(1);
     expect(cache.removeCalls).toEqual(["wi-1"]);
     expect(cache.upsertCalls).toHaveLength(0);
+    expect(dispatcher.calls).toHaveLength(1);
+    expect(dispatcher.calls[0]?.workItem.id).toBe("wi-1");
+    expect(dispatcher.calls[0]?.eventType).toBe("CLOSED");
   });
 
   it("returns not_found for a nonexistent work item", async () => {
-    const service = new WorkflowService(fakeWorkItemStore(null), fakeCache());
+    const service = new WorkflowService(fakeWorkItemStore(null), fakeCache(), fakeDispatcher());
     const result = await service.submitIncidentRca("missing", validRcaInput(), "alice");
     expect(result).toEqual({ outcome: "not_found" });
   });
@@ -239,7 +265,7 @@ describe("WorkflowService.submitIncidentRca", () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.RESOLVED }), {
       throwOnSubmitRca: new OptimisticConcurrencyError("wi-1", "RESOLVED"),
     });
-    const service = new WorkflowService(store, fakeCache());
+    const service = new WorkflowService(store, fakeCache(), fakeDispatcher());
 
     const result = await service.submitIncidentRca("wi-1", validRcaInput(), "alice");
 
