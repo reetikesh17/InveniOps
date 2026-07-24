@@ -21,6 +21,7 @@ export interface SerializedIngestionSignal {
   readonly rawPayload: unknown;
   readonly occurredAt: string;
   readonly receivedAt: string;
+  readonly correlationId: string;
 }
 
 export interface SignalBatchJobData {
@@ -45,6 +46,7 @@ export function serializeSignal(signal: IngestionSignal): SerializedIngestionSig
     rawPayload: signal.rawPayload,
     occurredAt: signal.occurredAt.toISOString(),
     receivedAt: signal.receivedAt.toISOString(),
+    correlationId: signal.correlationId,
   };
 }
 
@@ -57,6 +59,7 @@ export function deserializeSignal(signal: SerializedIngestionSignal): IngestionS
     rawPayload: signal.rawPayload,
     occurredAt: new Date(signal.occurredAt),
     receivedAt: new Date(signal.receivedAt),
+    correlationId: signal.correlationId,
   };
 }
 

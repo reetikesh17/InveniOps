@@ -20,6 +20,7 @@ function makeSignal(severity: Severity, overrides: Partial<IngestionSignal> = {}
     rawPayload: {},
     occurredAt: now,
     receivedAt: now,
+    correlationId: `req-${nextId}`,
     ...overrides,
   };
 }
@@ -391,6 +392,43 @@ describe("SignalBuffer", () => {
       expect(stats.depthBySeverity[Severity.P0]).toBe(2);
       expect(stats.depthBySeverity[Severity.P3]).toBe(1);
       expect(stats.depthBySeverity[Severity.P1]).toBe(0);
+    });
+
+    it("cross-tabulates drops by severity and reason, distinct from the separate by-severity and by-reason totals", () => {
+      const buffer = new SignalBuffer(
+        makeOptions({
+          capacity: 100,
+          highWaterMarkFraction: 0.01,
+          lowWaterMarkFraction: 0,
+          shedCeilingFractions: { [Severity.P1]: 0.3, [Severity.P2]: 0.2, [Severity.P3]: 0.01 },
+        }),
+      );
+
+      buffer.submit(makeSignal(Severity.P0)); // crosses high-water mark, enters shedding
+      for (let i = 0; i < 5; i += 1) {
+        buffer.submit(makeSignal(Severity.P3)); // P3's ceiling is 1 -> 4 of these get shed_ceiling-dropped
+      }
+
+      const stats = buffer.getStats();
+      expect(stats.droppedBySeverityAndReason[Severity.P3].shed_ceiling).toBe(4);
+      expect(stats.droppedBySeverityAndReason[Severity.P3].hard_capacity).toBe(0);
+      expect(stats.droppedBySeverityAndReason[Severity.P0].shed_ceiling).toBe(0);
+      // Still consistent with the pre-existing, separate breakdowns.
+      expect(stats.droppedBySeverity[Severity.P3]).toBe(4);
+      expect(stats.droppedByReason.shed_ceiling).toBe(4);
+    });
+  });
+
+  describe("isDraining", () => {
+    it("reflects whether the drain loop is currently running", () => {
+      const buffer = new SignalBuffer(makeOptions());
+      expect(buffer.isDraining).toBe(false);
+
+      buffer.start();
+      expect(buffer.isDraining).toBe(true);
+
+      buffer.stop();
+      expect(buffer.isDraining).toBe(false);
     });
   });
 });

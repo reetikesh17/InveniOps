@@ -1,10 +1,13 @@
 import { config } from "./config/index.js";
 import { logger } from "./utils/logger.js";
 import { startMetricsReporter, throughputCounter } from "./utils/metrics.js";
-import { connectClients, registerShutdownHooks } from "./repositories/clients.js";
+import { connectClients, registerShutdownHooks, prisma } from "./repositories/clients.js";
+import { PostgresWorkItemRepository } from "./repositories/postgres/index.js";
 import { createApp } from "./api/app.js";
 import { signalBuffer } from "./services/ingestion/signalBufferInstance.js";
-import { escalationScheduler, alertMetrics } from "./services/alerting/alertingInstance.js";
+import { escalationScheduler } from "./services/alerting/alertingInstance.js";
+import { setWorkerRuntimeRefs } from "./services/observability/runtimeRefs.js";
+import { startHealthProbes, stopHealthProbes } from "./services/observability/healthProbeInstance.js";
 import { startWorkerSystem, stopWorkerSystem } from "./workers/index.js";
 
 async function main(): Promise<void> {
@@ -20,11 +23,27 @@ async function main(): Promise<void> {
   signalBuffer.start();
   escalationScheduler.start();
 
+  // GET /ready and GET /metrics need these — see
+  // services/observability/runtimeRefs.ts for why this late-binding
+  // handoff exists instead of importing workerSystem directly.
+  setWorkerRuntimeRefs({
+    worker: workerSystem.worker,
+    queue: workerSystem.queue,
+    deadLetterQueue: workerSystem.deadLetterQueue,
+    metrics: workerSystem.metrics,
+  });
+
+  // After setWorkerRuntimeRefs so the probes' very first tick already has
+  // real queue depth to report, not a transient zero.
+  await startHealthProbes();
+
+  const workItemStore = new PostgresWorkItemRepository(prisma);
+
   const stopMetricsReporter = startMetricsReporter(throughputCounter, {
     logger,
     getBufferStats: () => signalBuffer.getStats(),
     getQueueStats: () => workerSystem.getQueueStats(),
-    getAlertStats: () => alertMetrics.reset(),
+    getActiveWorkItemCount: () => workItemStore.countActive(),
   });
 
   const server = app.listen(config.port, () => {
@@ -33,6 +52,7 @@ async function main(): Promise<void> {
 
   registerShutdownHooks(async () => {
     stopMetricsReporter();
+    stopHealthProbes();
     escalationScheduler.stop();
     signalBuffer.stop();
     const drainResult = await signalBuffer.drainAll(config.buffer.shutdownDrainTimeoutMs);

@@ -42,7 +42,23 @@ export function createSignalWorker(
           (oldest, signal) => Math.min(oldest, signal.receivedAt.getTime()),
           Date.now(),
         );
-        deps.metrics?.recordJobProcessed(Date.now() - oldestReceivedAtMs);
+        const latencyMs = Date.now() - oldestReceivedAtMs;
+        deps.metrics?.recordJobProcessed(latencyMs);
+
+        // Closes the trace gap at the queue boundary: a job aggregates
+        // signals from however many HTTP requests the buffer happened to
+        // batch together, so this logs the *set* of originating requests
+        // rather than one line per signal (which would be the volume this
+        // system is explicitly designed to survive). Cross-reference a
+        // specific request's own completion log (pino-http, req.id) via
+        // this correlationId to see both ends of one signal's path; the
+        // signalId itself (persisted in Mongo) is the finer-grained key
+        // within a batch.
+        const correlationIds = [...new Set(signals.map((signal) => signal.correlationId))];
+        deps.logger?.info(
+          { jobId: job.id, correlationIds, batchSize: signals.length, latencyMs },
+          "batch processed",
+        );
       }
 
       return result;

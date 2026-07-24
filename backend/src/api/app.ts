@@ -8,6 +8,8 @@ import helmet from "helmet";
 import cors from "cors";
 import { httpLogger } from "../utils/logger.js";
 import { healthRouter } from "./routes/health.js";
+import { readyRouter } from "./routes/ready.js";
+import { metricsRouter } from "./routes/metrics.js";
 import { signalsRouter } from "./routes/signals.js";
 import { workitemsRouter } from "./routes/workitems.js";
 import { analyticsRouter } from "./routes/analytics.js";
@@ -21,6 +23,8 @@ export function createApp(): Express {
   app.use(httpLogger);
 
   app.use("/health", healthRouter);
+  app.use("/ready", readyRouter);
+  app.use("/metrics", metricsRouter);
   app.use("/api/v1/signals", signalsRouter);
   app.use("/api/v1/incidents", workitemsRouter);
   app.use("/api/v1/analytics", analyticsRouter);

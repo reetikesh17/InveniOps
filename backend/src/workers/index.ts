@@ -1,7 +1,7 @@
 import type { Queue, Worker } from "bullmq";
 import { config } from "../config/index.js";
 import { logger } from "../utils/logger.js";
-import { createQueueMetricsRecorder, type QueueReportSnapshot } from "../utils/metrics.js";
+import { createQueueMetricsRecorder, type QueueMetricsRecorder, type QueueReportSnapshot } from "../utils/metrics.js";
 import { prisma, getMongoDb, redis } from "../repositories/clients.js";
 import { PostgresWorkItemRepository } from "../repositories/postgres/workItemRepository.js";
 import { MongoSignalRepository } from "../repositories/mongo/signalRepository.js";
@@ -22,6 +22,8 @@ export interface WorkerSystem {
   readonly worker: Worker<SignalBatchJobData>;
   /** Hand this to SignalBuffer.setSink() to wire the buffer's drain loop into the queue. */
   readonly sink: SignalSink;
+  /** Exposed for GET /metrics's cumulative counters and latency histogram — see src/api/routes/metrics.ts. */
+  readonly metrics: QueueMetricsRecorder;
   getQueueStats(): Promise<QueueReportSnapshot>;
 }
 
@@ -82,7 +84,7 @@ export async function startWorkerSystem(): Promise<WorkerSystem> {
       deadLetterQueue.getJobCounts(),
     ]);
     const dlqSize = Object.values(dlqJobCounts).reduce((sum, count) => sum + count, 0);
-    const { jobsProcessed, jobsFailed, averageLatencyMs } = metrics.reset();
+    const { jobsProcessed, jobsFailed, averageLatencyMs, p50LatencyMs, p99LatencyMs } = metrics.reset();
 
     return {
       waitingCount,
@@ -91,10 +93,12 @@ export async function startWorkerSystem(): Promise<WorkerSystem> {
       jobsProcessed,
       jobsFailed,
       averageEndToEndLatencyMs: averageLatencyMs,
+      p50LatencyMs,
+      p99LatencyMs,
     };
   }
 
-  return { queue, deadLetterQueue, worker, sink, getQueueStats };
+  return { queue, deadLetterQueue, worker, sink, metrics, getQueueStats };
 }
 
 /** Graceful shutdown: stop pulling new jobs, let in-flight ones finish (bounded by timeoutMs), then close connections. */

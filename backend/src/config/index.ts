@@ -52,6 +52,12 @@ const envSchema = z.object({
   ALERT_BACKOFF_DELAY_MS: z.coerce.number().int().positive().default(500),
   ALERT_SUPPRESSION_WINDOW_SECONDS: z.coerce.number().int().positive().default(86_400),
   ESCALATION_CHECK_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
+  // Observability (src/utils/healthProbe.ts, src/api/routes/health.ts).
+  // GET /health reads a cached snapshot refreshed on this interval, each
+  // probe bounded by this timeout — see healthProbe.ts for why /health
+  // must never make a live dependency call on the request path.
+  HEALTH_PROBE_INTERVAL_MS: z.coerce.number().int().positive().default(5_000),
+  HEALTH_PROBE_TIMEOUT_MS: z.coerce.number().int().positive().default(2_000),
 }).refine((env) => env.BUFFER_LOW_WATER_MARK_FRACTION < env.BUFFER_HIGH_WATER_MARK_FRACTION, {
   message: "BUFFER_LOW_WATER_MARK_FRACTION must be less than BUFFER_HIGH_WATER_MARK_FRACTION",
   path: ["BUFFER_LOW_WATER_MARK_FRACTION"],
@@ -126,6 +132,10 @@ export interface AppConfig {
   };
   readonly escalation: {
     readonly checkIntervalMs: number;
+  };
+  readonly health: {
+    readonly probeIntervalMs: number;
+    readonly probeTimeoutMs: number;
   };
 }
 
@@ -208,6 +218,10 @@ function loadConfig(): AppConfig {
     }),
     escalation: Object.freeze({
       checkIntervalMs: env.ESCALATION_CHECK_INTERVAL_MS,
+    }),
+    health: Object.freeze({
+      probeIntervalMs: env.HEALTH_PROBE_INTERVAL_MS,
+      probeTimeoutMs: env.HEALTH_PROBE_TIMEOUT_MS,
     }),
   });
 }

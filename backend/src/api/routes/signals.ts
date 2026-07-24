@@ -4,7 +4,7 @@ import { ComponentType, Severity } from "@prisma/client";
 import { z } from "zod";
 import { config } from "../../config/index.js";
 import { redis } from "../../repositories/clients.js";
-import { throughputCounter } from "../../utils/metrics.js";
+import { throughputCounter, signalCounters } from "../../utils/metrics.js";
 import type { IngestionSignal } from "../../services/ingestion/buffer.js";
 import { signalBuffer } from "../../services/ingestion/signalBufferInstance.js";
 import { checkTokenBuckets, secondsUntilAvailable, type TokenBucketResult } from "../../rateLimit/tokenBucket.js";
@@ -113,6 +113,7 @@ async function handleIngest(
   }
 
   const receivedAt = new Date();
+  const correlationId = String(req.id);
   const ingestionSignals: IngestionSignal[] = parsed.signals.map((signal) => ({
     signalId: signal.signalId ?? randomUUID(),
     componentId: signal.componentId,
@@ -121,13 +122,20 @@ async function handleIngest(
     rawPayload: signal.rawPayload,
     occurredAt: signal.occurredAt,
     receivedAt,
+    correlationId,
   }));
+  for (const signal of ingestionSignals) {
+    signalCounters.recordReceived(signal.severity);
+  }
 
   const accepted = submitOrReject(res, ingestionSignals);
   if (!accepted) {
     return;
   }
 
+  for (const signal of accepted) {
+    signalCounters.recordAccepted(signal.severity);
+  }
   throughputCounter.increment(accepted.length);
 
   res.status(202).json({
@@ -152,7 +160,7 @@ interface SyntheticOverrides {
 const COMPONENT_TYPES = Object.values(ComponentType);
 const SEVERITIES = Object.values(Severity);
 
-function generateSyntheticSignal(index: number, overrides: SyntheticOverrides, now: Date): IngestionSignal {
+function generateSyntheticSignal(index: number, overrides: SyntheticOverrides, now: Date, correlationId: string): IngestionSignal {
   return {
     signalId: randomUUID(),
     componentId: overrides.componentId ?? `SYNTHETIC_COMPONENT_${index % 10}`,
@@ -161,6 +169,7 @@ function generateSyntheticSignal(index: number, overrides: SyntheticOverrides, n
     rawPayload: { synthetic: true, index },
     occurredAt: now,
     receivedAt: now,
+    correlationId,
   };
 }
 
@@ -198,15 +207,22 @@ function handleBulkTest(req: Request, res: Response<IngestResponseBody | ErrorRe
   }
 
   const now = new Date();
+  const correlationId = String(req.id);
   const signals = Array.from({ length: count }, (_, index) =>
-    generateSyntheticSignal(index, { componentId, componentType, severity }, now),
+    generateSyntheticSignal(index, { componentId, componentType, severity }, now, correlationId),
   );
+  for (const signal of signals) {
+    signalCounters.recordReceived(signal.severity);
+  }
 
   const accepted = submitOrReject(res, signals);
   if (!accepted) {
     return;
   }
 
+  for (const signal of accepted) {
+    signalCounters.recordAccepted(signal.severity);
+  }
   throughputCounter.increment(accepted.length);
 
   res.status(202).json({ accepted: accepted.length });

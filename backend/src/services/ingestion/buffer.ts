@@ -21,6 +21,8 @@ export interface IngestionSignal {
   readonly rawPayload: unknown;
   readonly occurredAt: Date;
   readonly receivedAt: Date;
+  /** The originating HTTP request's id (pino-http's req.id / x-request-id) — carried through the buffer and the queue job so a signal's path is traceable in the worker's logs. */
+  readonly correlationId: string;
 }
 
 /**
@@ -60,6 +62,8 @@ export interface BufferStats {
   readonly depthBySeverity: Readonly<Record<Severity, number>>;
   readonly droppedBySeverity: Readonly<Record<Severity, number>>;
   readonly droppedByReason: Readonly<Record<DropReason, number>>;
+  /** Cross-tabulated (severity, reason) — never reset, same cumulative posture as droppedBySeverity/droppedByReason. Feeds GET /metrics's per-severity shed-vs-dropped breakdown. */
+  readonly droppedBySeverityAndReason: Readonly<Record<Severity, Readonly<Record<DropReason, number>>>>;
 }
 
 export interface DrainAllResult {
@@ -163,6 +167,13 @@ export class SignalBuffer {
     sink_failure: 0,
   };
 
+  private readonly droppedBySeverityAndReason: Record<Severity, Record<DropReason, number>> = {
+    [Severity.P0]: { shed_ceiling: 0, hard_capacity: 0, sink_failure: 0 },
+    [Severity.P1]: { shed_ceiling: 0, hard_capacity: 0, sink_failure: 0 },
+    [Severity.P2]: { shed_ceiling: 0, hard_capacity: 0, sink_failure: 0 },
+    [Severity.P3]: { shed_ceiling: 0, hard_capacity: 0, sink_failure: 0 },
+  };
+
   private state: BufferState = "normal";
   private timer: NodeJS.Timeout | undefined;
   private draining = false;
@@ -260,6 +271,7 @@ export class SignalBuffer {
   private recordDrop(severity: Severity, reason: DropReason): void {
     this.droppedBySeverity[severity] += 1;
     this.droppedByReason[reason] += 1;
+    this.droppedBySeverityAndReason[severity][reason] += 1;
   }
 
   private recomputeState(): void {
@@ -310,6 +322,11 @@ export class SignalBuffer {
       );
       return { drained: 0, failed: batch.length };
     }
+  }
+
+  /** Whether the interval-driven drain loop is currently running — GET /ready's readiness signal (see docs comment there for why this differs from liveness). */
+  get isDraining(): boolean {
+    return this.timer !== undefined;
   }
 
   /** Starts the interval-driven drain loop. Idempotent. */
@@ -375,6 +392,12 @@ export class SignalBuffer {
       depthBySeverity,
       droppedBySeverity: { ...this.droppedBySeverity },
       droppedByReason: { ...this.droppedByReason },
+      droppedBySeverityAndReason: {
+        [Severity.P0]: { ...this.droppedBySeverityAndReason[Severity.P0] },
+        [Severity.P1]: { ...this.droppedBySeverityAndReason[Severity.P1] },
+        [Severity.P2]: { ...this.droppedBySeverityAndReason[Severity.P2] },
+        [Severity.P3]: { ...this.droppedBySeverityAndReason[Severity.P3] },
+      },
     };
   }
 }

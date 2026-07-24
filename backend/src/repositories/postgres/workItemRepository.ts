@@ -233,4 +233,18 @@ export class PostgresWorkItemRepository {
     });
     return Object.fromEntries(rows.map((row) => [row.state, row._count._all]));
   }
+
+  /** Global work item counts by state — a real GROUP BY, not a findMany + count in Node. Feeds GET /metrics's ims_work_items gauge. */
+  async countAllGroupedByState(): Promise<Readonly<Record<string, number>>> {
+    const rows = await this.prisma.workItem.groupBy({
+      by: ["state"],
+      _count: { _all: true },
+    });
+    return Object.fromEntries(rows.map((row) => [row.state, row._count._all]));
+  }
+
+  /** Non-CLOSED work item count — the console reporter's "active items" figure (src/utils/metrics.ts). */
+  async countActive(): Promise<number> {
+    return this.prisma.workItem.count({ where: { state: { not: WorkItemStatus.CLOSED } } });
+  }
 }
