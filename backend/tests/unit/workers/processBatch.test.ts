@@ -8,6 +8,7 @@ import {
   type BatchWorkItemStore,
   type BatchCache,
   type BatchMetricsWriter,
+  type BatchEventPublisher,
 } from "../../../src/workers/processBatch.js";
 import type { DebounceResult } from "../../../src/services/ingestion/debouncer.js";
 import type { IngestionSignal } from "../../../src/services/ingestion/buffer.js";
@@ -93,6 +94,17 @@ function fakeCache(): BatchCache & { readonly upserted: WorkItem[] } {
     upserted,
     upsertActiveIncident(workItem: WorkItem): Promise<void> {
       upserted.push(workItem);
+      return Promise.resolve();
+    },
+  };
+}
+
+function fakeEventPublisher(): BatchEventPublisher & { readonly createdCalls: WorkItem[] } {
+  const createdCalls: WorkItem[] = [];
+  return {
+    createdCalls,
+    publishWorkItemCreated(workItem: WorkItem): Promise<void> {
+      createdCalls.push(workItem);
       return Promise.resolve();
     },
   };
@@ -253,5 +265,31 @@ describe("processBatch", () => {
     expect(metricsWriter.workItemCreatedCalls).toHaveLength(1);
     expect(metricsWriter.workItemCreatedCalls[0]).toHaveLength(1);
     expect(metricsWriter.workItemCreatedCalls[0]?.[0]).toMatchObject({ componentType: ComponentType.CACHE, severity: Severity.P2 });
+  });
+
+  it("publishes a real-time event only for newly-created work items, not every work item touched", async () => {
+    const signalA1 = makeSignal("COMPONENT_A");
+    const signalB1 = makeSignal("COMPONENT_B");
+
+    const signalStore = fakeSignalStore();
+    const workItemStore = fakeWorkItemStore();
+    const cache = fakeCache();
+    const eventPublisher = fakeEventPublisher();
+
+    const debouncer: BatchDebouncer = {
+      resolveBatch(signals: readonly IngestionSignal[]): Promise<readonly DebounceResult[]> {
+        return Promise.resolve(
+          signals.map((signal) => ({
+            workItemId: signal.componentId === "COMPONENT_A" ? "work-item-a" : "work-item-b",
+            created: signal.componentId === "COMPONENT_B",
+          })),
+        );
+      },
+    };
+
+    await processBatch([signalA1, signalB1], { debouncer, signalStore, workItemStore, cache, eventPublisher });
+
+    expect(eventPublisher.createdCalls).toHaveLength(1);
+    expect(eventPublisher.createdCalls[0]?.id).toBe("work-item-b");
   });
 });

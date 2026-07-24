@@ -14,6 +14,7 @@ import {
 import { WorkflowService } from "../../services/workitems/workflowService.js";
 import { alertDispatcher } from "../../services/alerting/alertingInstance.js";
 import { getMetricsWriter } from "../../services/aggregation/aggregationInstance.js";
+import { incidentEventPublisher } from "../../services/realtime/realtimeInstance.js";
 
 interface Services {
   readonly dashboard: DashboardProjectionService;
@@ -41,7 +42,7 @@ function getServices(): Services {
       dashboard: new DashboardProjectionService(workItemStore, signalStore, cache, {
         repopulateCap: config.dashboard.repopulateCap,
       }),
-      workflow: new WorkflowService(workItemStore, cache, alertDispatcher, getMetricsWriter()),
+      workflow: new WorkflowService(workItemStore, cache, alertDispatcher, getMetricsWriter(), incidentEventPublisher),
     };
   }
   return services;

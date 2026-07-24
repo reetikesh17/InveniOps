@@ -8,10 +8,12 @@ import { signalBuffer } from "./services/ingestion/signalBufferInstance.js";
 import { escalationScheduler } from "./services/alerting/alertingInstance.js";
 import { setWorkerRuntimeRefs } from "./services/observability/runtimeRefs.js";
 import { startHealthProbes, stopHealthProbes } from "./services/observability/healthProbeInstance.js";
+import { incidentEventSubscriber } from "./services/realtime/realtimeInstance.js";
 import { startWorkerSystem, stopWorkerSystem } from "./workers/index.js";
 
 async function main(): Promise<void> {
   await connectClients();
+  await incidentEventSubscriber.start();
 
   const app = createApp();
 
@@ -53,6 +55,7 @@ async function main(): Promise<void> {
   registerShutdownHooks(async () => {
     stopMetricsReporter();
     stopHealthProbes();
+    await incidentEventSubscriber.stop();
     escalationScheduler.stop();
     signalBuffer.stop();
     const drainResult = await signalBuffer.drainAll(config.buffer.shutdownDrainTimeoutMs);

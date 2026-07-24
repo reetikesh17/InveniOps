@@ -49,9 +49,18 @@ export interface WorkflowMetricsWriter {
   recordMttr(points: readonly MttrPoint[]): Promise<void>;
 }
 
+/** Never throws — see src/services/realtime/eventPublisher.ts. Optional (defaults to a no-op below) so existing tests/callers don't need to supply one. */
+export interface WorkflowEventPublisher {
+  publishWorkItemStateChanged(workItem: WorkItem, fromState: string, toState: string): Promise<void>;
+}
+
 const noopMetricsWriter: WorkflowMetricsWriter = {
   recordStateTransitions: (): Promise<void> => Promise.resolve(),
   recordMttr: (): Promise<void> => Promise.resolve(),
+};
+
+const noopEventPublisher: WorkflowEventPublisher = {
+  publishWorkItemStateChanged: (): Promise<void> => Promise.resolve(),
 };
 
 export type TransitionOutcome =
@@ -109,6 +118,7 @@ export class WorkflowService {
     private readonly cache: WorkflowCache,
     private readonly alertDispatcher: WorkflowAlertDispatcher,
     private readonly metricsWriter: WorkflowMetricsWriter = noopMetricsWriter,
+    private readonly eventPublisher: WorkflowEventPublisher = noopEventPublisher,
   ) {}
 
   async transitionWorkItem(
@@ -167,6 +177,8 @@ export class WorkflowService {
           timeInStateMs: Math.max(0, now.getTime() - workItem.updatedAt.getTime()),
         },
       ]);
+      // Real-time push for the dashboard's Live Feed. Never throws.
+      await this.eventPublisher.publishWorkItemStateChanged(updated, snapshot.state, toState);
       return { outcome: "transitioned", workItem: updated };
     } catch (error) {
       if (error instanceof OptimisticConcurrencyError) {
@@ -266,6 +278,9 @@ export class WorkflowService {
           },
         ]),
       ]);
+      // Real-time push — a CLOSED incident should disappear from the Live
+      // Feed promptly, same as any other transition. Never throws.
+      await this.eventPublisher.publishWorkItemStateChanged(closedWorkItem, snapshot.state, "CLOSED");
 
       return { outcome: "closed", workItem: closedWorkItem, mttrSeconds: mttrResult.mttrSeconds };
     } catch (error) {

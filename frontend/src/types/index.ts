@@ -1,5 +1,29 @@
-// The WorkItem / RcaRecord / StateTransition domain types will be added
-// here once the backend's Postgres schema is approved and implemented —
-// see backend/prisma/schema.prisma. Only src/types/health.ts exists today
-// because that's the only backend contract currently implemented.
-export type { DependencyStatus, HealthResponse } from "./health";
+export {
+  SEVERITIES,
+  COMPONENT_TYPES,
+  WORK_ITEM_STATES,
+  ROOT_CAUSE_CATEGORIES,
+  type Severity,
+  type ComponentType,
+  type WorkItemState,
+  type RootCauseCategory,
+} from "./enums";
+export type { WorkItem, IncidentDetail } from "./workItem";
+export type { RcaRecord, RcaSubmissionInput } from "./rca";
+export type { Signal } from "./signal";
+export type { StateTransition } from "./stateTransition";
+export type { PaginationParams, Page } from "./pagination";
+export type {
+  AnalyticsGroupBy,
+  ThroughputQuery,
+  GroupedAnalyticsQuery,
+  ThroughputPoint,
+  ThroughputResponse,
+  GroupedCountPoint,
+  IncidentCountsResponse,
+  MttrTrendPoint,
+  MttrTrendResponse,
+  ComponentHealth,
+} from "./analytics";
+export type { IncidentEventType, IncidentEvent, WorkItemCreatedEvent, WorkItemStateChangedEvent } from "./events";
+export type { DependencyStatus, DependencyHealth, HealthResponse } from "./health";

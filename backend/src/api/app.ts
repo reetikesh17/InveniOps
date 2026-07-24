@@ -12,6 +12,7 @@ import { readyRouter } from "./routes/ready.js";
 import { metricsRouter } from "./routes/metrics.js";
 import { signalsRouter } from "./routes/signals.js";
 import { workitemsRouter } from "./routes/workitems.js";
+import { incidentStreamRouter } from "./routes/incidentStream.js";
 import { analyticsRouter } from "./routes/analytics.js";
 
 export function createApp(): Express {
@@ -26,6 +27,11 @@ export function createApp(): Express {
   app.use("/ready", readyRouter);
   app.use("/metrics", metricsRouter);
   app.use("/api/v1/signals", signalsRouter);
+  // Mounted before workitemsRouter: both share the "/api/v1/incidents"
+  // base, and workitemsRouter's "GET /:id" would otherwise swallow
+  // "GET /stream" as an :id of "stream" if it were checked first. Express
+  // tries routers in registration order.
+  app.use("/api/v1/incidents", incidentStreamRouter);
   app.use("/api/v1/incidents", workitemsRouter);
   app.use("/api/v1/analytics", analyticsRouter);
 

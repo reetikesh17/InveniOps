@@ -10,6 +10,7 @@ import { SignalDebouncer } from "../services/ingestion/debouncer.js";
 import type { SignalSink } from "../services/ingestion/buffer.js";
 import { alertDispatcher } from "../services/alerting/alertingInstance.js";
 import { getMetricsWriter } from "../services/aggregation/aggregationInstance.js";
+import { incidentEventPublisher } from "../services/realtime/realtimeInstance.js";
 import { MongoMetricsRepository } from "../repositories/metrics/index.js";
 import { queueConnection } from "./connection.js";
 import { createSignalBatchQueue, createDeadLetterQueue, type SignalBatchJobData, type DeadLetterJobData } from "./queue.js";
@@ -70,6 +71,7 @@ export async function startWorkerSystem(): Promise<WorkerSystem> {
     cache,
     alertDispatcher,
     metricsWriter: getMetricsWriter(),
+    eventPublisher: incidentEventPublisher,
     deadLetterQueue,
     metrics,
     logger,

@@ -58,6 +58,11 @@ const envSchema = z.object({
   // must never make a live dependency call on the request path.
   HEALTH_PROBE_INTERVAL_MS: z.coerce.number().int().positive().default(5_000),
   HEALTH_PROBE_TIMEOUT_MS: z.coerce.number().int().positive().default(2_000),
+  // Real-time incident stream (src/api/routes/incidentStream.ts). Comment
+  // lines sent on this interval keep the connection alive through
+  // intermediary proxies/load balancers that would otherwise time out an
+  // idle long-lived HTTP response.
+  SSE_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().positive().default(15_000),
 }).refine((env) => env.BUFFER_LOW_WATER_MARK_FRACTION < env.BUFFER_HIGH_WATER_MARK_FRACTION, {
   message: "BUFFER_LOW_WATER_MARK_FRACTION must be less than BUFFER_HIGH_WATER_MARK_FRACTION",
   path: ["BUFFER_LOW_WATER_MARK_FRACTION"],
@@ -136,6 +141,9 @@ export interface AppConfig {
   readonly health: {
     readonly probeIntervalMs: number;
     readonly probeTimeoutMs: number;
+  };
+  readonly sse: {
+    readonly heartbeatIntervalMs: number;
   };
 }
 
@@ -222,6 +230,9 @@ function loadConfig(): AppConfig {
     health: Object.freeze({
       probeIntervalMs: env.HEALTH_PROBE_INTERVAL_MS,
       probeTimeoutMs: env.HEALTH_PROBE_TIMEOUT_MS,
+    }),
+    sse: Object.freeze({
+      heartbeatIntervalMs: env.SSE_HEARTBEAT_INTERVAL_MS,
     }),
   });
 }

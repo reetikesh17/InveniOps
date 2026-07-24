@@ -4,11 +4,13 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { PrismaClient, ComponentType, Severity } from "@prisma/client";
 import { MongoClient, type Db } from "mongodb";
+import { Redis } from "ioredis";
 import { createApp } from "../../../src/api/app.js";
 import { connectClients, disconnectClients } from "../../../src/repositories/clients.js";
 import { signalBuffer } from "../../../src/services/ingestion/signalBufferInstance.js";
 import { startWorkerSystem, stopWorkerSystem, type WorkerSystem } from "../../../src/workers/index.js";
-import { TEST_DATABASE_URL, TEST_MONGODB_URI } from "../testEnv.js";
+import { DashboardCacheRepository } from "../../../src/repositories/redis/dashboardCache.js";
+import { TEST_DATABASE_URL, TEST_MONGODB_URI, TEST_REDIS_URL } from "../testEnv.js";
 
 const RUN_ID = randomUUID();
 const COMPONENT_PREFIX = `PIPELINE_TEST_${RUN_ID}_`;
@@ -27,6 +29,8 @@ function componentIdFor(index: number): string {
 // the same database, so both see the same rows either way).
 const assertionPrisma = new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
 const assertionMongoClient = new MongoClient(TEST_MONGODB_URI);
+const assertionRedis = new Redis(TEST_REDIS_URL);
+const assertionCache = new DashboardCacheRepository(assertionRedis, 3600);
 let assertionDb: Db;
 
 let server: Server;
@@ -58,6 +62,17 @@ afterAll(async () => {
     server.close((err) => (err ? reject(err) : resolve()));
   });
 
+  // Fetched before the Postgres delete below specifically to evict these
+  // from the Redis dashboard cache too — every one of these 20 work items
+  // was created through the real HTTP path, which write-throughs into
+  // dashboard:active_incidents (see docs/data-model.md), so deleting only
+  // from Postgres/Mongo leaves 20 ghost entries behind every run.
+  const createdWorkItemIds = await assertionPrisma.workItem.findMany({
+    where: { componentId: { startsWith: COMPONENT_PREFIX } },
+    select: { id: true },
+  });
+  await Promise.all(createdWorkItemIds.map(({ id }) => assertionCache.removeIncident(id)));
+
   await assertionPrisma.workItem.deleteMany({ where: { componentId: { startsWith: COMPONENT_PREFIX } } });
   await assertionDb.collection("signals").deleteMany({ componentId: { $regex: `^${COMPONENT_PREFIX}` } });
   // signal_volume_metrics carries componentId as a dim, so this run's
@@ -69,6 +84,7 @@ afterAll(async () => {
 
   await assertionPrisma.$disconnect();
   await assertionMongoClient.close();
+  await assertionRedis.quit();
   await disconnectClients();
 }, 30_000);
 
