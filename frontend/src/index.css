@@ -29,6 +29,22 @@
   --color-state-investigating: var(--color-violet-600);
   --color-state-resolved: var(--color-emerald-600);
   --color-state-closed: var(--color-neutral-500);
+
+  /* Plays once when a Live Feed row mounts for a newly-arrived incident —
+     see IncidentTable.tsx. Existing rows re-rendering (state changes, etc.)
+     never get a fresh mount, so this never replays for them. */
+  --animate-row-enter: row-enter 0.35s ease-out;
+}
+
+@keyframes row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 body {

@@ -97,4 +97,4 @@ Compose), and a section on how you handled Backpressure.
 simulating an RDBMS outage folowed by an MCP failure). 
 4. Prompts/Spec/Plans: All markdowns and prompts used to create this repository 
 should be checked in. 
-5. Bonus points for any creative additions done.
+5. Bonus points for any creative additions done. 
