@@ -1,5 +1,36 @@
 @import "tailwindcss";
 
+@theme {
+  /* Neutral roles — components reference these, not neutral-500 etc.
+     directly, so every surface/border/text color in the app can be
+     retoned from this one place. All aliases into Tailwind's own default
+     neutral scale (never a hand-picked hex), so contrast stays whatever
+     that scale already guarantees. */
+  --color-surface: var(--color-white);
+  --color-surface-muted: var(--color-neutral-50);
+  --color-border: var(--color-neutral-200);
+  --color-border-strong: var(--color-neutral-300);
+  --color-ink: var(--color-neutral-900);
+  --color-ink-muted: var(--color-neutral-500);
+  --color-ink-faint: var(--color-neutral-400);
+
+  /* Severity — P0 is most severe. Badges pair every one of these with a
+     text label and a filled-bar icon (see SeverityBadge.tsx) — never rely
+     on this hue alone to carry meaning. */
+  --color-severity-p0: var(--color-red-600);
+  --color-severity-p1: var(--color-orange-600);
+  --color-severity-p2: var(--color-amber-600);
+  --color-severity-p3: var(--color-sky-600);
+
+  /* Workflow state — a deliberately distinct hue family from severity so
+     a status column and a severity column are never visually confusable
+     at a glance. */
+  --color-state-open: var(--color-blue-600);
+  --color-state-investigating: var(--color-violet-600);
+  --color-state-resolved: var(--color-emerald-600);
+  --color-state-closed: var(--color-neutral-500);
+}
+
 body {
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
