@@ -24,6 +24,11 @@ export interface Pagination {
   readonly offset: number;
 }
 
+export interface SignalPagination extends Pagination {
+  /** Defaults to "asc" (oldest first) — unchanged from this method's original behavior, so no existing caller's ordering assumption breaks. */
+  readonly order?: "asc" | "desc";
+}
+
 export interface InsertManyIdempotentResult {
   /** signalIds that were genuinely new this call — the only ones a caller should count. */
   readonly insertedSignalIds: readonly string[];
@@ -103,10 +108,10 @@ export class MongoSignalRepository {
     }
   }
 
-  async findByWorkItemId(workItemId: string, pagination: Pagination): Promise<SignalDocument[]> {
+  async findByWorkItemId(workItemId: string, pagination: SignalPagination): Promise<SignalDocument[]> {
     return this.collection
       .find({ workItemId })
-      .sort({ receivedAt: 1 })
+      .sort({ receivedAt: pagination.order === "desc" ? -1 : 1 })
       .skip(pagination.offset)
       .limit(pagination.limit)
       .toArray();

@@ -10,6 +10,7 @@ import {
   toIncidentSummary,
   type IncidentDetailDto,
   type SignalDto,
+  type StateTransitionDto,
 } from "../../services/dashboard/dashboardProjection.js";
 import { WorkflowService } from "../../services/workitems/workflowService.js";
 import { alertDispatcher } from "../../services/alerting/alertingInstance.js";
@@ -53,6 +54,12 @@ const paginationQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+// Default "asc" matches findByWorkItemId's original, unparameterized
+// behavior — existing callers that never pass `order` see no change.
+const signalsQuerySchema = paginationQuerySchema.extend({
+  order: z.enum(["asc", "desc"]).default("asc"),
+});
+
 const transitionBodySchema = z.object({
   toState: z.enum(["OPEN", "INVESTIGATING", "RESOLVED", "CLOSED"]),
   actor: z.string().min(1).max(200),
@@ -80,6 +87,7 @@ type IncidentDetailResponseBody = IncidentDetailDto | ErrorResponseBody;
 type IncidentListResponseBody = PageResponseBody<IncidentSummary> | ErrorResponseBody;
 type SignalsResponseBody = PageResponseBody<SignalDto> | ErrorResponseBody;
 type RcaResponseBody = (IncidentSummary & { readonly mttrSeconds: number }) | ErrorResponseBody;
+type TransitionsResponseBody = { readonly items: readonly StateTransitionDto[] } | ErrorResponseBody;
 
 async function handleListIncidents(req: Request, res: Response<IncidentListResponseBody>): Promise<void> {
   const parsed = paginationQuerySchema.safeParse(req.query);
@@ -116,20 +124,36 @@ async function handleGetIncidentSignals(req: Request, res: Response<SignalsRespo
     return;
   }
 
-  const parsedQuery = paginationQuerySchema.safeParse(req.query);
+  const parsedQuery = signalsQuerySchema.safeParse(req.query);
   if (!parsedQuery.success) {
     res.status(400).json({ error: "validation_error", message: "invalid pagination parameters" });
     return;
   }
 
-  const { limit, offset } = parsedQuery.data;
-  const page = await getServices().dashboard.getIncidentSignals(id, { limit, offset });
+  const { limit, offset, order } = parsedQuery.data;
+  const page = await getServices().dashboard.getIncidentSignals(id, { limit, offset, order });
   if (!page) {
     res.status(404).json({ error: "not_found", message: `No incident with id ${id}` });
     return;
   }
 
   res.status(200).json({ items: page.items, total: page.total, limit, offset });
+}
+
+async function handleGetIncidentTransitions(req: Request, res: Response<TransitionsResponseBody>): Promise<void> {
+  const { id } = req.params;
+  if (!id) {
+    res.status(400).json({ error: "validation_error", message: "incident id is required" });
+    return;
+  }
+
+  const transitions = await getServices().dashboard.getIncidentTransitions(id);
+  if (!transitions) {
+    res.status(404).json({ error: "not_found", message: `No incident with id ${id}` });
+    return;
+  }
+
+  res.status(200).json({ items: transitions });
 }
 
 async function handleTransition(req: Request, res: Response<IncidentResponseBody>): Promise<void> {
@@ -217,6 +241,13 @@ workitemsRouter.get(
   "/:id/signals",
   (req: Request, res: Response<SignalsResponseBody>, next: NextFunction): void => {
     handleGetIncidentSignals(req, res).catch(next);
+  },
+);
+
+workitemsRouter.get(
+  "/:id/transitions",
+  (req: Request, res: Response<TransitionsResponseBody>, next: NextFunction): void => {
+    handleGetIncidentTransitions(req, res).catch(next);
   },
 );
 

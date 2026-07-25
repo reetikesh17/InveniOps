@@ -1,9 +1,12 @@
 import type { WorkItemState } from "./enums";
 
-// Mirrors the Prisma StateTransition model shape (prisma/schema.prisma) —
-// no backend endpoint returns this directly yet (there's no audit-trail
-// route today), included for forward compatibility per the shared-types
-// spec and so a future audit-trail view has a ready-made type.
+// Mirrors backend src/services/dashboard/dashboardProjection.ts's
+// StateTransitionDto — what GET /api/v1/incidents/:id/transitions returns
+// (the Incident Detail page's audit trail). fromState === toState is a
+// real, valid row: the escalation scheduler records escalations on this
+// same trail as a no-op state update, distinguishable only by that equality
+// (see backend/src/repositories/postgres/workItemRepository.ts's
+// recordEscalation).
 export interface StateTransition {
   readonly id: string;
   readonly workItemId: string;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ComponentType, Severity, WorkItemStatus, type WorkItem } from "@prisma/client";
+import { ComponentType, Severity, WorkItemStatus, type WorkItem, type StateTransition } from "@prisma/client";
 import {
   DashboardProjectionService,
   type WorkItemReadStore,
@@ -45,7 +45,10 @@ function toSummary(workItem: WorkItem): IncidentSummary {
   };
 }
 
-function fakeWorkItemStore(workItems: readonly WorkItemWithRca[]): WorkItemReadStore & { findByIdCalls: string[] } {
+function fakeWorkItemStore(
+  workItems: readonly WorkItemWithRca[],
+  transitions: readonly StateTransition[] = [],
+): WorkItemReadStore & { findByIdCalls: string[] } {
   const findByIdCalls: string[] = [];
   return {
     findByIdCalls,
@@ -56,6 +59,9 @@ function fakeWorkItemStore(workItems: readonly WorkItemWithRca[]): WorkItemReadS
     listActive(pagination: Pagination): Promise<WorkItem[]> {
       const active = workItems.filter((workItem) => workItem.state !== "CLOSED");
       return Promise.resolve(active.slice(pagination.offset, pagination.offset + pagination.limit));
+    },
+    listTransitions(workItemId: string): Promise<StateTransition[]> {
+      return Promise.resolve(transitions.filter((transition) => transition.workItemId === workItemId));
     },
   };
 }
@@ -246,5 +252,43 @@ describe("DashboardProjectionService.getIncidentSignals", () => {
       repopulateCap: 100,
     });
     expect(await service.getIncidentSignals("missing", { limit: 10, offset: 0 })).toBeNull();
+  });
+});
+
+describe("DashboardProjectionService.getIncidentTransitions", () => {
+  function makeTransition(overrides: Partial<StateTransition> = {}): StateTransition {
+    return {
+      id: "st-1",
+      workItemId: "wi-1",
+      fromState: WorkItemStatus.OPEN,
+      toState: WorkItemStatus.INVESTIGATING,
+      actor: "operator-1",
+      occurredAt: NOW,
+      ...overrides,
+    };
+  }
+
+  it("returns the full audit trail for an existing incident, oldest first as the store provides it", async () => {
+    const workItem = makeWorkItem();
+    const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }], [
+      makeTransition({ id: "st-1", toState: WorkItemStatus.INVESTIGATING }),
+      makeTransition({ id: "st-2", fromState: WorkItemStatus.INVESTIGATING, toState: WorkItemStatus.RESOLVED }),
+    ]);
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), fakeCache(), {
+      repopulateCap: 100,
+    });
+
+    const transitions = await service.getIncidentTransitions("wi-1");
+
+    expect(transitions).toHaveLength(2);
+    expect(transitions?.map((t) => t.id)).toEqual(["st-1", "st-2"]);
+    expect(transitions?.[0]).toMatchObject({ fromState: "OPEN", toState: "INVESTIGATING", actor: "operator-1" });
+  });
+
+  it("returns null for a nonexistent incident rather than an empty list", async () => {
+    const service = new DashboardProjectionService(fakeWorkItemStore([]), fakeSignalStore([]), fakeCache(), {
+      repopulateCap: 100,
+    });
+    expect(await service.getIncidentTransitions("missing")).toBeNull();
   });
 });

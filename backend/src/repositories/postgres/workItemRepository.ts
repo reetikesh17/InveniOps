@@ -4,6 +4,7 @@ import {
   type PrismaClient,
   type WorkItem,
   type RcaRecord,
+  type StateTransition,
   type ComponentType,
   type Severity,
   type RootCauseCategory,
@@ -117,6 +118,14 @@ export class PostgresWorkItemRepository {
     return this.prisma.workItem.findUnique({
       where: { id },
       include: { rca: true },
+    });
+  }
+
+  /** Full audit trail for one work item, oldest first — includes escalation rows (fromState === toState), which the caller distinguishes by that equality, not by a separate flag. */
+  async listTransitions(workItemId: string): Promise<StateTransition[]> {
+    return this.prisma.stateTransition.findMany({
+      where: { workItemId },
+      orderBy: { occurredAt: "asc" },
     });
   }
 

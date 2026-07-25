@@ -9,6 +9,8 @@ import type {
   PaginationParams,
   RcaSubmissionInput,
   Signal,
+  SignalsQuery,
+  StateTransition,
   ThroughputQuery,
   ThroughputResponse,
   WorkItem,
@@ -179,8 +181,12 @@ export const api = {
     return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}`, opts);
   },
 
-  getIncidentSignals(id: string, params: PaginationParams = {}, opts?: CallOptions): Promise<Page<Signal>> {
+  getIncidentSignals(id: string, params: SignalsQuery = {}, opts?: CallOptions): Promise<Page<Signal>> {
     return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/signals${toQueryString(params)}`, opts);
+  },
+
+  getIncidentTransitions(id: string, opts?: CallOptions): Promise<{ readonly items: readonly StateTransition[] }> {
+    return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/transitions`, opts);
   },
 
   transitionIncident(id: string, toState: WorkItemState, actor: string, opts?: CallOptions): Promise<WorkItem> {

@@ -12,7 +12,7 @@ export type { WorkItem, IncidentDetail } from "./workItem";
 export type { RcaRecord, RcaSubmissionInput } from "./rca";
 export type { Signal } from "./signal";
 export type { StateTransition } from "./stateTransition";
-export type { PaginationParams, Page } from "./pagination";
+export type { PaginationParams, SignalsQuery, Page } from "./pagination";
 export type {
   AnalyticsGroupBy,
   ThroughputQuery,

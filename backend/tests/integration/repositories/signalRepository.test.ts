@@ -97,6 +97,18 @@ describe("MongoSignalRepository", () => {
       expect(page2.map((s) => s.signalId)).toEqual([signals[2]?.signalId, signals[3]?.signalId]);
     });
 
+    it("returns newest-first when order is desc", async () => {
+      const workItemId = randomUUID();
+      const signals = [0, 1, 2].map((i) =>
+        makeSignal({ workItemId, receivedAt: new Date(Date.UTC(2026, 0, 1, 0, 0, i)) }),
+      );
+      await repo.insertMany(signals);
+
+      const results = await repo.findByWorkItemId(workItemId, { limit: 10, offset: 0, order: "desc" });
+
+      expect(results.map((s) => s.signalId)).toEqual([signals[2]?.signalId, signals[1]?.signalId, signals[0]?.signalId]);
+    });
+
     it("does not return signals belonging to a different work item", async () => {
       const workItemId = randomUUID();
       await repo.insertMany([makeSignal({ workItemId }), makeSignal({ workItemId: randomUUID() })]);

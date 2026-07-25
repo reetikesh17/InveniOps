@@ -1,7 +1,7 @@
-import type { WorkItem, RcaRecord as PrismaRcaRecord } from "@prisma/client";
+import type { WorkItem, RcaRecord as PrismaRcaRecord, StateTransition } from "@prisma/client";
 import { getLegalNextStates, type WorkItemStateName } from "../../domain/state/index.js";
 import type { IncidentSummary, ActiveIncidentPage } from "../../repositories/redis/dashboardCache.js";
-import type { SignalDocument } from "../../repositories/mongo/signalRepository.js";
+import type { SignalDocument, SignalPagination } from "../../repositories/mongo/signalRepository.js";
 import type { WorkItemWithRca } from "../../repositories/postgres/index.js";
 
 // Narrow, structural interfaces — the real PostgresWorkItemRepository /
@@ -12,10 +12,11 @@ import type { WorkItemWithRca } from "../../repositories/postgres/index.js";
 export interface WorkItemReadStore {
   findById(id: string): Promise<WorkItemWithRca | null>;
   listActive(pagination: Pagination): Promise<WorkItem[]>;
+  listTransitions(workItemId: string): Promise<StateTransition[]>;
 }
 
 export interface SignalReadStore {
-  findByWorkItemId(workItemId: string, pagination: Pagination): Promise<SignalDocument[]>;
+  findByWorkItemId(workItemId: string, pagination: SignalPagination): Promise<SignalDocument[]>;
   countByWorkItemId(workItemId: string): Promise<number>;
 }
 
@@ -62,6 +63,16 @@ export interface SignalDto {
   readonly workItemId: string | null;
 }
 
+// Mirrors the Prisma StateTransition model — see GET /api/v1/incidents/:id/transitions.
+export interface StateTransitionDto {
+  readonly id: string;
+  readonly workItemId: string;
+  readonly fromState: string;
+  readonly toState: string;
+  readonly actor: string;
+  readonly occurredAt: string;
+}
+
 export interface DashboardProjectionOptions {
   /** Cap on how many active work items a single cold-cache repopulation fetches from Postgres — see docs/data-model.md. */
   readonly repopulateCap: number;
@@ -92,6 +103,17 @@ function toRcaSummaryDto(rca: PrismaRcaRecord): RcaSummaryDto {
     preventionSteps: rca.preventionSteps,
     mttrSeconds: rca.mttrSeconds,
     submittedAt: rca.submittedAt.toISOString(),
+  };
+}
+
+function toStateTransitionDto(transition: StateTransition): StateTransitionDto {
+  return {
+    id: transition.id,
+    workItemId: transition.workItemId,
+    fromState: transition.fromState,
+    toState: transition.toState,
+    actor: transition.actor,
+    occurredAt: transition.occurredAt.toISOString(),
   };
 }
 
@@ -174,7 +196,7 @@ export class DashboardProjectionService {
   }
 
   /** Null means the work item itself doesn't exist — distinct from "exists but has no signals yet." */
-  async getIncidentSignals(workItemId: string, pagination: Pagination): Promise<Page<SignalDto> | null> {
+  async getIncidentSignals(workItemId: string, pagination: SignalPagination): Promise<Page<SignalDto> | null> {
     const exists = await this.incidentExists(workItemId);
     if (!exists) {
       return null;
@@ -186,6 +208,17 @@ export class DashboardProjectionService {
     ]);
 
     return { items: documents.map(toSignalDto), total };
+  }
+
+  /** Null means the work item itself doesn't exist. Unpaginated: an incident accumulates at most a handful of transitions (one per lifecycle step, plus rare escalation rows) — nowhere near the volume that justifies paging, unlike the raw signal log. */
+  async getIncidentTransitions(workItemId: string): Promise<readonly StateTransitionDto[] | null> {
+    const exists = await this.incidentExists(workItemId);
+    if (!exists) {
+      return null;
+    }
+
+    const transitions = await this.workItemStore.listTransitions(workItemId);
+    return transitions.map(toStateTransitionDto);
   }
 
   private async incidentExists(workItemId: string): Promise<boolean> {
