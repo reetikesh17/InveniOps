@@ -3,7 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Incident Management System</title>
+    <meta name="color-scheme" content="dark light" />
+    <title>Incident Console</title>
+    <!-- The favicon is the segmented urgency ribbon in miniature (the same
+         four severity swatches as the header/feed spine), not a generic
+         gear/bell/chart glyph — so it's recognizable as this app's tab even
+         at 16px. Inline data URI: no icon file to keep in sync, no
+         dependency. -->
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNyIgZmlsbD0iIzE1MWIxZSIvPjxyZWN0IHg9IjQiIHk9IjYiIHdpZHRoPSI0LjUiIGhlaWdodD0iMjAiIHJ4PSIxLjUiIGZpbGw9IiNlMDY4NWMiLz48cmVjdCB4PSIxMC41IiB5PSI2IiB3aWR0aD0iNC41IiBoZWlnaHQ9IjIwIiByeD0iMS41IiBmaWxsPSIjZTBhNjRmIi8+PHJlY3QgeD0iMTciIHk9IjYiIHdpZHRoPSI0LjUiIGhlaWdodD0iMjAiIHJ4PSIxLjUiIGZpbGw9IiM0ZmEwOTMiLz48cmVjdCB4PSIyMy41IiB5PSI2IiB3aWR0aD0iNC41IiBoZWlnaHQ9IjIwIiByeD0iMS41IiBmaWxsPSIjNmM3Yzk2Ii8+PC9zdmc+"
+    />
+    <!-- Sets data-theme on <html> before first paint (stored choice, else OS
+         preference, else dark) so the CSS in index.css never has to guess and
+         a returning visitor who forced a theme against their OS preference
+         never sees a flash of the wrong one. Must stay a plain synchronous
+         script (no type="module", no defer) and must run before the
+         stylesheet link below finishes, and must agree with the storage key
+         and fallback logic in src/hooks/useTheme.ts. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("ims:theme");
+          var theme =
+            stored === "dark" || stored === "light"
+              ? stored
+              : window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark";
+          document.documentElement.setAttribute("data-theme", theme);
+        } catch (e) {
+          // storage/matchMedia unavailable — index.css's own dark default and
+          // prefers-color-scheme media query still apply without this.
+        }
+      })();
+    </script>
+    <!-- Three faces per the design system: Archivo (display/equipment labels),
+         IBM Plex Sans (body prose), JetBrains Mono (machine values). Loaded
+         over a <link>, not an npm dependency; strong system fallbacks in the
+         CSS stacks keep the app legible offline. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
     <div id="root"></div>

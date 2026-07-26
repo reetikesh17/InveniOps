@@ -12,10 +12,11 @@ export function ErrorState({ message, onRetry, retryLabel = "Retry" }: ErrorStat
   return (
     <div
       role="alert"
-      className="flex flex-col items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-6 py-10 text-center"
+      className="flex flex-col items-center gap-3 rounded-md border border-border bg-surface px-6 py-10 text-center"
     >
-      <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
-      <p className="text-sm font-medium text-red-800">{message}</p>
+      {/* The P0 severity hue is the app's only "critical" colour — reuse it, don't introduce raw red. */}
+      <ExclamationTriangleIcon className="h-7 w-7 text-severity-p0" />
+      <p className="max-w-md font-body text-prose text-ink">{message}</p>
       {onRetry && (
         <Button variant="secondary" onClick={onRetry}>
           {retryLabel}

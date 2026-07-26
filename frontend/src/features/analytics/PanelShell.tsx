@@ -43,7 +43,7 @@ export function PanelShell({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-base font-semibold text-ink">{title}</h2>
-          {description && <p className="text-sm text-ink-muted">{description}</p>}
+          {description && <p className="font-body text-prose text-ink-muted">{description}</p>}
         </div>
         {controls && <div className="flex flex-wrap items-center gap-2">{controls}</div>}
       </div>

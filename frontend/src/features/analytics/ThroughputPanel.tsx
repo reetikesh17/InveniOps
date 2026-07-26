@@ -2,14 +2,7 @@ import { useCallback, useMemo } from "react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { api } from "../../lib/api";
 import { ChartTooltipContent } from "./ChartTooltip";
-import {
-  CHART_AXIS,
-  CHART_GRID,
-  CHART_INK_MUTED,
-  THROUGHPUT_COLOR,
-  formatBucketFull,
-  makeTimeTickFormatter,
-} from "./chartTheme";
+import { formatBucketFull, makeTimeTickFormatter, useChartColors } from "./chartTheme";
 import { CHART_HEIGHT, PanelShell } from "./PanelShell";
 import { useAnalyticsResource } from "./useAnalyticsResource";
 import type { TimeRange } from "./useTimeRange";
@@ -20,6 +13,7 @@ export interface ThroughputPanelProps {
 
 export function ThroughputPanel({ range }: ThroughputPanelProps): JSX.Element {
   const { fromIso, toIso, intervalSeconds, fromMs, toMs } = range;
+  const c = useChartColors();
 
   const fetcher = useCallback(
     (opts: Parameters<typeof api.getThroughput>[1]) =>
@@ -57,20 +51,15 @@ export function ThroughputPanel({ range }: ThroughputPanelProps): JSX.Element {
     >
       <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
-          <CartesianGrid stroke={CHART_GRID} vertical={false} />
+          <CartesianGrid stroke={c.grid} vertical={false} />
           <XAxis
             dataKey="bucket"
             tickFormatter={tickFormatter}
-            stroke={CHART_AXIS}
-            tick={{ fill: CHART_INK_MUTED, fontSize: 11 }}
+            stroke={c.axis}
+            tick={{ fill: c.inkMuted, fontSize: 11 }}
             minTickGap={28}
           />
-          <YAxis
-            stroke={CHART_AXIS}
-            tick={{ fill: CHART_INK_MUTED, fontSize: 11 }}
-            width={36}
-            allowDecimals={false}
-          />
+          <YAxis stroke={c.axis} tick={{ fill: c.inkMuted, fontSize: 11 }} width={36} allowDecimals={false} />
           <Tooltip
             content={
               <ChartTooltipContent
@@ -84,7 +73,7 @@ export function ThroughputPanel({ range }: ThroughputPanelProps): JSX.Element {
             type="monotone"
             dataKey="total"
             name="Throughput"
-            stroke={THROUGHPUT_COLOR}
+            stroke={c.line}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}

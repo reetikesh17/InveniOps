@@ -4,6 +4,7 @@ import { Button, Card, EmptyState, ErrorState, IncidentDetailSkeleton, Input, us
 import { XCircleIcon } from "../../components/icons";
 import { friendlyErrorMessage } from "../../lib/errorMessages";
 import { useDelayedFlag } from "../../hooks/useDelayedFlag";
+import { useDocumentTitle } from "../../hooks/useDocumentTitle";
 import { RcaForm } from "../rca/RcaForm";
 import { DetailHeader } from "./DetailHeader";
 import { RcaReadOnly } from "./RcaReadOnly";
@@ -34,6 +35,7 @@ export function IncidentDetailPage(): JSX.Element | null {
 
   const { detail, loading, error, notFound, refresh } = useIncidentDetail(id ?? "");
   const showSkeleton = useDelayedFlag(loading && !detail);
+  useDocumentTitle(detail ? `${detail.severity} · ${detail.componentId}` : "Incident");
 
   useEffect(() => {
     if (!conflictMessage) {
@@ -87,7 +89,11 @@ export function IncidentDetailPage(): JSX.Element | null {
       </Link>
 
       {conflictMessage && (
-        <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+        <div
+          role="alert"
+          style={{ borderLeftColor: "var(--color-severity-p1)" }}
+          className="rounded-md border border-border border-l-[3px] bg-surface-raised px-4 py-2.5 text-sm text-ink"
+        >
           {conflictMessage}
         </div>
       )}

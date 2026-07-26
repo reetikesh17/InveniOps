@@ -3,6 +3,7 @@ import { EmptyState, ErrorState, IncidentListSkeleton } from "../../components";
 import { ArchiveIcon } from "../../components/icons";
 import { friendlyErrorMessage } from "../../lib/errorMessages";
 import { useDelayedFlag } from "../../hooks/useDelayedFlag";
+import { useDocumentTitle } from "../../hooks/useDocumentTitle";
 import { FeedViewToggle } from "./FeedViewToggle";
 import { IncidentTable } from "./IncidentTable";
 import { Pagination } from "./Pagination";
@@ -22,6 +23,7 @@ function parsePage(params: URLSearchParams): number {
  * to the detail page, where the read-only RCA and final MTTR live.
  */
 export function ClosedIncidentsView(): JSX.Element {
+  useDocumentTitle("Closed Incidents");
   const [searchParams, setSearchParams] = useSearchParams();
   const page = parsePage(searchParams);
   const { items, total, loading, error, refetch } = useClosedIncidents(page, PAGE_SIZE);
@@ -43,7 +45,7 @@ export function ClosedIncidentsView(): JSX.Element {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-ink">Closed incidents</h1>
+          <h1 className="font-display text-lg font-bold uppercase tracking-[0.1em] text-ink">Closed incidents</h1>
           <FeedViewToggle view="closed" />
         </div>
         {total > 0 && <span className="text-sm text-ink-muted">{total} total</span>}

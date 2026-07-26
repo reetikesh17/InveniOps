@@ -32,17 +32,17 @@ function SignalRow({ signal }: { signal: Signal }): JSX.Element {
         aria-expanded={expanded}
         className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-surface-muted"
       >
-        <ChevronDownIcon className={`h-4 w-4 shrink-0 text-ink-faint transition-transform ${expanded ? "rotate-180" : ""}`} />
+        <ChevronDownIcon className={`h-4 w-4 shrink-0 text-ink-muted transition-transform ${expanded ? "rotate-180" : ""}`} />
         {isKnownSeverity(signal.severity) ? (
           <SeverityBadge severity={signal.severity} />
         ) : (
           <span className="text-xs font-semibold text-ink-muted">{signal.severity}</span>
         )}
-        <RelativeTime value={signal.receivedAt} className="text-ink-muted" />
-        <span className="ml-auto truncate text-xs text-ink-faint">{signal.signalId}</span>
+        <RelativeTime value={signal.receivedAt} className="font-mono text-mono-num tabular-nums text-ink-muted" />
+        <span className="ml-auto truncate font-mono text-mono-id text-ink-muted">{signal.signalId}</span>
       </button>
       {expanded && (
-        <pre className="overflow-x-auto bg-surface-muted px-3 py-2.5 text-xs text-ink">
+        <pre className="overflow-x-auto bg-surface-muted px-3 py-2.5 font-mono text-xs text-ink">
           {JSON.stringify(signal.rawPayload, null, 2)}
         </pre>
       )}

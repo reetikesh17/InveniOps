@@ -19,24 +19,25 @@ const AUTO_DISMISS_MS = 5_000;
 
 function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => void }): JSX.Element {
   const isSuccess = toast.variant === "success";
+  // Success is neutral (no green — colour is rationed to severity); error
+  // borrows the P0 hue on its rail + icon.
   return (
     <div
       role="status"
-      className={`pointer-events-auto flex w-full max-w-sm items-start gap-2 rounded-lg border px-3 py-2.5 text-sm shadow-lg ${
-        isSuccess ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-red-200 bg-red-50 text-red-900"
-      }`}
+      style={{ borderLeftColor: isSuccess ? "var(--color-ink-muted)" : "var(--color-severity-p0)" }}
+      className="pointer-events-auto flex w-full max-w-sm items-start gap-2 rounded-md border border-border border-l-[3px] bg-surface-raised px-3 py-2.5 text-ink shadow-lg"
     >
       {isSuccess ? (
-        <CheckCircleIcon className="h-5 w-5 shrink-0 text-emerald-600" />
+        <CheckCircleIcon className="h-5 w-5 shrink-0 text-ink-muted" />
       ) : (
-        <XCircleIcon className="h-5 w-5 shrink-0 text-red-600" />
+        <XCircleIcon className="h-5 w-5 shrink-0 text-severity-p0" />
       )}
-      <span className="flex-1 pt-0.5">{toast.message}</span>
+      <span className="flex-1 pt-0.5 font-body text-prose">{toast.message}</span>
       <button
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss notification"
-        className="rounded text-lg leading-none text-current/60 hover:text-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900"
+        className="rounded-sm text-lg leading-none text-ink-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink focus-visible:ring-offset-surface-raised"
       >
         ×
       </button>

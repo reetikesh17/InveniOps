@@ -9,9 +9,16 @@ interface BannerContent {
   readonly showRetry: boolean;
 }
 
-const TONE_CLASSES: Record<BannerTone, string> = {
-  critical: "border-red-200 bg-red-50 text-red-800",
-  warning: "border-amber-200 bg-amber-50 text-amber-900",
+// A left rail in the severity hue (P0 for outage/unreachable, P1 for shedding)
+// on the raised surface — the banner is the system-health analogue of a row
+// spine, so it reuses the same rationed colours instead of raw red/amber.
+const TONE_RAIL: Record<BannerTone, string> = {
+  critical: "var(--color-severity-p0)",
+  warning: "var(--color-severity-p1)",
+};
+const TONE_ICON: Record<BannerTone, string> = {
+  critical: "text-severity-p0",
+  warning: "text-severity-p1",
 };
 
 /**
@@ -62,15 +69,16 @@ export function SystemBanner(): JSX.Element | null {
   return (
     <div
       role={banner.tone === "critical" ? "alert" : "status"}
-      className={`flex flex-wrap items-center gap-2 border-b px-4 py-2 text-sm sm:px-6 ${TONE_CLASSES[banner.tone]}`}
+      style={{ borderLeftColor: TONE_RAIL[banner.tone] }}
+      className="flex flex-wrap items-center gap-2 border-b border-l-[3px] border-b-border bg-surface-raised px-4 py-2 text-sm text-ink sm:px-6"
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      <span>{banner.message}</span>
+      <Icon className={`h-4 w-4 shrink-0 ${TONE_ICON[banner.tone]}`} />
+      <span className="font-body">{banner.message}</span>
       {banner.showRetry && (
         <button
           type="button"
           onClick={refresh}
-          className="ml-auto rounded font-medium underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900"
+          className="ml-auto rounded-sm font-mono text-xs uppercase tracking-wide text-ink-muted underline underline-offset-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-ink focus-visible:ring-offset-surface-raised"
         >
           Retry now
         </button>

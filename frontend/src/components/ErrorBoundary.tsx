@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (this.state.error) {
       return (
         <Card className="flex flex-col items-center gap-3 py-10 text-center">
-          <ExclamationTriangleIcon className="h-8 w-8 text-red-500" />
+          <ExclamationTriangleIcon className="h-8 w-8 text-severity-p0" />
           <div>
             <p className="text-sm font-semibold text-ink">
               {this.props.label ? `Something went wrong loading ${this.props.label}.` : "Something went wrong on this screen."}

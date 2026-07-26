@@ -5,16 +5,11 @@ import { api } from "../../lib/api";
 import type { AnalyticsGroupBy } from "../../types";
 import { ChartTooltipContent } from "./ChartTooltip";
 import {
-  CHART_AXIS,
-  CHART_GRID,
-  CHART_INK_MUTED,
-  CHART_SURFACE,
   COMPONENT_TYPE_ORDER,
   SEVERITY_ORDER,
-  colorForComponentType,
-  colorForSeverity,
   formatBucketFull,
   makeTimeTickFormatter,
+  useChartColors,
 } from "./chartTheme";
 import { CHART_HEIGHT, PanelShell } from "./PanelShell";
 import { useAnalyticsResource } from "./useAnalyticsResource";
@@ -38,7 +33,7 @@ function GroupByToggle({ value, onChange }: { value: AnalyticsGroupBy; onChange:
             aria-pressed={isSelected}
             onClick={() => onChange(option.key)}
             className={`px-2.5 py-1 text-xs font-medium ${index > 0 ? "border-l border-border-strong" : ""} ${
-              isSelected ? "bg-ink text-white" : "bg-surface text-ink-muted hover:bg-surface-muted"
+              isSelected ? "bg-ink text-surface-muted" : "bg-surface text-ink-muted hover:bg-surface-raised"
             } ${FOCUS_RING}`}
           >
             {option.label}
@@ -77,8 +72,9 @@ export function IncidentVolumePanel({ range }: IncidentVolumePanelProps): JSX.El
   );
   const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [fromIso, toIso, intervalSeconds, groupBy]);
 
+  const c = useChartColors();
   const order = groupBy === "severity" ? SEVERITY_ORDER : COMPONENT_TYPE_ORDER;
-  const colorFor = groupBy === "severity" ? colorForSeverity : colorForComponentType;
+  const colorFor = groupBy === "severity" ? c.colorForSeverity : c.colorForComponentType;
 
   // Pivot the server's long {bucket,value,count} rows into one row per bucket
   // with a column per series value (recharts' stacked-bar shape). No counts
@@ -115,17 +111,17 @@ export function IncidentVolumePanel({ range }: IncidentVolumePanelProps): JSX.El
       <div className="flex flex-col gap-2">
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <BarChart data={rows} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
-            <CartesianGrid stroke={CHART_GRID} vertical={false} />
+            <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis
               dataKey="bucket"
               tickFormatter={tickFormatter}
-              stroke={CHART_AXIS}
-              tick={{ fill: CHART_INK_MUTED, fontSize: 11 }}
+              stroke={c.axis}
+              tick={{ fill: c.inkMuted, fontSize: 11 }}
               minTickGap={28}
             />
-            <YAxis stroke={CHART_AXIS} tick={{ fill: CHART_INK_MUTED, fontSize: 11 }} width={36} allowDecimals={false} />
+            <YAxis stroke={c.axis} tick={{ fill: c.inkMuted, fontSize: 11 }} width={36} allowDecimals={false} />
             <Tooltip
-              cursor={{ fill: "rgba(0,0,0,0.04)" }}
+              cursor={{ fill: "rgba(127,127,127,0.12)" }}
               content={
                 <ChartTooltipContent labelFormatter={(label) => formatBucketFull(String(label))} valueFormatter={(v) => `${v}`} hideZero />
               }
@@ -137,7 +133,7 @@ export function IncidentVolumePanel({ range }: IncidentVolumePanelProps): JSX.El
                 name={value}
                 stackId="incidents"
                 fill={colorFor(value)}
-                stroke={CHART_SURFACE}
+                stroke={c.surface}
                 strokeWidth={1.5}
                 radius={index === activeSeries.length - 1 ? [2, 2, 0, 0] : undefined}
                 isAnimationActive={false}

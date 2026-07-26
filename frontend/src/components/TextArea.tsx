@@ -25,7 +25,12 @@ export function TextArea({ label, error, hint, id, className = "", rows = 3, ...
       <textarea
         id={textAreaId}
         rows={rows}
-        className={fieldClasses(Boolean(error), `resize-y ${className}`)}
+        // `prose` — this is genuinely human-authored free text (RCA
+        // description, fix applied, prevention steps), the exact case the
+        // type scale's prose rung names by example. The other three field
+        // primitives stay at Tailwind's default text-sm; only TextArea holds
+        // long-form writing.
+        className={fieldClasses(Boolean(error), `resize-y font-body text-prose ${className}`)}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         {...rest}

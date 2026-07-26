@@ -280,6 +280,66 @@ the APIs above. Every route is a lazily-loaded chunk wrapped in an error
 boundary, so one screen failing degrades to a recoverable card, never a white
 page.
 
+### Design system
+
+**The brief: a NOC panel read at 3am by an on-call engineer who just got
+paged.** One job — show what's broken, how bad, and how long, scannable in
+under three seconds — which drove every decision below. Full rationale:
+[ADR 0008](docs/decisions/0008-console-visual-system.md). Tokens live in the
+`@theme` layer of [`frontend/src/index.css`](frontend/src/index.css).
+
+**Palette — colour rationed to severity, nothing else.** Every hue in the
+system is fully desaturated/darkened from a normal UI palette *except* the
+four severity swatches, so a glance at colour alone means "how bad" and
+nothing competes with it — no colourful buttons, no cheerful success-green,
+no brand blue. Two parallel palettes, not one flipped: dark **"instrument
+slate"** is the primary mode (`#0e1315` panel, `#d6dddf` ink), and light
+**"daylight triage"** is a first-class alternative in cool greys (`#eef1f2`
+panel), never the cream/warm-white a light mode defaults to by habit. Severity
+splits warm-vs-cool by urgency tier — P0/P1 (act now) are warm red/amber, P2/P3
+(be aware) are cool teal/slate — so the *temperature* of a row is legible
+even before reading the code, and the same four hues drive the row spine, the
+age dot, the header's urgency ribbon, and the analytics charts from one source
+(`components/severity.ts`) so they can never drift apart. Every text/colour
+pairing in both themes is audited against WCAG AA (4.5:1 for real text, 3:1
+for graphical elements like the spine/dots) — see the ADR for the two
+contrast bugs the audit caught and how they were fixed without losing the
+"three ink tiers" hierarchy.
+
+**Type — a three-face system that tells machine from human at a glance.**
+Archivo for equipment-style labels (tracked, uppercase — the wordmark and page
+headings), IBM Plex Sans for human prose (titles, RCA narrative, empty/error
+copy), JetBrains Mono for every machine-generated value — component/signal
+IDs, timestamps, counts, raw JSON — with tabular figures so numbers align in
+a column. Seven named type-scale rungs (`eyebrow` through `mono-micro`, all
+defined in `index.css`'s `@theme` block and demoed live on `/styleguide`) mean
+no component ever reaches for an arbitrary `text-[13px]` — it picks the rung
+that matches its job.
+
+**Density & signature — the severity spine.** Feed rows run roughly 1.7× the
+density of a typical list row (`~28px`), because an operator scanning fifty
+active incidents needs the whole picture on one screen, not five scrolls. The
+signature element is a 3px colour rail on each row's leading edge; because
+rows abut with no divider, a severity-sorted feed reads as one continuous
+ribbon rather than fifty individual coloured chips. An **age dot** in the same
+gutter answers "how long" — hollow while fresh, filled once an incident has
+sat unaddressed past a threshold — and "time in state" separately escalates by
+ink weight, never a second colour, so severity and staleness never blur into
+each other.
+
+|  |  |
+|---|---|
+| ![Live Feed — dark](docs/screenshots/live-feed-dark.png) | ![Live Feed — light](docs/screenshots/live-feed-light.png) |
+| **Dark** — "instrument slate," the default | **Light** — "daylight triage," a first-class alternative, not a flip |
+
+Every reusable primitive in every state — badges, buttons, form fields, the
+full type scale, the severity spine on real data — is catalogued at
+[`/styleguide`](frontend/src/features/styleguide/StyleGuidePage.tsx). It's a
+**development artifact, not a product surface**: intentionally not linked
+from the primary nav (an on-call engineer never needs it at 3am), reachable
+only by typing the URL, and it exists so the visual system can be reviewed and
+regression-checked independent of any one screen.
+
 ### Routes
 
 | Route | Screen | What it does |
@@ -301,10 +361,10 @@ on navigating away with unsaved changes.
 
 | | |
 |---|---|
-| ![Live Feed](docs/ui/live-feed.png) | ![Incident Detail](docs/ui/incident-detail.png) |
-| **Live Feed** — severity counts, escalating time-in-state, real-time updates | **Incident Detail** — state controls, transition timeline, raw signals |
-| ![RCA form](docs/ui/rca-form.png) | ![Analytics](docs/ui/analytics.png) |
-| **RCA form** — live MTTR preview, character counters, draft persistence | **Analytics** — throughput, volume, MTTR trend, component health, live system status |
+| ![Live Feed](docs/screenshots/live-feed-dark.png) | ![Incident Detail + RCA form](docs/screenshots/incident-detail.png) |
+| **Live Feed** — severity counts, escalating time-in-state, real-time updates | **Incident Detail** — state controls, transition timeline, raw signals, and (once RESOLVED) the RCA form with its live MTTR preview |
+| ![Analytics](docs/screenshots/analytics.png) | |
+| **Analytics** — throughput, volume, MTTR trend, component health, live system status | |
 
 ### Resilience & accessibility
 
@@ -321,13 +381,23 @@ on navigating away with unsaved changes.
 - Skeletons appear only after ~200ms to avoid flicker; every fetch is
   cancellable and aborted on unmount.
 - Keyboard-navigable through the full workflow with a visible focus ring
-  throughout; `header`/`nav`/`main` landmarks, one `h1` per screen, a
-  skip-to-content link, and `aria-current` on the active nav item. No meaning
-  is carried by colour alone (severity/state badges pair colour with an icon
-  and label; charts always carry legends and labels). Chart palettes are
-  validated for colour-vision-deficiency separation.
+  throughout — always the neutral `ring-ink` token, never a severity hue, so
+  focus stays visible against every surface in both themes
+  (11.7:1+ dark / 14.4:1+ light); `header`/`nav`/`main` landmarks, one `h1`
+  per screen, a skip-to-content link, and `aria-current` on the active nav
+  item. No meaning is carried by colour alone (severity is always paired
+  with its mono code; state carries no colour at all; charts always carry
+  legends and labels). Chart palettes are validated for colour-vision-
+  deficiency separation.
+- **Every text/background pairing meets WCAG AA** (4.5:1 text, 3:1
+  graphical), in both themes, checked with a contrast script rather than
+  eyeballed — see [ADR 0008](docs/decisions/0008-console-visual-system.md)
+  for the one real failure it caught (`ink-faint` used as label text) and how
+  it was fixed without flattening the three-tier ink hierarchy.
 - Responsive at **375 / 768 / 1440px** — tables collapse to cards on narrow
-  viewports, charts reflow, no horizontal overflow.
+  viewports, charts reflow, no horizontal overflow. Re-checked specifically
+  against the denser feed-row layout, since a tighter row breaks differently
+  than a sparse one.
 
 ### Running the frontend standalone
 

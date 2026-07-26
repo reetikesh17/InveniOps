@@ -1,4 +1,5 @@
 import { FOCUS_RING } from "../../components/Button";
+import { EYEBROW_CLASSES } from "../../components/typography";
 import { INTERVAL_OPTIONS, RANGE_OPTIONS, type TimeRange } from "./useTimeRange";
 
 function Segmented<T extends string>({
@@ -14,7 +15,7 @@ function Segmented<T extends string>({
 }): JSX.Element {
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs font-medium uppercase tracking-wide text-ink-faint">{legend}</span>
+      <span className={EYEBROW_CLASSES}>{legend}</span>
       <div className="inline-flex overflow-hidden rounded-md border border-border-strong" role="group" aria-label={legend}>
         {options.map((option, index) => {
           const isSelected = option.key === selected;
@@ -25,7 +26,7 @@ function Segmented<T extends string>({
               aria-pressed={isSelected}
               onClick={() => onSelect(option.key)}
               className={`px-2.5 py-1 text-xs font-medium ${index > 0 ? "border-l border-border-strong" : ""} ${
-                isSelected ? "bg-ink text-white" : "bg-surface text-ink-muted hover:bg-surface-muted"
+                isSelected ? "bg-ink text-surface-muted" : "bg-surface text-ink-muted hover:bg-surface-raised"
               } ${FOCUS_RING}`}
             >
               {option.label}

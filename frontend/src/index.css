@@ -1,45 +1,130 @@
 @import "tailwindcss";
 
+/*
+  INCIDENT CONSOLE — visual system
+  --------------------------------
+  A NOC panel read in a dark room at 3am. Instrument-grey everything; colour is
+  rationed to severity ALONE and appears only on the severity spine. Dark is the
+  primary mode; light ("daylight triage") is a first-class parallel, not a flip.
+
+  Token names are kept stable so the whole app retones from here:
+    surface-muted = app background (the panel)
+    surface       = rows / cards
+    surface-raised = header / hover / raised chrome
+    border        = hairline dividers   · border-strong = a firmer edge
+    ink / ink-muted / ink-faint = three text tiers
+    severity-p0..p3 = the only chromatic values in the system
+*/
+
 @theme {
-  /* Neutral roles — components reference these, not neutral-500 etc.
-     directly, so every surface/border/text color in the app can be
-     retoned from this one place. All aliases into Tailwind's own default
-     neutral scale (never a hand-picked hex), so contrast stays whatever
-     that scale already guarantees. */
-  --color-surface: var(--color-white);
-  --color-surface-muted: var(--color-neutral-50);
-  --color-border: var(--color-neutral-200);
-  --color-border-strong: var(--color-neutral-300);
-  --color-ink: var(--color-neutral-900);
-  --color-ink-muted: var(--color-neutral-500);
-  --color-ink-faint: var(--color-neutral-400);
+  /* Typefaces — body prose in Plex Sans, machine values in JetBrains Mono,
+     equipment-label display in Archivo (used tracked + uppercase, small). */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", "Menlo", monospace;
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
 
-  /* Severity — P0 is most severe. Badges pair every one of these with a
-     text label and a filled-bar icon (see SeverityBadge.tsx) — never rely
-     on this hue alone to carry meaning. */
-  --color-severity-p0: var(--color-red-600);
-  --color-severity-p1: var(--color-orange-600);
-  --color-severity-p2: var(--color-amber-600);
-  --color-severity-p3: var(--color-sky-600);
+  /* Type scale — every text size in the app is one of these seven named
+     rungs (size + line-height paired, Tailwind's own --text-sm/--text-sm--line-height
+     mechanism). Nothing renders at an arbitrary text-[Npx] value; a
+     component picks the rung that matches its job, never a bespoke number.
+       eyebrow     10/14  — column headers, field labels (mono, uppercase, tracked)
+       wordmark    13/16  — brand mark / page H1s (display, uppercase, tracked)
+       title       13/18  — human-authored titles (incident title)
+       prose       12/17  — body copy (RCA text, empty/error copy)
+       mono-id     12/16  — machine identity values (component/signal IDs)
+       mono-num    12/16  — numeric columns (pair with tabular-nums + text-right)
+       mono-micro  11/14  — secondary lowercase mono (state pill, connection status) */
+  --text-eyebrow: 0.625rem;
+  --text-eyebrow--line-height: 0.875rem;
+  --text-wordmark: 0.8125rem;
+  --text-wordmark--line-height: 1rem;
+  --text-title: 0.8125rem;
+  --text-title--line-height: 1.125rem;
+  --text-prose: 0.75rem;
+  --text-prose--line-height: 1.0625rem;
+  --text-mono-id: 0.75rem;
+  --text-mono-id--line-height: 1rem;
+  --text-mono-num: 0.75rem;
+  --text-mono-num--line-height: 1rem;
+  --text-mono-micro: 0.6875rem;
+  --text-mono-micro--line-height: 0.875rem;
 
-  /* Workflow state — a deliberately distinct hue family from severity so
-     a status column and a severity column are never visually confusable
-     at a glance. */
-  --color-state-open: var(--color-blue-600);
-  --color-state-investigating: var(--color-violet-600);
-  --color-state-resolved: var(--color-emerald-600);
-  --color-state-closed: var(--color-neutral-500);
+  /* Density — the approved feed-row height (~1.7x the pre-redesign row),
+     named so it's a real Tailwind spacing token (`min-h-row`, `h-row`), not
+     a bracket value re-typed at every call site. */
+  --spacing-row: 1.75rem;
 
-  /* Plays once when a Live Feed row mounts for a newly-arrived incident —
-     see IncidentTable.tsx. Existing rows re-rendering (state changes, etc.)
-     never get a fresh mount, so this never replays for them. */
-  --animate-row-enter: row-enter 0.35s ease-out;
+  /* ----- DARK (default) — "instrument slate" ----- */
+  --color-bg: #0e1315; /* the panel */
+  --color-surface-muted: #0e1315; /* alias: app background */
+  --color-surface: #151b1e; /* rows / cards */
+  --color-surface-raised: #1b2226; /* header / hover */
+  --color-border: #232b2f; /* hairline */
+  --color-border-strong: #2f383d;
+  --color-ink: #d6dddf; /* off-white — no pure-white glare */
+  --color-ink-muted: #8a949b;
+  --color-ink-faint: #5c666d;
+
+  /* Severity — the ONLY chromatic tokens. Desaturated, warm(P0/P1)=act-now
+     vs cool(P2/P3)=be-aware, four distinct greyscale luminances. */
+  --color-severity-p0: #e0685c; /* critical — muted signal red */
+  --color-severity-p1: #e0a64f; /* high     — muted amber */
+  --color-severity-p2: #4fa093; /* medium   — muted teal */
+  --color-severity-p3: #6c7c96; /* low      — muted slate */
+
+  /* Row-enter: a quiet lift, not a colour flash. */
+  --animate-row-enter: row-enter 0.4s ease-out;
+}
+
+/* ----- LIGHT ("daylight triage") — cool grey, never cream ----- */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #eef1f2;
+  --color-surface-muted: #eef1f2;
+  --color-surface: #fafbfb;
+  --color-surface-raised: #ffffff;
+  --color-border: #dde2e4;
+  --color-border-strong: #cbd2d5;
+  --color-ink: #192124;
+  --color-ink-muted: #5a646b;
+  --color-ink-faint: #8b959b;
+
+  --color-severity-p0: #c24436;
+  --color-severity-p1: #a5701f;
+  --color-severity-p2: #2c7a6e;
+  --color-severity-p3: #566783;
+}
+
+/* OS preference applies light unless the user has explicitly forced dark. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --color-bg: #eef1f2;
+    --color-surface-muted: #eef1f2;
+    --color-surface: #fafbfb;
+    --color-surface-raised: #ffffff;
+    --color-border: #dde2e4;
+    --color-border-strong: #cbd2d5;
+    --color-ink: #192124;
+    --color-ink-muted: #5a646b;
+    --color-ink-faint: #8b959b;
+
+    --color-severity-p0: #c24436;
+    --color-severity-p1: #a5701f;
+    --color-severity-p2: #2c7a6e;
+    --color-severity-p3: #566783;
+  }
+}
+
+:root {
+  color-scheme: dark;
 }
 
 @keyframes row-enter {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
   to {
     opacity: 1;
@@ -47,7 +132,16 @@
   }
 }
 
+html,
 body {
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  /* Slightly tightened default tracking reads more "instrument". */
+  letter-spacing: -0.005em;
+}
+
+/* Machine values never wrap awkwardly mid-token. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }

@@ -20,7 +20,7 @@ export function Input({ label, error, id, className = "", ...rest }: InputProps)
       )}
       <input
         id={inputId}
-        className={fieldClasses(Boolean(error), className)}
+        className={fieldClasses(Boolean(error), `text-sm ${className}`)}
         aria-invalid={error ? true : undefined}
         aria-describedby={errorId}
         {...rest}

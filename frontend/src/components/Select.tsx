@@ -29,7 +29,7 @@ export function Select({ label, error, options, placeholder, id, className = "",
       <div className="relative">
         <select
           id={selectId}
-          className={fieldClasses(Boolean(error), `appearance-none pr-8 ${className}`)}
+          className={fieldClasses(Boolean(error), `appearance-none pr-8 text-sm ${className}`)}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId}
           defaultValue={rest.value === undefined && rest.defaultValue === undefined ? "" : undefined}
@@ -46,7 +46,7 @@ export function Select({ label, error, options, placeholder, id, className = "",
             </option>
           ))}
         </select>
-        <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+        <ChevronDownIcon className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" />
       </div>
       {error && (
         <p id={errorId} className={FIELD_ERROR_CLASSES}>

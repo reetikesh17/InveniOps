@@ -44,7 +44,9 @@ export function ChartTooltipContent({
   return (
     <div className="rounded-md border border-border bg-surface px-2.5 py-2 text-xs shadow-lg">
       {label !== undefined && (
-        <p className="mb-1 font-medium text-ink">{labelFormatter ? labelFormatter(label) : String(label)}</p>
+        <p className="mb-1 font-mono text-mono-num font-medium tabular-nums text-ink">
+          {labelFormatter ? labelFormatter(label) : String(label)}
+        </p>
       )}
       <ul className="flex flex-col gap-0.5">
         {rows.map((entry, index) => {
@@ -53,7 +55,7 @@ export function ChartTooltipContent({
             <li key={`${rawName}-${index}`} className="flex items-center gap-2">
               <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ backgroundColor: entry.color }} aria-hidden="true" />
               <span className="text-ink-muted">{nameFor ? nameFor(rawName) : rawName}</span>
-              <span className="ml-auto font-medium tabular-nums text-ink">
+              <span className="ml-auto font-mono text-mono-num font-medium tabular-nums text-ink">
                 {entry.value === undefined ? "—" : valueFormatter(entry.value)}
               </span>
             </li>

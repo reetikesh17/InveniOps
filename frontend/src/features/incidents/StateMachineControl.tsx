@@ -89,7 +89,7 @@ export function StateMachineControl({
           </Button>
         ))}
       </div>
-      {generalError && <p className="text-sm text-red-700">{generalError}</p>}
+      {generalError && <p className="font-body text-prose text-severity-p0">{generalError}</p>}
     </div>
   );
 }

@@ -7,15 +7,11 @@ import type { AnalyticsGroupBy } from "../../types";
 import { formatDuration } from "../incidents/formatDuration";
 import { ChartTooltipContent } from "./ChartTooltip";
 import {
-  CHART_AXIS,
-  CHART_GRID,
-  CHART_INK_MUTED,
   COMPONENT_TYPE_ORDER,
-  MTTR_AVG_COLOR,
-  MTTR_ROLLING_COLOR,
   SEVERITY_ORDER,
   formatBucketFull,
   makeTimeTickFormatter,
+  useChartColors,
 } from "./chartTheme";
 import { CHART_HEIGHT, PanelShell } from "./PanelShell";
 import { useAnalyticsResource } from "./useAnalyticsResource";
@@ -41,7 +37,7 @@ function GroupByToggle({ value, onChange }: { value: AnalyticsGroupBy; onChange:
             aria-pressed={isSelected}
             onClick={() => onChange(option.key)}
             className={`px-2.5 py-1 text-xs font-medium ${index > 0 ? "border-l border-border-strong" : ""} ${
-              isSelected ? "bg-ink text-white" : "bg-surface text-ink-muted hover:bg-surface-muted"
+              isSelected ? "bg-ink text-surface-muted" : "bg-surface text-ink-muted hover:bg-surface-raised"
             } ${FOCUS_RING}`}
           >
             {option.label}
@@ -52,15 +48,15 @@ function GroupByToggle({ value, onChange }: { value: AnalyticsGroupBy; onChange:
   );
 }
 
-function TwoLineLegend(): JSX.Element {
+function TwoLineLegend({ avg, rolling }: { avg: string; rolling: string }): JSX.Element {
   return (
     <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-muted">
       <li className="flex items-center gap-1.5">
-        <span className="h-0.5 w-4" style={{ backgroundColor: MTTR_AVG_COLOR }} aria-hidden="true" />
+        <span className="h-0.5 w-4" style={{ backgroundColor: avg }} aria-hidden="true" />
         Bucket average
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="h-1 w-4 rounded-full" style={{ backgroundColor: MTTR_ROLLING_COLOR }} aria-hidden="true" />
+        <span className="h-1 w-4 rounded-full" style={{ backgroundColor: rolling }} aria-hidden="true" />
         Rolling average (4 buckets)
       </li>
     </ul>
@@ -73,6 +69,7 @@ export interface MttrPanelProps {
 
 export function MttrPanel({ range }: MttrPanelProps): JSX.Element {
   const { fromIso, toIso, intervalSeconds, fromMs, toMs } = range;
+  const c = useChartColors();
   const [groupBy, setGroupBy] = useState<AnalyticsGroupBy>("severity");
   const [selectedValue, setSelectedValue] = useState<string | null>(null);
 
@@ -155,17 +152,17 @@ export function MttrPanel({ range }: MttrPanelProps): JSX.Element {
       <div className="flex flex-col gap-2">
         <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
           <LineChart data={rows} margin={{ top: 8, right: 12, bottom: 4, left: 4 }}>
-            <CartesianGrid stroke={CHART_GRID} vertical={false} />
+            <CartesianGrid stroke={c.grid} vertical={false} />
             <XAxis
               dataKey="bucket"
               tickFormatter={tickFormatter}
-              stroke={CHART_AXIS}
-              tick={{ fill: CHART_INK_MUTED, fontSize: 11 }}
+              stroke={c.axis}
+              tick={{ fill: c.inkMuted, fontSize: 11 }}
               minTickGap={28}
             />
             <YAxis
-              stroke={CHART_AXIS}
-              tick={{ fill: CHART_INK_MUTED, fontSize: 11 }}
+              stroke={c.axis}
+              tick={{ fill: c.inkMuted, fontSize: 11 }}
               width={48}
               tickFormatter={(value: number) => formatMttr(value)}
             />
@@ -178,12 +175,12 @@ export function MttrPanel({ range }: MttrPanelProps): JSX.Element {
                 />
               }
             />
-            <Line type="monotone" dataKey="avg" name="avg" stroke={MTTR_AVG_COLOR} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="avg" name="avg" stroke={c.lineFaint} strokeWidth={1.5} dot={false} isAnimationActive={false} />
             <Line
               type="monotone"
               dataKey="rolling"
               name="rolling"
-              stroke={MTTR_ROLLING_COLOR}
+              stroke={c.line}
               strokeWidth={2.5}
               dot={false}
               activeDot={{ r: 4 }}
@@ -191,7 +188,7 @@ export function MttrPanel({ range }: MttrPanelProps): JSX.Element {
             />
           </LineChart>
         </ResponsiveContainer>
-        <TwoLineLegend />
+        <TwoLineLegend avg={c.lineFaint} rolling={c.line} />
       </div>
     </PanelShell>
   );

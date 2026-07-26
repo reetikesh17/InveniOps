@@ -40,7 +40,7 @@ export function FeedViewToggle({ view }: { view: FeedView }): JSX.Element {
             aria-pressed={isSelected}
             onClick={() => select(option.key)}
             className={`px-3 py-1 text-sm font-medium ${index > 0 ? "border-l border-border-strong" : ""} ${
-              isSelected ? "bg-ink text-white" : "bg-surface text-ink-muted hover:bg-surface-muted"
+              isSelected ? "bg-ink text-surface-muted" : "bg-surface text-ink-muted hover:bg-surface-raised"
             } ${FOCUS_RING}`}
           >
             {option.label}

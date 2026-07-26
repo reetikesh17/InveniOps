@@ -89,7 +89,8 @@ export function TransitionTimeline({ incidentId }: TransitionTimelineProps): JSX
                 )}
               </div>
               <p className="text-xs text-ink-muted">
-                {transition.actor} · <RelativeTime value={transition.occurredAt} />
+                {transition.actor} ·{" "}
+                <RelativeTime value={transition.occurredAt} className="font-mono text-mono-micro tabular-nums" />
               </p>
             </div>
           </li>

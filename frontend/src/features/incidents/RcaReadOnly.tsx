@@ -1,12 +1,13 @@
 import { RelativeTime } from "../../components";
+import { EYEBROW_CLASSES } from "../../components/typography";
 import type { RcaRecord } from "../../types";
 import { formatDuration } from "./formatDuration";
 
 function Field({ label, value }: { label: string; value: string }): JSX.Element {
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-xs font-medium uppercase tracking-wide text-ink-faint">{label}</span>
-      <p className="whitespace-pre-wrap text-sm text-ink">{value}</p>
+      <span className={EYEBROW_CLASSES}>{label}</span>
+      <p className="whitespace-pre-wrap font-body text-prose text-ink">{value}</p>
     </div>
   );
 }
@@ -28,8 +29,8 @@ export function RcaReadOnly({ rca }: RcaReadOnlyProps): JSX.Element {
       <Field label="Root cause description" value={rca.rootCauseDescription} />
       <Field label="Fix applied" value={rca.fixApplied} />
       <Field label="Prevention steps" value={rca.preventionSteps} />
-      <p className="text-xs text-ink-faint">
-        Submitted <RelativeTime value={rca.submittedAt} />
+      <p className="text-xs text-ink-muted">
+        Submitted <RelativeTime value={rca.submittedAt} className="font-mono text-mono-micro tabular-nums" />
       </p>
     </div>
   );

@@ -22,7 +22,7 @@ export function DateTimeInput({ label, error, id, className = "", ...rest }: Dat
       <input
         id={inputId}
         type="datetime-local"
-        className={fieldClasses(Boolean(error), className)}
+        className={fieldClasses(Boolean(error), `text-sm ${className}`)}
         aria-invalid={error ? true : undefined}
         aria-describedby={errorId}
         {...rest}

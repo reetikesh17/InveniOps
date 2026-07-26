@@ -1,3 +1,5 @@
+import { DISPLAY_HEADING_CLASSES } from "../../components/typography";
+import { useDocumentTitle } from "../../hooks/useDocumentTitle";
 import { ComponentHealthPanel } from "./ComponentHealthPanel";
 import { IncidentVolumePanel } from "./IncidentVolumePanel";
 import { MttrPanel } from "./MttrPanel";
@@ -7,13 +9,14 @@ import { TimeRangeSelector } from "./TimeRangeSelector";
 import { useTimeRange } from "./useTimeRange";
 
 export function AnalyticsPage(): JSX.Element {
+  useDocumentTitle("Analytics");
   const range = useTimeRange();
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold text-ink">Analytics</h1>
-        <p className="mt-1 text-sm text-ink-muted">
+        <h1 className={DISPLAY_HEADING_CLASSES}>Analytics</h1>
+        <p className="mt-1 font-body text-prose text-ink-muted">
           Timeseries from the aggregation sink and live system health. All bucketing is server-side; the shared range below
           is saved to the URL.
         </p>

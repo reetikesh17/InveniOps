@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { API_BASE_URL, api, ApiRequestError, type ApiErrorInfo } from "../lib/api";
-import type { PaginationParams, WorkItem } from "../types";
+import type { WorkItem } from "../types";
 
 // Describes the real-time transport only — "connecting" (initial attempt or
 // mid-backoff reconnect), "live" (SSE connected), "polling" (degraded
@@ -15,6 +15,15 @@ export interface UseIncidentsResult {
   readonly connectionStatus: IncidentsConnectionStatus;
   readonly refresh: () => void;
 }
+
+const IncidentsContext = createContext<UseIncidentsResult | null>(null);
+
+// The backend's own max page size (see DASHBOARD_LIST_MAX_LIMIT in
+// backend/src/config/index.ts) — one bounded working set shared by the Live
+// Feed table and the header's live severity counts, so there's exactly one
+// list fetch / SSE subscription in flight for the whole app, not one per
+// consumer (the same reasoning as HealthProvider's single /health poller).
+const FETCH_LIMIT = 200;
 
 // Matches the console reporter's own 5s cadence elsewhere in this system —
 // see docs/observability.md — for a consistent sense of "how fresh is
@@ -40,8 +49,9 @@ function toErrorInfo(error: unknown): ApiErrorInfo {
 }
 
 /**
- * Live Feed data source: fetches the active-incident list, then tries to
- * stay current in real time over SSE (GET /api/v1/incidents/stream — see
+ * The single incidents subscription for the whole app — fetches the
+ * active-incident list, then tries to stay current in real time over SSE
+ * (GET /api/v1/incidents/stream — see
  * docs/decisions/0007-sse-for-real-time-transport.md), reconnecting with
  * capped exponential backoff on drop. If SSE can't be established after
  * MAX_SSE_RETRIES attempts, degrades to polling the same list endpoint on
@@ -50,9 +60,11 @@ function toErrorInfo(error: unknown): ApiErrorInfo {
  *
  * SSE events are treated as a refetch trigger, not a merge source — see the
  * ADR for why (mainly: avoids duplicating the backend's sort order
- * client-side).
+ * client-side). Drives both the Live Feed table and the header's live
+ * severity counts off one shared fetch/SSE connection (the same reasoning as
+ * HealthProvider).
  */
-export function useIncidents(params: PaginationParams = {}): UseIncidentsResult {
+export function IncidentsProvider({ children }: { children: ReactNode }): JSX.Element {
   const [data, setData] = useState<readonly WorkItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiErrorInfo | null>(null);
@@ -66,12 +78,6 @@ export function useIncidents(params: PaginationParams = {}): UseIncidentsResult 
   const listControllerRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef(0);
 
-  // Kept in a ref, not a dependency, so a caller passing a fresh object
-  // literal each render doesn't churn the SSE connection / effect below —
-  // only the values matter, read at fetch time.
-  const paramsRef = useRef(params);
-  paramsRef.current = params;
-
   const fetchList = useCallback(async (): Promise<void> => {
     // Supersede any in-flight list read (a rapid SSE burst can trigger several)
     // and abort it on unmount — no stale page ever overwrites a newer one.
@@ -79,7 +85,7 @@ export function useIncidents(params: PaginationParams = {}): UseIncidentsResult 
     const controller = new AbortController();
     listControllerRef.current = controller;
     try {
-      const page = await api.listIncidents(paramsRef.current, { signal: controller.signal });
+      const page = await api.listIncidents({ limit: FETCH_LIMIT }, { signal: controller.signal });
       if (controller.signal.aborted || !mountedRef.current) {
         return;
       }
@@ -175,9 +181,9 @@ export function useIncidents(params: PaginationParams = {}): UseIncidentsResult 
       }
       stopPolling();
     };
-    // Intentionally mount-only: paramsRef/connectSse/fetchList are read via
-    // refs/stable callbacks so this effect doesn't need to react to prop
-    // identity changes — see paramsRef above.
+    // Intentionally mount-only: connectSse/fetchList are read via stable
+    // callbacks, and FETCH_LIMIT is a fixed constant, so this effect never
+    // needs to react to a dependency change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -185,5 +191,18 @@ export function useIncidents(params: PaginationParams = {}): UseIncidentsResult 
     void fetchList();
   }, [fetchList]);
 
-  return { data, loading, error, connectionStatus, refresh };
+  const value = useMemo<UseIncidentsResult>(
+    () => ({ data, loading, error, connectionStatus, refresh }),
+    [data, loading, error, connectionStatus, refresh],
+  );
+
+  return <IncidentsContext.Provider value={value}>{children}</IncidentsContext.Provider>;
+}
+
+export function useIncidents(): UseIncidentsResult {
+  const ctx = useContext(IncidentsContext);
+  if (!ctx) {
+    throw new Error("useIncidents must be used within an IncidentsProvider");
+  }
+  return ctx;
 }

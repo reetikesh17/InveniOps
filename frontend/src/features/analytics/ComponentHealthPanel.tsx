@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { EYEBROW_CLASSES } from "../../components";
 import { api } from "../../lib/api";
 import type { CallOptions } from "../../lib/api";
 import type { ComponentHealth } from "../../types";
@@ -49,11 +50,11 @@ function rankWorstFirst(a: HealthRow, b: HealthRow): number {
 }
 
 function HeaderCell({ className, children }: { className: string; children: string }): JSX.Element {
-  return <div className={`text-xs font-medium uppercase tracking-wide text-ink-faint ${className}`}>{children}</div>;
+  return <div className={`${EYEBROW_CLASSES} ${className}`}>{children}</div>;
 }
 
 function FieldLabel({ children }: { children: string }): JSX.Element {
-  return <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-ink-faint sm:hidden">{children}</span>;
+  return <span className={`mr-1 sm:hidden ${EYEBROW_CLASSES}`}>{children}</span>;
 }
 
 export interface ComponentHealthPanelProps {
@@ -109,26 +110,26 @@ export function ComponentHealthPanel({ range }: ComponentHealthPanelProps): JSX.
               role="row"
               className="flex flex-col gap-1 p-3 text-sm sm:flex-row sm:items-center sm:gap-3"
             >
-              <div role="cell" className="hidden w-8 shrink-0 tabular-nums text-ink-faint sm:block">
+              <div role="cell" className="hidden w-8 shrink-0 font-mono text-mono-num tabular-nums text-ink-muted sm:block">
                 {index + 1}
               </div>
-              <div role="cell" className="min-w-0 flex-1 font-medium text-ink">
-                <span className="mr-1 text-ink-faint sm:hidden">#{index + 1}</span>
+              <div role="cell" className="min-w-0 flex-1 font-mono text-mono-id text-ink">
+                <span className="mr-1 font-mono text-mono-num text-ink-muted sm:hidden">#{index + 1}</span>
                 {row.componentId}
               </div>
-              <div role="cell" className="shrink-0 tabular-nums text-ink sm:w-24 sm:text-right">
+              <div role="cell" className="shrink-0 font-mono text-mono-num tabular-nums text-ink sm:w-24 sm:text-right">
                 <FieldLabel>Incidents</FieldLabel>
                 {row.incidentCount}
               </div>
-              <div role="cell" className="shrink-0 tabular-nums sm:w-20 sm:text-right">
+              <div role="cell" className="shrink-0 font-mono text-mono-num tabular-nums sm:w-20 sm:text-right">
                 <FieldLabel>Open</FieldLabel>
                 <span className={row.openCount > 0 ? "font-semibold text-severity-p0" : "text-ink"}>{row.openCount}</span>
               </div>
-              <div role="cell" className="shrink-0 tabular-nums text-ink sm:w-24 sm:text-right">
+              <div role="cell" className="shrink-0 font-mono text-mono-num tabular-nums text-ink sm:w-24 sm:text-right">
                 <FieldLabel>Avg MTTR</FieldLabel>
                 {row.avgMttrMs === null ? "—" : formatDuration(Math.round(row.avgMttrMs / 1000))}
               </div>
-              <div role="cell" className="shrink-0 tabular-nums text-ink-muted sm:w-24 sm:text-right">
+              <div role="cell" className="shrink-0 font-mono text-mono-num tabular-nums text-ink-muted sm:w-24 sm:text-right">
                 <FieldLabel>Signals</FieldLabel>
                 {row.recentSignalCount}
               </div>

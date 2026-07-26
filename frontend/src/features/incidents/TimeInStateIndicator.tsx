@@ -2,26 +2,32 @@ import { useEffect, useState } from "react";
 import { RelativeTime } from "../../components";
 import type { WorkItemState } from "../../types";
 
-// Only OPEN/INVESTIGATING are "still needs a human" states — RESOLVED and
-// CLOSED sitting around for a while isn't an operational problem, so they
-// never escalate visually, no matter how old updatedAt gets.
+// Only OPEN/INVESTIGATING are "still needs a human" states — RESOLVED/CLOSED
+// never escalate no matter how old.
 const ESCALATING_STATES: readonly WorkItemState[] = ["OPEN", "INVESTIGATING"];
 
 const ELEVATED_AFTER_MS = 10 * 60_000;
 const CRITICAL_AFTER_MS = 30 * 60_000;
 const TICK_MS = 15_000;
 
-function tierClassName(elapsedMs: number, escalates: boolean): string {
+// Escalation is NEUTRAL — colour is rationed to severity, so "how long" climbs
+// an ink weight ramp (quiet → full → bold) and gains a ▲, rather than turning
+// red. The severity hue stays on the spine alone. Both quiet rungs share the
+// same ink-muted colour (ink-faint fails AA text contrast at this size — see
+// docs/decisions/0008-console-visual-system.md) and are told apart by style,
+// not colour: resolved/closed is italic (it's also already named by the STATE
+// badge beside it), a fresh open incident is upright.
+function tier(elapsedMs: number, escalates: boolean): { className: string; marker: boolean } {
   if (!escalates) {
-    return "text-ink-muted";
+    return { className: "italic text-ink-muted", marker: false };
   }
   if (elapsedMs >= CRITICAL_AFTER_MS) {
-    return "font-semibold text-severity-p0";
+    return { className: "font-semibold text-ink", marker: true };
   }
   if (elapsedMs >= ELEVATED_AFTER_MS) {
-    return "font-medium text-severity-p2";
+    return { className: "font-medium text-ink", marker: true };
   }
-  return "text-ink-muted";
+  return { className: "text-ink-muted", marker: false };
 }
 
 export interface TimeInStateIndicatorProps {
@@ -30,12 +36,6 @@ export interface TimeInStateIndicatorProps {
   readonly className?: string;
 }
 
-/**
- * Wraps RelativeTime (same "Xm ago" text, same absolute-time hover) but adds
- * an escalating colour/weight the longer an incident sits in an unaddressed
- * state — so a P1 stuck in OPEN for 40 minutes reads as urgent at a glance,
- * not just as quiet-looking text identical to a fresh one.
- */
 export function TimeInStateIndicator({ since, state, className = "" }: TimeInStateIndicatorProps): JSX.Element {
   const sinceMs = new Date(since).getTime();
   const escalates = ESCALATING_STATES.includes(state);
@@ -49,5 +49,18 @@ export function TimeInStateIndicator({ since, state, className = "" }: TimeInSta
     return () => clearInterval(timer);
   }, [sinceMs, escalates]);
 
-  return <RelativeTime value={since} className={`${tierClassName(elapsedMs, escalates)} ${className}`} />;
+  const { className: tierClass, marker } = tier(elapsedMs, escalates);
+
+  return (
+    <span className={`inline-flex items-center gap-1 font-mono tabular-nums ${tierClass} ${className}`}>
+      <RelativeTime value={since} />
+      {/* Sized relative to the surrounding text (not an absolute px) so it
+          always scales with wherever this indicator is used. */}
+      {marker && (
+        <span aria-hidden="true" className="text-[0.7em] leading-none">
+          ▲
+        </span>
+      )}
+    </span>
+  );
 }

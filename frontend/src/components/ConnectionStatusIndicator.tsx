@@ -1,35 +1,46 @@
 import { useSystemHealth } from "../hooks/useSystemHealth";
-
-interface Indicator {
-  readonly label: string;
-  readonly dotClassName: string;
-}
+import { SEVERITY_COLOR_VAR } from "./severity";
+import { MONO_MICRO_CLASSES } from "./typography";
 
 /**
- * The header's at-a-glance health dot. Reads the shared health context (one
- * app-wide poller — see HealthProvider), never its own request. Never colour
- * alone: the text label carries the same state as the dot.
+ * Header health dot. Colour stays rationed: "connected" is neutral (a filled
+ * ink dot), and only a degraded/down/offline state borrows the severity scale
+ * (amber = shedding, red = down/offline) — the same four hues used everywhere
+ * else. The text label always carries the state independently of colour.
  */
 export function ConnectionStatusIndicator(): JSX.Element {
   const { phase, health } = useSystemHealth();
 
-  let indicator: Indicator;
+  let label: string;
+  let dotColor: string;
+  let filled = true;
+
   if (phase === "checking") {
-    indicator = { label: "Checking…", dotClassName: "bg-neutral-400" };
+    label = "connecting";
+    dotColor = "var(--color-ink-faint)";
+    filled = false;
   } else if (phase === "unreachable") {
-    indicator = { label: "Offline", dotClassName: "bg-red-500" };
+    label = "offline";
+    dotColor = SEVERITY_COLOR_VAR.P0;
   } else if (health?.status === "degraded") {
-    indicator = { label: "Degraded", dotClassName: "bg-amber-500" };
+    label = "shedding";
+    dotColor = SEVERITY_COLOR_VAR.P1;
   } else if (health?.status === "unhealthy") {
-    indicator = { label: "Unhealthy", dotClassName: "bg-red-500" };
+    label = "degraded";
+    dotColor = SEVERITY_COLOR_VAR.P0;
   } else {
-    indicator = { label: "Connected", dotClassName: "bg-emerald-500" };
+    label = "connected";
+    dotColor = "var(--color-ink)";
   }
 
   return (
-    <div className="flex items-center gap-2 text-sm text-ink-muted">
-      <span className={`h-2 w-2 rounded-full ${indicator.dotClassName}`} aria-hidden="true" />
-      <span>{indicator.label}</span>
-    </div>
+    <span className={`inline-flex items-center gap-1.5 ${MONO_MICRO_CLASSES}`}>
+      <span
+        className="h-2 w-2 rounded-full"
+        style={filled ? { backgroundColor: dotColor } : { boxShadow: `inset 0 0 0 1.5px ${dotColor}` }}
+        aria-hidden="true"
+      />
+      {label}
+    </span>
   );
 }

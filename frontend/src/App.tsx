@@ -3,6 +3,7 @@ import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
 import { Header } from "./components/Header";
 import { ErrorBoundary, IncidentListSkeleton, SystemBanner, ToastProvider } from "./components";
 import { HealthProvider } from "./hooks/useSystemHealth";
+import { IncidentsProvider } from "./hooks/useIncidents";
 
 // Route-level code splitting: every page is its own chunk, so the initial
 // load ships only the shell + the landing route. Analytics in particular
@@ -28,24 +29,26 @@ function Route({ label, children }: { label: string; children: ReactNode }): JSX
 function RootLayout(): JSX.Element {
   return (
     <HealthProvider>
-      <ToastProvider>
-        <div className="min-h-screen bg-surface-muted">
-          <a
-            href="#main-content"
-            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-ink focus:px-3 focus:py-2 focus:text-sm focus:text-white"
-          >
-            Skip to main content
-          </a>
-          <Header />
-          <SystemBanner />
-          {/* max-w-7xl, not a narrower marketing-page width — this is a dense
-              operator tool, and 1440px is a required breakpoint, so the shell
-              should actually use that space. */}
-          <main id="main-content" className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
-            <Outlet />
-          </main>
-        </div>
-      </ToastProvider>
+      <IncidentsProvider>
+        <ToastProvider>
+          <div className="min-h-screen bg-surface-muted">
+            <a
+              href="#main-content"
+              className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-ink focus:px-3 focus:py-2 focus:text-sm focus:text-surface-muted"
+            >
+              Skip to main content
+            </a>
+            <Header />
+            <SystemBanner />
+            {/* max-w-7xl, not a narrower marketing-page width — this is a dense
+                operator tool, and 1440px is a required breakpoint, so the shell
+                should actually use that space. */}
+            <main id="main-content" className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+              <Outlet />
+            </main>
+          </div>
+        </ToastProvider>
+      </IncidentsProvider>
     </HealthProvider>
   );
 }

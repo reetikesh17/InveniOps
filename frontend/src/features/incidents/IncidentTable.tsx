@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { EYEBROW_CLASSES } from "../../components";
 import type { WorkItem } from "../../types";
 import { IncidentRow } from "./IncidentRow";
 
@@ -12,7 +13,7 @@ export interface IncidentTableProps {
 
 function HeaderCell({ className, children }: { className: string; children: string }): JSX.Element {
   return (
-    <div role="columnheader" className={`text-xs font-medium uppercase tracking-wide text-ink-faint ${className}`}>
+    <div role="columnheader" className={`${EYEBROW_CLASSES} ${className}`}>
       {children}
     </div>
   );
@@ -62,17 +63,19 @@ export function IncidentTable({ incidents }: IncidentTableProps): JSX.Element {
   }, [incidents]);
 
   return (
-    <div role="table" aria-label="Active incidents" className="overflow-hidden rounded-lg border border-border bg-surface">
-      <div role="row" className="hidden gap-3 border-b border-border bg-surface-muted px-3 py-2 sm:flex">
-        <HeaderCell className="w-16">Severity</HeaderCell>
-        <HeaderCell className="w-28">State</HeaderCell>
-        <HeaderCell className="w-36 shrink-0">Component</HeaderCell>
+    <div role="table" aria-label="Active incidents" className="overflow-hidden rounded-md border border-border bg-surface">
+      {/* Column header aligns to the row grid; the leading 3px + 14px gutter
+          matches the row's rail + SEV cell. */}
+      <div role="row" className="hidden items-center gap-3 border-b border-border bg-surface-raised pl-[15px] pr-2.5 py-1.5 sm:flex">
+        <HeaderCell className="w-14">Sev</HeaderCell>
+        <HeaderCell className="w-48 shrink-0">Component</HeaderCell>
         <HeaderCell className="flex-1">Title</HeaderCell>
-        <HeaderCell className="w-20 text-right">Signals</HeaderCell>
-        <HeaderCell className="w-24">First seen</HeaderCell>
-        <HeaderCell className="w-28">In state</HeaderCell>
+        <HeaderCell className="w-14 text-right">Sig</HeaderCell>
+        <HeaderCell className="w-24">In state</HeaderCell>
+        <HeaderCell className="w-28">State</HeaderCell>
       </div>
-      <div role="rowgroup" className="divide-y divide-border">
+      {/* No divide-y: rows abut so the severity rails form one continuous ribbon. */}
+      <div role="rowgroup">
         {incidents.map((incident) => (
           <IncidentRow key={incident.id} incident={incident} isNew={newIds.has(incident.id)} />
         ))}

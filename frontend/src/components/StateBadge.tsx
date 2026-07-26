@@ -1,20 +1,10 @@
 import type { WorkItemState } from "../types";
-import { ArchiveIcon, CheckCircleIcon, ClockIcon, DotIcon, type IconProps } from "./icons";
 
-interface StateConfig {
-  readonly label: string;
-  readonly className: string;
-  readonly Icon: (props: IconProps) => JSX.Element;
-}
-
-// CLOSED intentionally uses a muted neutral fill rather than a saturated
-// colour — closed items should visually recede in a dense active list, not
-// compete with items that still need attention.
-const CONFIG: Record<WorkItemState, StateConfig> = {
-  OPEN: { label: "Open", className: "bg-state-open text-white", Icon: DotIcon },
-  INVESTIGATING: { label: "Investigating", className: "bg-state-investigating text-white", Icon: ClockIcon },
-  RESOLVED: { label: "Resolved", className: "bg-state-resolved text-white", Icon: CheckCircleIcon },
-  CLOSED: { label: "Closed", className: "bg-neutral-200 text-ink-muted", Icon: ArchiveIcon },
+const LABEL: Record<WorkItemState, string> = {
+  OPEN: "open",
+  INVESTIGATING: "investigating",
+  RESOLVED: "resolved",
+  CLOSED: "closed",
 };
 
 export interface StateBadgeProps {
@@ -22,16 +12,23 @@ export interface StateBadgeProps {
   readonly className?: string;
 }
 
-/** Icon + text label per state — a distinct shape per state, not just colour, same reasoning as SeverityBadge. */
+/**
+ * Workflow state is context, not urgency, so it gets NO colour — colour is
+ * rationed to severity. A quiet lowercase mono label inside a hairline
+ * outline; CLOSED recedes further (no border — dropping the outline, not the
+ * text colour, since ink-faint fails AA text contrast at this size; see
+ * docs/decisions/0008-console-visual-system.md). Never competes with the
+ * severity spine for the eye.
+ */
 export function StateBadge({ state, className = "" }: StateBadgeProps): JSX.Element {
-  const config = CONFIG[state];
-  const { Icon } = config;
+  const isClosed = state === "CLOSED";
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-xs font-semibold ${config.className} ${className}`}
+      className={`inline-flex items-center rounded-sm px-1.5 py-0.5 font-mono text-mono-micro lowercase tracking-tight text-ink-muted ${
+        isClosed ? "" : "border border-border-strong"
+      } ${className}`}
     >
-      <Icon className="h-2.5 w-2.5 shrink-0" />
-      {config.label}
+      {LABEL[state]}
     </span>
   );
 }

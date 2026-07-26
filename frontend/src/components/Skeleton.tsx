@@ -4,7 +4,7 @@
 // primitive every layout-specific skeleton below is built from.
 
 export function SkeletonBlock({ className = "" }: { className?: string }): JSX.Element {
-  return <div className={`animate-pulse rounded bg-neutral-200 ${className}`} aria-hidden="true" />;
+  return <div className={`animate-pulse rounded-sm bg-border ${className}`} aria-hidden="true" />;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Button, Card, DateTimeInput, Select, TextArea } from "../../components";
+import { EYEBROW_CLASSES } from "../../components/typography";
 import { api, ApiRequestError } from "../../lib/api";
 import { ROOT_CAUSE_CATEGORIES, type RootCauseCategory } from "../../types";
 import { formatDuration } from "../incidents/formatDuration";
@@ -59,7 +60,7 @@ function CharacterCounter({ value }: { value: string }): JSX.Element {
   const length = value.trim().length;
   const met = length >= MIN_TEXT_FIELD_LENGTH;
   return (
-    <span className={met ? "text-emerald-600" : "text-ink-faint"}>
+    <span className={met ? "font-mono text-ink" : "font-mono text-ink-muted"}>
       {length}/{MIN_TEXT_FIELD_LENGTH}
       {met ? " ✓" : " min"}
     </span>
@@ -73,7 +74,10 @@ function UnsavedChangesDialog({ onStay, onLeave }: { onStay: () => void; onLeave
         <h2 id="rca-leave-title" className="text-base font-semibold text-ink">
           Discard this RCA?
         </h2>
-        <p className="mt-1 text-sm text-ink-muted">You have an unsaved root cause analysis. Leaving now will keep your draft in this session, but the incident won’t be closed.</p>
+        <p className="mt-1 font-body text-prose text-ink-muted">
+          You have an unsaved root cause analysis. Leaving now will keep your draft in this session, but the incident
+          won’t be closed.
+        </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={onStay}>
             Keep editing
@@ -277,14 +281,16 @@ export function RcaForm({ incidentId, firstSignalAt, actor, onSubmitted, onConfl
       <Card padding="sm" className="bg-surface-muted">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs font-medium uppercase tracking-wide text-ink-faint">MTTR to be recorded</span>
-            <span className="text-lg font-semibold tabular-nums text-ink" aria-live="polite">
+            <span className={EYEBROW_CLASSES}>MTTR to be recorded</span>
+            <span className="font-mono text-lg font-semibold tabular-nums text-ink" aria-live="polite">
               {recordedSeconds < 0 ? "—" : formatDuration(recordedSeconds)}
             </span>
           </div>
-          <p className="text-xs text-ink-muted">
+          <p className="font-body text-prose text-ink-muted">
             First signal → submission. Your entered incident window:{" "}
-            <span className="tabular-nums text-ink">{windowSeconds === null ? "—" : formatDuration(windowSeconds)}</span>
+            <span className="font-mono text-mono-num tabular-nums text-ink">
+              {windowSeconds === null ? "—" : formatDuration(windowSeconds)}
+            </span>
           </p>
         </div>
       </Card>
@@ -331,7 +337,7 @@ export function RcaForm({ incidentId, firstSignalAt, actor, onSubmitted, onConfl
       />
 
       {generalError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="font-body text-prose text-severity-p0">
           {generalError}
         </p>
       )}
