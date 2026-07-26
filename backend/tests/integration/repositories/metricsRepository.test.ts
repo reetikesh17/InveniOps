@@ -131,6 +131,30 @@ describe("MongoMetricsRepository", () => {
 
       expect(result).toEqual([]);
     });
+
+    it("is per-bucket, not cumulative: a burst then silence then a smaller burst yields spike / gap / smaller spike — never a running total", async () => {
+      const base = new Date("2026-03-01T00:00:00.000Z");
+      // Minute 0: a burst of 10. Minute 1: silence (no rows written at all).
+      // Minute 2: a smaller burst of 3.
+      await repo.recordSignalVolume([
+        { ts: new Date(base.getTime() + 0), componentId: "C1", severity: "P1", count: 6 },
+        { ts: new Date(base.getTime() + 30_000), componentId: "C1", severity: "P1", count: 4 }, // still minute 0
+        { ts: new Date(base.getTime() + 120_000), componentId: "C1", severity: "P1", count: 3 }, // minute 2
+      ]);
+
+      const result = await repo.queryThroughput(base, new Date(base.getTime() + 300_000), { unit: "minute", binSize: 1 });
+
+      // The spike bucket totals its own burst (6+4=10); the second bucket
+      // totals ONLY its own burst (3), not 10+3=13 — proving the pipeline sums
+      // within each bucket, never across them (a plateau would be 10 then 13).
+      expect(result).toEqual([
+        { bucket: base, componentId: "C1", severity: "P1", count: 10 },
+        { bucket: new Date(base.getTime() + 120_000), componentId: "C1", severity: "P1", count: 3 },
+      ]);
+      // The silent minute 1 simply produces no row (a gap the chart renders as
+      // zero) — it is neither carried forward (plateau) nor a phantom.
+      expect(result.some((b) => b.bucket.getTime() === base.getTime() + 60_000)).toBe(false);
+    });
   });
 
   describe("queryIncidentCounts", () => {
@@ -216,6 +240,57 @@ describe("MongoMetricsRepository", () => {
     it("returns zero/null for a component with no data, not an error", async () => {
       const result = await repo.queryComponentHealth("NEVER_SEEN", new Date(Date.now() - 60_000));
       expect(result).toEqual({ recentSignalCount: 0, avgMttrMs: null });
+    });
+  });
+
+  // MTTR is defined (docs/assignment.md) as first-signal → RCA-submission, so
+  // it only exists for CLOSED work items. recordMttr is called from exactly
+  // one place (WorkflowService.submitIncidentRca); nothing writes an
+  // MTTR-like "time since open" for an open item. These pin that: an all-open
+  // dataset yields no MTTR from EITHER endpoint, and both endpoints read the
+  // same mttr_metrics value when a closure does exist.
+  describe("MTTR is closed-only, and consistent across endpoints", () => {
+    it("an all-open dataset (signal volume but no closures) yields no MTTR anywhere — not time-since-open", async () => {
+      const now = new Date();
+      // Plenty of open activity: a busy component that never closed anything.
+      await repo.recordSignalVolume([
+        { ts: now, componentId: "BUSY_OPEN", severity: "P0", count: 500 },
+        { ts: now, componentId: "BUSY_OPEN", severity: "P1", count: 250 },
+      ]);
+      // Deliberately no recordMttr — nothing has been closed.
+
+      const trend = await repo.queryMttrTrend(
+        new Date(now.getTime() - 3_600_000),
+        new Date(now.getTime() + 3_600_000),
+        { unit: "minute", binSize: 1 },
+        "severity",
+      );
+      const health = await repo.queryComponentHealth("BUSY_OPEN", new Date(now.getTime() - 3_600_000));
+
+      expect(trend).toEqual([]); // the trend has nothing to plot — not a rising "age" line
+      expect(health.recentSignalCount).toBe(750); // it IS active…
+      expect(health.avgMttrMs).toBeNull(); // …but has no MTTR, because it never closed
+    });
+
+    it("when a closure exists, the trend average and the component-health average read the same underlying value", async () => {
+      const now = new Date();
+      await repo.recordMttr([
+        { ts: now, componentType: "CACHE", severity: "P2", componentId: "CLOSED_ONCE", mttrMs: 4_000 },
+        { ts: now, componentType: "CACHE", severity: "P2", componentId: "CLOSED_ONCE", mttrMs: 8_000 },
+      ]);
+
+      const trend = await repo.queryMttrTrend(
+        new Date(now.getTime() - 3_600_000),
+        new Date(now.getTime() + 3_600_000),
+        { unit: "hour", binSize: 1 },
+        "severity",
+      );
+      const health = await repo.queryComponentHealth("CLOSED_ONCE", new Date(now.getTime() - 3_600_000));
+
+      // Same two closed samples → same mean (6000) from both code paths.
+      expect(health.avgMttrMs).toBe(6_000);
+      const p2Bucket = trend.find((b) => b.value === "P2");
+      expect(p2Bucket?.avgMttrMs).toBe(6_000);
     });
   });
 });

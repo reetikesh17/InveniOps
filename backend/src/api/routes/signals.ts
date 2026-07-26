@@ -9,6 +9,7 @@ import type { IngestionSignal } from "../../services/ingestion/buffer.js";
 import { signalBuffer } from "../../services/ingestion/signalBufferInstance.js";
 import { checkTokenBuckets, secondsUntilAvailable, type TokenBucketResult } from "../../rateLimit/tokenBucket.js";
 import { parseSignalBatch, type ValidationFieldError } from "./signalValidation.js";
+import { pickSeverityForComponentType } from "./syntheticSeverity.js";
 
 interface ErrorResponseBody {
   readonly error: string;
@@ -158,14 +159,43 @@ interface SyntheticOverrides {
 }
 
 const COMPONENT_TYPES = Object.values(ComponentType);
-const SEVERITIES = Object.values(Severity);
 
+// A fixed pool of synthetic components: SYNTHETIC_COMPONENT_SLOTS / 6 per
+// type (20 each at 120). A component's (type, id, characteristic severity)
+// are all a pure function of its slot, so they never change between signals
+// or between bulk-test calls.
+const SYNTHETIC_COMPONENT_SLOTS = 120;
+
+/**
+ * Every synthetic component has ONE characteristic failure severity for its
+ * whole burst — a Cache component is a P2 component, an RDBMS is a P0
+ * component. This matters: signals within a burst are NOT independently
+ * drawn, because the ingestion buffer prioritises higher severities under
+ * backpressure, so a component fed ~dozens of independent draws would almost
+ * always see one P0 and have its work item created as P0 — every type would
+ * converge to P0 and the Strategy pattern would look broken all over again.
+ *
+ * Instead each component's severity is an even quantile across its type's mix
+ * (see syntheticSeverity.ts): rank r of ranksPerType maps to quantile
+ * (r + 0.5) / ranksPerType. Spread over a type's components this reproduces
+ * the mix's proportions — modal at the type's strategy floor (RDBMS mostly
+ * P0, Cache mostly P2) — while keeping each individual component stable.
+ */
 function generateSyntheticSignal(index: number, overrides: SyntheticOverrides, now: Date, correlationId: string): IngestionSignal {
+  const numTypes = COMPONENT_TYPES.length;
+  const ranksPerType = Math.max(1, Math.floor(SYNTHETIC_COMPONENT_SLOTS / numTypes));
+  const slot = index % SYNTHETIC_COMPONENT_SLOTS;
+  const componentType = overrides.componentType ?? COMPONENT_TYPES[slot % numTypes] ?? ComponentType.API;
+  const rank = Math.floor(slot / numTypes) % ranksPerType;
+
   return {
     signalId: randomUUID(),
-    componentId: overrides.componentId ?? `SYNTHETIC_COMPONENT_${index % 10}`,
-    componentType: overrides.componentType ?? COMPONENT_TYPES[index % COMPONENT_TYPES.length] ?? ComponentType.API,
-    severity: overrides.severity ?? SEVERITIES[index % SEVERITIES.length] ?? Severity.P3,
+    // componentId encodes its type (CACHE_1, RDBMS_3, …) and stays fixed.
+    componentId: overrides.componentId ?? `${componentType}_${rank + 1}`,
+    componentType,
+    // Deterministic per-component severity from the type's mix — an explicit
+    // override still wins.
+    severity: overrides.severity ?? pickSeverityForComponentType(componentType, () => (rank + 0.5) / ranksPerType),
     rawPayload: { synthetic: true, index },
     occurredAt: now,
     receivedAt: now,
