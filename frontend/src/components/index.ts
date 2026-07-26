@@ -11,4 +11,7 @@ export { EmptyState, type EmptyStateProps } from "./EmptyState";
 export { ErrorState, type ErrorStateProps } from "./ErrorState";
 export { ToastProvider, useToast, type ToastVariant } from "./Toast";
 export { RelativeTime, type RelativeTimeProps } from "./RelativeTime";
+export { ErrorBoundary } from "./ErrorBoundary";
+export { SystemBanner } from "./SystemBanner";
+export { ConnectionStatusIndicator } from "./ConnectionStatusIndicator";
 export * from "./icons";

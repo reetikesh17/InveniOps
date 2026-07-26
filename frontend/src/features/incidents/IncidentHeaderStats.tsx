@@ -38,16 +38,18 @@ function useIngestionThroughput(): number | null {
 
   useEffect(() => {
     let cancelled = false;
+    let controller: AbortController | null = null;
 
     async function poll(): Promise<void> {
+      controller?.abort();
+      controller = new AbortController();
       const to = new Date();
       const from = new Date(to.getTime() - THROUGHPUT_WINDOW_SECONDS * 1000);
       try {
-        const response = await api.getThroughput({
-          from: from.toISOString(),
-          to: to.toISOString(),
-          interval: THROUGHPUT_WINDOW_SECONDS,
-        });
+        const response = await api.getThroughput(
+          { from: from.toISOString(), to: to.toISOString(), interval: THROUGHPUT_WINDOW_SECONDS },
+          { signal: controller.signal },
+        );
         if (cancelled) {
           return;
         }
@@ -55,8 +57,8 @@ function useIngestionThroughput(): number | null {
         setSignalsPerSecond(total / THROUGHPUT_WINDOW_SECONDS);
       } catch {
         // A header stat, not core dashboard data — a transient analytics
-        // failure shouldn't disrupt the Live Feed. Goes blank this cycle,
-        // tries again on the next poll.
+        // failure (or an aborted in-flight request) shouldn't disrupt the Live
+        // Feed. Goes blank this cycle, tries again on the next poll.
       }
     }
 
@@ -64,6 +66,7 @@ function useIngestionThroughput(): number | null {
     const timer = setInterval(() => void poll(), THROUGHPUT_POLL_MS);
     return () => {
       cancelled = true;
+      controller?.abort();
       clearInterval(timer);
     };
   }, []);

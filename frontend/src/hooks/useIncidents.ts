@@ -63,6 +63,7 @@ export function useIncidents(params: PaginationParams = {}): UseIncidentsResult 
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const refetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listControllerRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef(0);
 
   // Kept in a ref, not a dependency, so a caller passing a fresh object
@@ -72,20 +73,25 @@ export function useIncidents(params: PaginationParams = {}): UseIncidentsResult 
   paramsRef.current = params;
 
   const fetchList = useCallback(async (): Promise<void> => {
+    // Supersede any in-flight list read (a rapid SSE burst can trigger several)
+    // and abort it on unmount — no stale page ever overwrites a newer one.
+    listControllerRef.current?.abort();
+    const controller = new AbortController();
+    listControllerRef.current = controller;
     try {
-      const page = await api.listIncidents(paramsRef.current);
-      if (!mountedRef.current) {
+      const page = await api.listIncidents(paramsRef.current, { signal: controller.signal });
+      if (controller.signal.aborted || !mountedRef.current) {
         return;
       }
       setData(page.items);
       setError(null);
     } catch (err) {
-      if (!mountedRef.current) {
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError") || !mountedRef.current) {
         return;
       }
       setError(toErrorInfo(err));
     } finally {
-      if (mountedRef.current) {
+      if (!controller.signal.aborted && mountedRef.current) {
         setLoading(false);
       }
     }
@@ -158,6 +164,7 @@ export function useIncidents(params: PaginationParams = {}): UseIncidentsResult 
 
     return () => {
       mountedRef.current = false;
+      listControllerRef.current?.abort();
       eventSourceRef.current?.close();
       eventSourceRef.current = null;
       if (reconnectTimerRef.current) {

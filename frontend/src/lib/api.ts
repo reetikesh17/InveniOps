@@ -177,6 +177,11 @@ export const api = {
     return apiFetch(`/api/v1/incidents${toQueryString(params)}`, opts);
   },
 
+  /** Closed-incident history (status=closed), most recently closed first — server-paginated, since history grows without bound. */
+  listClosedIncidents(params: PaginationParams = {}, opts?: CallOptions): Promise<Page<WorkItem>> {
+    return apiFetch(`/api/v1/incidents${toQueryString({ ...params, status: "closed" })}`, opts);
+  },
+
   getIncident(id: string, opts?: CallOptions): Promise<IncidentDetail> {
     return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}`, opts);
   },

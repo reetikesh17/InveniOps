@@ -31,19 +31,24 @@ export function useIncidentDetail(id: string): UseIncidentDetailResult {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiErrorInfo | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const mountedRef = useRef(true);
+  // Tracks the in-flight request so a new fetch (or unmount) aborts the prior
+  // one — no state update ever lands from a superseded or torn-down request.
+  const controllerRef = useRef<AbortController | null>(null);
 
   const fetchDetail = useCallback(async (): Promise<void> => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
     try {
-      const result = await api.getIncident(id);
-      if (!mountedRef.current) {
+      const result = await api.getIncident(id, { signal: controller.signal });
+      if (controller.signal.aborted) {
         return;
       }
       setDetail(result);
       setNotFound(false);
       setError(null);
     } catch (err) {
-      if (!mountedRef.current) {
+      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
         return;
       }
       if (err instanceof ApiRequestError && err.info.kind === "not_found") {
@@ -52,20 +57,17 @@ export function useIncidentDetail(id: string): UseIncidentDetailResult {
         setError(toErrorInfo(err));
       }
     } finally {
-      if (mountedRef.current) {
+      if (!controller.signal.aborted) {
         setLoading(false);
       }
     }
   }, [id]);
 
   useEffect(() => {
-    mountedRef.current = true;
     setLoading(true);
     setNotFound(false);
     void fetchDetail();
-    return () => {
-      mountedRef.current = false;
-    };
+    return () => controllerRef.current?.abort();
   }, [fetchDetail]);
 
   return { detail, loading, error, notFound, refresh: fetchDetail };

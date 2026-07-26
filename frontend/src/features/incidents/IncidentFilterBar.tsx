@@ -4,9 +4,14 @@ import { COMPONENT_TYPES, SEVERITIES, WORK_ITEM_STATES } from "../../types";
 import { hasActiveFilters, parseFilters } from "./incidentFilters";
 
 const SEVERITY_OPTIONS = [{ value: "", label: "All severities" }, ...SEVERITIES.map((value) => ({ value, label: value }))];
+// Active-view filter only lists the *active* states — CLOSED is excluded here
+// because the active feed never contains closed incidents (they live under the
+// "Closed" view toggle, see FeedViewToggle). Offering "Closed" here would be a
+// filter that can never match anything.
+const ACTIVE_STATES = WORK_ITEM_STATES.filter((state) => state !== "CLOSED");
 const STATE_OPTIONS = [
   { value: "", label: "All states" },
-  ...WORK_ITEM_STATES.map((value) => ({ value, label: value.charAt(0) + value.slice(1).toLowerCase() })),
+  ...ACTIVE_STATES.map((value) => ({ value, label: value.charAt(0) + value.slice(1).toLowerCase() })),
 ];
 const COMPONENT_TYPE_OPTIONS = [
   { value: "", label: "All component types" },

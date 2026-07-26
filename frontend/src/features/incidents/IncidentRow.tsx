@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { RelativeTime, SeverityBadge, StateBadge } from "../../components";
 import { FOCUS_RING } from "../../components/Button";
@@ -17,7 +18,7 @@ function FieldLabel({ children }: { children: string }): JSX.Element {
   return <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-ink-faint sm:hidden">{children}</span>;
 }
 
-export function IncidentRow({ incident, isNew }: IncidentRowProps): JSX.Element {
+function IncidentRowInner({ incident, isNew }: IncidentRowProps): JSX.Element {
   return (
     <Link
       to={`/incidents/${encodeURIComponent(incident.id)}`}
@@ -66,3 +67,28 @@ export function IncidentRow({ incident, isNew }: IncidentRowProps): JSX.Element 
     </Link>
   );
 }
+
+// Memoized by VALUE, not reference: every SSE-triggered refetch replaces the
+// whole list with freshly-parsed objects, so a reference-equality memo would
+// never skip. Comparing the fields this row actually renders means a refresh
+// that returns identical data re-renders zero rows — only rows whose data
+// truly changed (a new state, a bumped signal count) repaint. That's what
+// keeps a live update from cascading into a full-list re-render.
+export const IncidentRow = memo(IncidentRowInner, (prev, next) => {
+  if (prev.isNew !== next.isNew) {
+    return false;
+  }
+  const a = prev.incident;
+  const b = next.incident;
+  return (
+    a.id === b.id &&
+    a.severity === b.severity &&
+    a.state === b.state &&
+    a.title === b.title &&
+    a.componentId === b.componentId &&
+    a.componentType === b.componentType &&
+    a.signalCount === b.signalCount &&
+    a.firstSignalAt === b.firstSignalAt &&
+    a.updatedAt === b.updatedAt
+  );
+});

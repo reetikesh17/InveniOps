@@ -240,7 +240,7 @@ headers (per-IP token bucket, backed by Redis).
 
 | Method & path | Request | Response |
 |---|---|---|
-| `GET /` | query `limit`, `offset` | `200 { items: IncidentSummary[], total, limit, offset }` — active (non-CLOSED) incidents, severity then age |
+| `GET /` | query `limit`, `offset`, `status=active\|closed` (default `active`) | `200 { items: IncidentSummary[], total, limit, offset }` — `active`: non-CLOSED incidents, severity then age (from the Redis cache); `closed`: CLOSED incidents, most-recently-closed first (from Postgres) |
 | `GET /:id` | — | `200` `IncidentSummary & { legalNextStates: WorkItemState[], rca: RcaSummaryDto \| null }` · `404 not_found` |
 | `GET /:id/signals` | query `limit`, `offset` | `200 { items: SignalDto[], total, limit, offset }` — raw signals from Mongo, chronological · `404 not_found` |
 | `POST /:id/transition` | `{ toState, actor }` | `200 IncidentSummary` · `404 not_found` · `409 invalid_transition` (illegal per the state machine) · `409 conflict` (optimistic-concurrency race) · `400 validation_error` |
@@ -271,6 +271,90 @@ All four return `400 validation_error` for a missing/malformed `from`/`to`/`inte
 | `GET /health` | `200` (all critical dependencies up) or `503` (one or more down) — per-dependency status/latency, buffer state, queue depth, uptime, version, throughput |
 | `GET /ready` | `200` once the buffer drainer and BullMQ worker are actually running, `503` otherwise — distinct from `/health`, see docs/observability.md |
 | `GET /metrics` | `200 text/plain` — Prometheus exposition format |
+
+## Frontend (UI)
+
+React 18 + TypeScript + Vite + Tailwind, in [`frontend/`](frontend/). A dense,
+responsive operator dashboard that drives the whole incident lifecycle against
+the APIs above. Every route is a lazily-loaded chunk wrapped in an error
+boundary, so one screen failing degrades to a recoverable card, never a white
+page.
+
+### Routes
+
+| Route | Screen | What it does |
+|---|---|---|
+| `/` | **Live Feed** | Active incidents, severity-then-recency (server-sorted). Real-time via SSE with a polling fallback; client-side filters (severity/state/component type) persisted in the URL; pagination; time-in-state that visually escalates as it grows. An **Active / Closed** toggle (`?view=closed`) switches to the closed-incident **history** — server-paginated (via `GET /api/v1/incidents?status=closed`), most-recently-closed first, since closed incidents leave the active cache once RCA'd. |
+| `/incidents/:id` | **Incident Detail** | Header + state-machine controls rendered from the server's `legalNextStates` (the domain layer stays authoritative); transition timeline; raw signals from Mongo, paginated & load-on-demand, newest/oldest with expandable payloads. Handles 409-conflict, RCA-required, and not-found explicitly. |
+| `/analytics` | **Analytics** | Throughput, incident volume (stacked, by type/severity), MTTR trend with the server's rolling average overlaid, and a worst-first component-health table — all from the aggregation endpoints, with a shared URL-persisted range/bucket selector. Plus a live **System Status** panel (per-dependency latency, buffer fill, queue depth, shedding state) that makes the backpressure work visible. |
+| `/styleguide` | **Style Guide** | Every reusable primitive in every state — the visual system the dashboard is built from. |
+
+### The workflow
+
+Feed → click an incident → **Start investigating** → **Mark resolved** →
+**Complete the RCA** (both timestamps, category, and the three narrative
+fields, client-validated as a mirror of the backend domain rules) → submit →
+the incident closes and the page re-renders as the read-only RCA with the
+computed MTTR. The RCA form previews the MTTR it's about to record, counts
+characters toward the minimums, persists a draft to `sessionStorage`, and warns
+on navigating away with unsaved changes.
+
+| | |
+|---|---|
+| ![Live Feed](docs/ui/live-feed.png) | ![Incident Detail](docs/ui/incident-detail.png) |
+| **Live Feed** — severity counts, escalating time-in-state, real-time updates | **Incident Detail** — state controls, transition timeline, raw signals |
+| ![RCA form](docs/ui/rca-form.png) | ![Analytics](docs/ui/analytics.png) |
+| **RCA form** — live MTTR preview, character counters, draft persistence | **Analytics** — throughput, volume, MTTR trend, component health, live system status |
+
+### Resilience & accessibility
+
+- **Backend unreachable** → a shell-level banner (header/nav stay usable), and
+  a single `/health` poller retries automatically with exponential backoff
+  (5s → 30s). **Shedding under backpressure** surfaces as a distinct
+  "system under load" banner, not a generic outage; a dependency outage shows
+  which dependency is down.
+- **Real-time transport** is SSE, with a documented rationale in
+  [ADR 0007](docs/decisions/0007-sse-for-real-time-transport.md). SSE drops
+  degrade to polling with a subtle indicator so the operator always knows how
+  fresh the data is. Live updates never re-mount the list; rows are memoized by
+  value so a refresh repaints only what actually changed.
+- Skeletons appear only after ~200ms to avoid flicker; every fetch is
+  cancellable and aborted on unmount.
+- Keyboard-navigable through the full workflow with a visible focus ring
+  throughout; `header`/`nav`/`main` landmarks, one `h1` per screen, a
+  skip-to-content link, and `aria-current` on the active nav item. No meaning
+  is carried by colour alone (severity/state badges pair colour with an icon
+  and label; charts always carry legends and labels). Chart palettes are
+  validated for colour-vision-deficiency separation.
+- Responsive at **375 / 768 / 1440px** — tables collapse to cards on narrow
+  viewports, charts reflow, no horizontal overflow.
+
+### Running the frontend standalone
+
+The frontend reads its API base URL from `VITE_API_BASE_URL` (default
+`http://localhost:3000`).
+
+```bash
+cd frontend
+npm install
+
+# dev server with hot reload (http://localhost:5173)
+npm run dev
+
+# type-check + production build, then serve the built bundle (http://localhost:4173)
+npm run build
+npm run preview
+
+# point at a non-default backend
+VITE_API_BASE_URL=http://api.example.com npm run dev
+
+# unit/component tests (RCA validation + form behaviour)
+npm test
+```
+
+Under Docker Compose the `frontend` service runs the Vite dev server against a
+bind-mounted source tree (hot reload), with `VITE_API_BASE_URL` supplied by
+compose — no separate step needed beyond `docker compose up`.
 
 ## Design Patterns
 

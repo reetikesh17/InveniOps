@@ -1,19 +1,35 @@
-import { useHealthStatus, type ConnectionStatus } from "../hooks/useHealthStatus";
+import { useSystemHealth } from "../hooks/useSystemHealth";
 
-const STATUS_CONFIG: Record<ConnectionStatus, { label: string; dotClassName: string }> = {
-  checking: { label: "Checking…", dotClassName: "bg-neutral-400" },
-  connected: { label: "Connected", dotClassName: "bg-emerald-500" },
-  disconnected: { label: "Disconnected", dotClassName: "bg-red-500" },
-};
+interface Indicator {
+  readonly label: string;
+  readonly dotClassName: string;
+}
 
+/**
+ * The header's at-a-glance health dot. Reads the shared health context (one
+ * app-wide poller — see HealthProvider), never its own request. Never colour
+ * alone: the text label carries the same state as the dot.
+ */
 export function ConnectionStatusIndicator(): JSX.Element {
-  const status = useHealthStatus();
-  const { label, dotClassName } = STATUS_CONFIG[status];
+  const { phase, health } = useSystemHealth();
+
+  let indicator: Indicator;
+  if (phase === "checking") {
+    indicator = { label: "Checking…", dotClassName: "bg-neutral-400" };
+  } else if (phase === "unreachable") {
+    indicator = { label: "Offline", dotClassName: "bg-red-500" };
+  } else if (health?.status === "degraded") {
+    indicator = { label: "Degraded", dotClassName: "bg-amber-500" };
+  } else if (health?.status === "unhealthy") {
+    indicator = { label: "Unhealthy", dotClassName: "bg-red-500" };
+  } else {
+    indicator = { label: "Connected", dotClassName: "bg-emerald-500" };
+  }
 
   return (
-    <div className="flex items-center gap-2 text-sm text-neutral-600">
-      <span className={`h-2 w-2 rounded-full ${dotClassName}`} aria-hidden="true" />
-      <span>{label}</span>
+    <div className="flex items-center gap-2 text-sm text-ink-muted">
+      <span className={`h-2 w-2 rounded-full ${indicator.dotClassName}`} aria-hidden="true" />
+      <span>{indicator.label}</span>
     </div>
   );
 }

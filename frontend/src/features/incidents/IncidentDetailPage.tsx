@@ -2,6 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button, Card, EmptyState, ErrorState, IncidentDetailSkeleton, Input, useToast } from "../../components";
 import { XCircleIcon } from "../../components/icons";
+import { friendlyErrorMessage } from "../../lib/errorMessages";
+import { useDelayedFlag } from "../../hooks/useDelayedFlag";
 import { RcaForm } from "../rca/RcaForm";
 import { DetailHeader } from "./DetailHeader";
 import { RcaReadOnly } from "./RcaReadOnly";
@@ -22,7 +24,7 @@ function Section({ title, children }: { title: string; children: ReactNode }): J
   );
 }
 
-export function IncidentDetailPage(): JSX.Element {
+export function IncidentDetailPage(): JSX.Element | null {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -31,6 +33,7 @@ export function IncidentDetailPage(): JSX.Element {
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const { detail, loading, error, notFound, refresh } = useIncidentDetail(id ?? "");
+  const showSkeleton = useDelayedFlag(loading && !detail);
 
   useEffect(() => {
     if (!conflictMessage) {
@@ -66,15 +69,15 @@ export function IncidentDetailPage(): JSX.Element {
   }
 
   if (loading && !detail) {
-    return <IncidentDetailSkeleton />;
+    return showSkeleton ? <IncidentDetailSkeleton /> : null;
   }
 
   if (error && !detail) {
-    return <ErrorState message={error.message} onRetry={() => void handleRefresh()} />;
+    return <ErrorState message={friendlyErrorMessage(error, "this incident")} onRetry={() => void handleRefresh()} />;
   }
 
   if (!detail) {
-    return <IncidentDetailSkeleton />;
+    return showSkeleton ? <IncidentDetailSkeleton /> : null;
   }
 
   return (

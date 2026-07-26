@@ -60,6 +60,13 @@ function fakeWorkItemStore(
       const active = workItems.filter((workItem) => workItem.state !== "CLOSED");
       return Promise.resolve(active.slice(pagination.offset, pagination.offset + pagination.limit));
     },
+    listClosed(pagination: Pagination): Promise<WorkItem[]> {
+      const closed = workItems.filter((workItem) => workItem.state === "CLOSED");
+      return Promise.resolve(closed.slice(pagination.offset, pagination.offset + pagination.limit));
+    },
+    countClosed(): Promise<number> {
+      return Promise.resolve(workItems.filter((workItem) => workItem.state === "CLOSED").length);
+    },
     listTransitions(workItemId: string): Promise<StateTransition[]> {
       return Promise.resolve(transitions.filter((transition) => transition.workItemId === workItemId));
     },
@@ -158,6 +165,45 @@ describe("DashboardProjectionService.getActiveIncidents", () => {
     expect(page.total).toBe(1); // real total, not zero — this is not a cache miss
     expect(page.items).toHaveLength(0);
     expect(workItemStore.findByIdCalls).toHaveLength(0); // never fell back to Postgres
+  });
+});
+
+describe("DashboardProjectionService.getClosedIncidents", () => {
+  it("returns only CLOSED incidents, straight from Postgres, never touching the active cache", async () => {
+    const workItems = [
+      makeWorkItem({ id: "wi-open", state: WorkItemStatus.OPEN }),
+      makeWorkItem({ id: "wi-closed-1", state: WorkItemStatus.CLOSED, closedAt: NOW }),
+      makeWorkItem({ id: "wi-closed-2", state: WorkItemStatus.CLOSED, closedAt: NOW }),
+    ];
+    const cache = fakeCache();
+    const service = new DashboardProjectionService(
+      fakeWorkItemStore(workItems.map((workItem) => ({ ...workItem, rca: null }))),
+      fakeSignalStore([]),
+      cache,
+      { repopulateCap: 100 },
+    );
+
+    const page = await service.getClosedIncidents({ limit: 10, offset: 0 });
+
+    expect(page.total).toBe(2);
+    expect(page.items.map((item) => item.id).sort()).toEqual(["wi-closed-1", "wi-closed-2"]);
+    expect(page.items.every((item) => item.state === "CLOSED")).toBe(true);
+    expect(cache.upsertCalls).toHaveLength(0); // history is a Postgres-only cold read
+  });
+
+  it("paginates the closed set", async () => {
+    const workItems = [0, 1, 2].map((i) => makeWorkItem({ id: `wi-${i}`, state: WorkItemStatus.CLOSED, closedAt: NOW }));
+    const service = new DashboardProjectionService(
+      fakeWorkItemStore(workItems.map((workItem) => ({ ...workItem, rca: null }))),
+      fakeSignalStore([]),
+      fakeCache(),
+      { repopulateCap: 100 },
+    );
+
+    const page = await service.getClosedIncidents({ limit: 2, offset: 0 });
+
+    expect(page.total).toBe(3); // full count, not the page size
+    expect(page.items).toHaveLength(2);
   });
 });
 

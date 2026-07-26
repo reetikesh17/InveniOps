@@ -54,6 +54,13 @@ const paginationQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+// The incident list defaults to active (non-CLOSED) incidents; status=closed
+// serves the closed-incident history view instead (read from Postgres, most
+// recently closed first). Default "active" keeps every existing caller unchanged.
+const listQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(["active", "closed"]).default("active"),
+});
+
 // Default "asc" matches findByWorkItemId's original, unparameterized
 // behavior — existing callers that never pass `order` see no change.
 const signalsQuerySchema = paginationQuerySchema.extend({
@@ -90,14 +97,18 @@ type RcaResponseBody = (IncidentSummary & { readonly mttrSeconds: number }) | Er
 type TransitionsResponseBody = { readonly items: readonly StateTransitionDto[] } | ErrorResponseBody;
 
 async function handleListIncidents(req: Request, res: Response<IncidentListResponseBody>): Promise<void> {
-  const parsed = paginationQuerySchema.safeParse(req.query);
+  const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "validation_error", message: "invalid pagination parameters" });
     return;
   }
 
-  const { limit, offset } = parsed.data;
-  const page = await getServices().dashboard.getActiveIncidents({ limit, offset });
+  const { limit, offset, status } = parsed.data;
+  const dashboard = getServices().dashboard;
+  const page =
+    status === "closed"
+      ? await dashboard.getClosedIncidents({ limit, offset })
+      : await dashboard.getActiveIncidents({ limit, offset });
   res.status(200).json({ items: page.items, total: page.total, limit, offset });
 }
 

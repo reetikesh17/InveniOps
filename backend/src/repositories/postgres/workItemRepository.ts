@@ -139,6 +139,27 @@ export class PostgresWorkItemRepository {
   }
 
   /**
+   * Closed incidents for the history view — ordered most-recently-closed
+   * first (closedAt is always set on close; updatedAt is the tiebreak). Read
+   * straight from Postgres, never the cache: CLOSED work items are
+   * deliberately absent from the dashboard's active-incident cache (see
+   * DashboardCacheRepository), and history is a cold path that doesn't need
+   * the hot-path cache anyway.
+   */
+  async listClosed(pagination: Pagination): Promise<WorkItem[]> {
+    return this.prisma.workItem.findMany({
+      where: { state: WorkItemStatus.CLOSED },
+      orderBy: [{ closedAt: "desc" }, { updatedAt: "desc" }],
+      take: pagination.limit,
+      skip: pagination.offset,
+    });
+  }
+
+  async countClosed(): Promise<number> {
+    return this.prisma.workItem.count({ where: { state: WorkItemStatus.CLOSED } });
+  }
+
+  /**
    * Atomic: guarded state update + audit row insert in one transaction.
    * The update's WHERE clause includes `state: fromState` — under
    * Postgres's READ COMMITTED isolation, a concurrent transaction that

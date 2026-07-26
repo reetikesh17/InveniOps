@@ -12,6 +12,8 @@ import type { WorkItemWithRca } from "../../repositories/postgres/index.js";
 export interface WorkItemReadStore {
   findById(id: string): Promise<WorkItemWithRca | null>;
   listActive(pagination: Pagination): Promise<WorkItem[]>;
+  listClosed(pagination: Pagination): Promise<WorkItem[]>;
+  countClosed(): Promise<number>;
   listTransitions(workItemId: string): Promise<StateTransition[]>;
 }
 
@@ -159,6 +161,20 @@ export class DashboardProjectionService {
     const items = summaries.filter((summary): summary is IncidentSummary => summary !== null);
 
     return { items, total: page.total };
+  }
+
+  /**
+   * The closed-incident history list — straight from Postgres (closed items
+   * aren't cached), most-recently-closed first, server-paginated because
+   * history grows without bound. `updatedAt` on each summary reflects the
+   * close time, since closing is the last write to the row.
+   */
+  async getClosedIncidents(pagination: Pagination): Promise<Page<IncidentSummary>> {
+    const [workItems, total] = await Promise.all([
+      this.workItemStore.listClosed(pagination),
+      this.workItemStore.countClosed(),
+    ]);
+    return { items: workItems.map(toIncidentSummary), total };
   }
 
   async getIncidentDetail(workItemId: string): Promise<IncidentDetailDto | null> {

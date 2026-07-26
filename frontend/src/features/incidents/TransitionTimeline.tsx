@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { EmptyState, ErrorState, RelativeTime, SkeletonBlock, StateBadge } from "../../components";
 import { api, ApiRequestError, type ApiErrorInfo } from "../../lib/api";
+import { friendlyErrorMessage } from "../../lib/errorMessages";
+import { useDelayedFlag } from "../../hooks/useDelayedFlag";
 import type { StateTransition } from "../../types";
 
 function toErrorInfo(error: unknown): ApiErrorInfo {
@@ -15,35 +17,47 @@ export interface TransitionTimelineProps {
 }
 
 /** Who/what/when, from the StateTransition audit trail (GET /:id/transitions) — never paginated, an incident accumulates at most a handful of these. */
-export function TransitionTimeline({ incidentId }: TransitionTimelineProps): JSX.Element {
+export function TransitionTimeline({ incidentId }: TransitionTimelineProps): JSX.Element | null {
   const [transitions, setTransitions] = useState<readonly StateTransition[] | null>(null);
   const [error, setError] = useState<ApiErrorInfo | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
 
-  const fetchTransitions = useCallback(async (): Promise<void> => {
-    setError(null);
-    try {
-      const { items } = await api.getIncidentTransitions(incidentId);
-      setTransitions(items);
-    } catch (err) {
-      setError(toErrorInfo(err));
-    }
-  }, [incidentId]);
-
+  // Aborted on unmount / incident change so a late response never updates a
+  // torn-down timeline.
   useEffect(() => {
-    void fetchTransitions();
-  }, [fetchTransitions]);
+    const controller = new AbortController();
+    setError(null);
+    api
+      .getIncidentTransitions(incidentId, { signal: controller.signal })
+      .then(({ items }) => {
+        if (!controller.signal.aborted) {
+          setTransitions(items);
+        }
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+          return;
+        }
+        setError(toErrorInfo(err));
+      });
+    return () => controller.abort();
+  }, [incidentId, reloadNonce]);
+
+  const showSkeleton = useDelayedFlag(transitions === null && error === null);
 
   if (error) {
-    return <ErrorState message="Couldn't load the transition history." onRetry={() => void fetchTransitions()} />;
+    return (
+      <ErrorState message={friendlyErrorMessage(error, "the transition history")} onRetry={() => setReloadNonce((n) => n + 1)} />
+    );
   }
 
   if (transitions === null) {
-    return (
+    return showSkeleton ? (
       <div className="flex flex-col gap-2">
         <SkeletonBlock className="h-10 w-full" />
         <SkeletonBlock className="h-10 w-full" />
       </div>
-    );
+    ) : null;
   }
 
   if (transitions.length === 0) {

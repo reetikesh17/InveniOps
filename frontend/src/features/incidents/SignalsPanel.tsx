@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, EmptyState, ErrorState, RelativeTime, SeverityBadge, SkeletonBlock } from "../../components";
 import { ChevronDownIcon } from "../../components/icons";
 import { api, ApiRequestError, type ApiErrorInfo } from "../../lib/api";
+import { friendlyErrorMessage } from "../../lib/errorMessages";
+import { useDelayedFlag } from "../../hooks/useDelayedFlag";
 import { SEVERITIES, type Severity, type Signal } from "../../types";
 import { Pagination } from "./Pagination";
 
@@ -60,30 +62,42 @@ export function SignalsPanel({ incidentId }: SignalsPanelProps): JSX.Element {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiErrorInfo | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
 
-  const fetchPage = useCallback(async (): Promise<void> => {
+  // Fetch is aborted on unmount and whenever the page/order/incident changes,
+  // so a slow response for a page the operator has already navigated away from
+  // never lands as a state update on an unmounted (or stale) view.
+  useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
-    try {
-      const result = await api.getIncidentSignals(incidentId, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, order });
-      setSignals(result.items);
-      setTotal(result.total);
-    } catch (err) {
-      setError(toErrorInfo(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [incidentId, page, order]);
-
-  useEffect(() => {
-    void fetchPage();
-  }, [fetchPage]);
+    api
+      .getIncidentSignals(incidentId, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, order }, { signal: controller.signal })
+      .then((result) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setSignals(result.items);
+        setTotal(result.total);
+        setLoading(false);
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+          return;
+        }
+        setError(toErrorInfo(err));
+        setLoading(false);
+      });
+    return () => controller.abort();
+  }, [incidentId, page, order, reloadNonce]);
 
   function setOrderAndResetPage(next: Order): void {
     setOrder(next);
     setPage(1);
   }
 
+  const retry = (): void => setReloadNonce((n) => n + 1);
+  const showSkeleton = useDelayedFlag(loading && signals.length === 0);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
@@ -106,13 +120,15 @@ export function SignalsPanel({ incidentId }: SignalsPanelProps): JSX.Element {
       </div>
 
       {loading && signals.length === 0 ? (
-        <div className="flex flex-col gap-2">
-          <SkeletonBlock className="h-9 w-full" />
-          <SkeletonBlock className="h-9 w-full" />
-          <SkeletonBlock className="h-9 w-full" />
-        </div>
+        showSkeleton ? (
+          <div className="flex flex-col gap-2">
+            <SkeletonBlock className="h-9 w-full" />
+            <SkeletonBlock className="h-9 w-full" />
+            <SkeletonBlock className="h-9 w-full" />
+          </div>
+        ) : null
       ) : error ? (
-        <ErrorState message="Couldn't load signals for this incident." onRetry={() => void fetchPage()} />
+        <ErrorState message={friendlyErrorMessage(error, "signals")} onRetry={retry} />
       ) : total === 0 ? (
         <EmptyState headline="No signals recorded" body="Nothing has been linked to this incident yet." />
       ) : (
