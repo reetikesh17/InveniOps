@@ -174,7 +174,9 @@ InveniOps/
 
 ## Backpressure Handling
 
-Full design writeup: [docs/backpressure.md](docs/backpressure.md).
+Full design writeup: [docs/backpressure.md](docs/backpressure.md). For load-test
+methodology, the measured baseline, and a documented tuning pass on top of it, see
+[docs/performance.md](docs/performance.md).
 
 **The problem.** The assignment requires absorbing bursts up to 10,000 signals/sec
 without the system crashing when Postgres, Mongo, or Redis is momentarily slow.
@@ -481,6 +483,161 @@ existing, already-tested code.
 
 ## Testing
 
-**TODO:** expand beyond the current retry-wrapper unit tests (`backend/tests/unit/retry.test.ts`)
-to cover the state machine, RCA validation, and debouncer once they exist; add
-integration tests against the Dockerized stores.
+**Unit tests** (`backend/tests/unit/`, `npm test`): 363 tests, zero I/O, run in a few
+seconds. Coverage is enforced, not just reported — `vitest.config.ts` sets a
+threshold (currently 85% statements/lines, 90% branches, 78% functions) scoped to
+`src/domain/**`, `src/services/**`, and the retry util, and a plain `npm test` fails
+the run if actual coverage drops below it. The two areas the rubric names explicitly
+are both at 100%:
+
+- **RCA validation** (`domain/rca/validateRca.test.ts`) — every rule, both a passing
+  and failing case; boundary cases (exactly-at-minimum text length, end time one
+  second after/equal to start, start time exactly at `firstSignalAt`, timestamps one
+  second in the future); every `RootCauseCategory` enum member accepted, an invalid
+  one rejected; multiple simultaneous failures return every field error, not just the
+  first.
+- **Retry logic** (`utils/retry.test.ts`, `repositories/postgres/{prismaErrors,withPostgresRetry}.test.ts`)
+  — succeeds first try / after N transient failures / exhausts and throws; exponential
+  backoff timing and jitter (asserted against the actual random draw, not just "some
+  number in range"); every Prisma error code the retry wrapper classifies, tested
+  individually — connection failure (P1001), deadlock/serialization conflict (P2034),
+  and pool timeout (P2024) retry; constraint violation (P2002), not-found (P2025), and
+  validation errors do not.
+
+Also at 100%: the **work item state machine** (every legal transition, every illegal
+transition via the full cross-product of states, CLOSED's terminal-ness, and
+`getLegalNextStates` for all four states) and **alert strategy resolution** (the
+`AlertStrategyRegistry` lookup plus every per-component-type strategy). The
+**debouncer** (`services/ingestion/debouncer.test.ts`) — previously exercised only by
+the slow, real-Redis/Postgres/Mongo integration test below — now also has a fast unit
+suite against fake stores covering the create/link/race/lock-contention/cache-staleness
+paths individually. The **ingestion buffer**'s interval-driven drain loop
+(`start`/`stop`/`setSink`, tick reentrancy, surviving a failing tick) is covered the
+same way.
+
+Deliberately left to the integration suite rather than mocked: `src/repositories/**`'s
+actual Prisma/Mongo/Redis calls, and the I/O-heavy alert dispatch/escalation
+orchestration — those are thin wrappers around real clients, and a unit test against a
+mocked ORM would mostly assert that the mock does what the mock was told to do.
+
+**Integration tests** (`backend/tests/integration/`, `npm run test:integration`,
+requires the Dockerized stores running): the debouncer's real Postgres-unique-index
+correctness under actual concurrency (60 simultaneous signals × 8 iterations, exactly
+one work item every time), the full ingest→debounce→alert→dashboard-cache pipeline,
+repository round-trips against real Postgres/Mongo, the rate limiter, and the SSE event
+bus.
+
+**E2E tests** (`backend/tests/e2e/`, `npm run test:e2e`, requires the real
+docker-compose stack running): full-lifecycle correctness against the actually
+deployed backend over its real HTTP API — 500 signals across 5 components collapsing
+into 5 work items (not 500), correct Mongo linkage, alerting-Strategy severity
+reconciliation, dashboard-cache-vs-Postgres consistency, the full
+OPEN→INVESTIGATING→RESOLVED→CLOSED lifecycle with RCA validation and MTTR, and a
+concurrency test firing 50 simultaneous transitions at one work item across 25
+iterations to prove exactly one ever wins.
+
+**Chaos / resilience tests** (`backend/tests/chaos/`, `npm run test:chaos`, requires
+the real docker-compose stack running, ~1.5-3 min): pauses, stops, and kills the real
+containers — Postgres outage, Redis outage, slow Mongo, queue saturation, a mid-job
+worker crash, and a graceful-shutdown drain — asserting concrete data-integrity
+outcomes, not just "didn't crash." Full write-up: `backend/tests/chaos/README.md`.
+
+**CI** (`.github/workflows/ci.yml`): lint, typecheck, unit tests (coverage-gated),
+frontend typecheck/tests, then integration + E2E + a short load test with a
+throughput-regression floor, all against the real stack — on every push and PR. The
+chaos suite runs on manual trigger only (`workflow_dispatch`), not on every push; the
+workflow file documents why (disruptive by design, and genuinely variable runtime, not
+a fit for a PR gate).
+
+## Sample Data
+
+The assignment asks for "a script or JSON file to mock a failure event across the
+stack (e.g., simulating an RDBMS outage followed by an MCP failure)." `scripts/scenarios/`
+has both: a narrated, replayable **cascading failure** scenario, and a companion
+script that walks the resulting incidents through the full lifecycle to `CLOSED` —
+so opening [the dashboard](http://localhost:5173) afterward shows a realistic mix of
+active and closed incidents with real MTTR values, not an empty analytics page.
+
+### Running it
+
+```bash
+docker compose up -d             # from the repo root, if not already running
+
+cd scripts/scenarios
+npm install                                # one-time
+
+npm run cascading-failure                  # real time — ~3 minutes, for a live demo
+npm run cascading-failure -- --speed 30    # compressed — ~10 seconds, for CI
+
+npm run replay-lifecycle                   # then this — closes the incident work items
+```
+
+Both scripts talk to the real, running stack over the real HTTP API
+(`http://localhost:3000` by default, `--api-url` to override) — no in-process
+shortcuts. `--speed` divides every wait in the timeline by that factor: `--speed 1`
+(the default) plays out exactly as narrated in real time; `--speed 30` produces the
+same event sequence, in the same order, at the same volumes, in about ten seconds.
+Both are safe to re-run against the same stack — componentIds are fixed, so each run
+reads a component's pre-existing signal count first and only asserts against what
+*that run itself* added.
+
+### `cascading-failure.ts` / `cascading-failure.json`
+
+`cascading-failure.json` is the canonical, static event sequence — inspectable
+without running anything. `cascading-failure.ts` reads it at runtime and replays it
+exactly as written, narrating each beat to the console as it fires:
+
+| T+ | Beat | What happens |
+|---|---|---|
+| 0s | Baseline | Low-severity background traffic across all 6 component types |
+| 30s | RDBMS primary begins failing | Connection pool exhaustion on `DB_PRIMARY_01`, ramping 1/s → 10/s over 15s |
+| 45s | Dependent APIs time out | Three API components report timeouts as the DB backs up |
+| 60s | MCP host fails | `MCP_HOST_01` fails as its downstream dependency degrades |
+| 75s | Cache miss storm | `CACHE_SESSION_01` ramps 2/s → 12/s as services fall back to the (failing) DB |
+| 120s | Partial recovery | Every previously-failing component's error rate declines |
+| 180s | Steady state restored | No new signals |
+
+Once the timeline finishes, the script verifies — against the real system, not
+inferred — every property the assignment asks this scenario to demonstrate:
+
+- **Debouncing collapsed the RDBMS burst into one work item**: polls Postgres
+  directly until each component's `work_items` row shows the expected `signal_count`,
+  and confirms the 83 RDBMS signals from the ramp (86 including the recovery beat)
+  collapsed into exactly **one** work item — enforced by
+  `idx_work_items_active_component_id`, not just the Redis debounce fast path.
+- **The alerting Strategy assigned P0 to RDBMS and lower severities elsewhere**: the
+  RDBMS beat deliberately *reports* P1 (a monitor under-calling a connection-pool
+  warning — realistic), specifically so this can prove the Strategy's severity
+  *floor* is doing real work, not just echoing what was sent. It greps the backend's
+  own logs for the dispatched `ALERT [...]` line and confirms RDBMS's alert was
+  corrected up to **P0**, while the API/MCP_HOST/CACHE alerts — which already
+  reported at their own floor — pass through unchanged.
+- **Signals were correctly linked to their work items**: the same per-component
+  `signal_count` check, run for all 12 components (6 failing, 6 healthy baseline).
+- **The buffer absorbed the burst without loss**: every `POST /api/v1/signals`
+  response is tallied; the run reports 0 signals dropped (503) across the whole
+  scenario. (A fast `--speed` run can genuinely trip the real per-IP rate limiter —
+  the script retries those like any well-behaved client would, honoring
+  `Retry-After`, and reports the retry count separately from actual data loss.)
+
+Verification uses direct, read-only Postgres access and `docker logs`, the same
+posture as `backend/tests/chaos/`'s helpers, because there's no — and shouldn't be a
+— "find the work item for this componentId" HTTP endpoint; every signal and every
+state transition still goes through the real API. Each run writes
+`scripts/scenarios/.output/last-run.json` (gitignored) recording the componentId →
+work item ID mapping, which the companion script below reads.
+
+### `replay-lifecycle.ts`
+
+Reads `.output/last-run.json` and walks every **incident** work item (the 6 from the
+failure narrative — not the 6 healthy baseline ones) through
+`OPEN → INVESTIGATING → RESOLVED →` a real RCA (`POST /:id/rca`, which validates and
+closes it in one step), printing the computed MTTR for each. The RCA content is
+tailored per component type and passes the real `validateRca` rules, not placeholder
+text; `incidentStartTime` is the work item's actual `firstSignalAt`, so the reported
+MTTR is the real elapsed time, not a fabricated one.
+
+The 6 baseline work items are left `OPEN` on purpose — so the dashboard shows both
+still-active incidents (baseline) and closed ones with real MTTR (the cascading
+failure), exercising both halves of the UI and giving the analytics/MTTR views real
+closed data to chart.

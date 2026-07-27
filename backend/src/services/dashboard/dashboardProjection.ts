@@ -1,6 +1,6 @@
 import type { WorkItem, RcaRecord as PrismaRcaRecord, StateTransition } from "@prisma/client";
 import { getLegalNextStates, type WorkItemStateName } from "../../domain/state/index.js";
-import type { IncidentSummary, ActiveIncidentPage } from "../../repositories/redis/dashboardCache.js";
+import { CacheUnavailableError, type IncidentSummary, type ActiveIncidentPage } from "../../repositories/redis/dashboardCache.js";
 import type { SignalDocument, SignalPagination } from "../../repositories/mongo/signalRepository.js";
 import type { WorkItemWithRca } from "../../repositories/postgres/index.js";
 
@@ -12,6 +12,8 @@ import type { WorkItemWithRca } from "../../repositories/postgres/index.js";
 export interface WorkItemReadStore {
   findById(id: string): Promise<WorkItemWithRca | null>;
   listActive(pagination: Pagination): Promise<WorkItem[]>;
+  /** Total active count, independent of any one page — the Postgres-direct fallback path needs this when the cache itself (not just a key) is unavailable; see getActiveIncidents. */
+  countActive(): Promise<number>;
   listClosed(pagination: Pagination): Promise<WorkItem[]>;
   countClosed(): Promise<number>;
   listTransitions(workItemId: string): Promise<StateTransition[]>;
@@ -146,7 +148,20 @@ export class DashboardProjectionService {
   ) {}
 
   async getActiveIncidents(pagination: Pagination): Promise<Page<IncidentSummary>> {
-    let page = await this.cache.getActiveIncidentIds(pagination);
+    let page: ActiveIncidentPage;
+    try {
+      page = await this.cache.getActiveIncidentIds(pagination);
+    } catch (error) {
+      if (error instanceof CacheUnavailableError) {
+        // Redis itself is unreachable, not just a cold/empty cache — the
+        // repopulate-then-reread cycle below would only fail again and
+        // report zero active incidents, which would be wrong, not
+        // degraded. Read Postgres directly instead; this bypasses the
+        // cache for this call entirely rather than pretending it's warm.
+        return this.getActiveIncidentsFromPostgres(pagination);
+      }
+      throw error;
+    }
 
     if (page.total === 0) {
       // Ambiguous by cardinality alone: genuinely zero active incidents,
@@ -154,13 +169,29 @@ export class DashboardProjectionService {
       // repopulating from Postgres and re-checking is cheap and correct —
       // a truly-empty system just repopulates nothing and total stays 0.
       await this.repopulateActiveCache();
-      page = await this.cache.getActiveIncidentIds(pagination);
+      try {
+        page = await this.cache.getActiveIncidentIds(pagination);
+      } catch (error) {
+        if (error instanceof CacheUnavailableError) {
+          return this.getActiveIncidentsFromPostgres(pagination);
+        }
+        throw error;
+      }
     }
 
     const summaries = await Promise.all(page.ids.map((id) => this.getIncidentSummaryCacheAware(id)));
     const items = summaries.filter((summary): summary is IncidentSummary => summary !== null);
 
     return { items, total: page.total };
+  }
+
+  /** The degraded path getActiveIncidents falls back to when the cache is genuinely unreachable — same data, same severity-then-firstSignalAt order (listActive's own ORDER BY), just without the cache's ZSET in between. */
+  private async getActiveIncidentsFromPostgres(pagination: Pagination): Promise<Page<IncidentSummary>> {
+    const [workItems, total] = await Promise.all([
+      this.workItemStore.listActive(pagination),
+      this.workItemStore.countActive(),
+    ]);
+    return { items: workItems.map(toIncidentSummary), total };
   }
 
   /**
@@ -178,7 +209,7 @@ export class DashboardProjectionService {
   }
 
   async getIncidentDetail(workItemId: string): Promise<IncidentDetailDto | null> {
-    const cached = await this.cache.getIncidentSummary(workItemId);
+    const cached = await this.getCachedSummaryOrNull(workItemId);
     if (cached) {
       return {
         ...cached,
@@ -238,7 +269,7 @@ export class DashboardProjectionService {
   }
 
   private async incidentExists(workItemId: string): Promise<boolean> {
-    const cached = await this.cache.getIncidentSummary(workItemId);
+    const cached = await this.getCachedSummaryOrNull(workItemId);
     if (cached) {
       return true;
     }
@@ -247,7 +278,7 @@ export class DashboardProjectionService {
   }
 
   private async getIncidentSummaryCacheAware(workItemId: string): Promise<IncidentSummary | null> {
-    const cached = await this.cache.getIncidentSummary(workItemId);
+    const cached = await this.getCachedSummaryOrNull(workItemId);
     if (cached) {
       return cached;
     }
@@ -257,6 +288,18 @@ export class DashboardProjectionService {
       return null;
     }
     return this.cache.upsertActiveIncident(workItem);
+  }
+
+  /** getIncidentSummary(), with a genuinely-unreachable cache folded into the same "treat as miss, fall through to Postgres" shape every caller above already handles — see CacheUnavailableError's own doc comment for why that's safe here specifically (unlike getActiveIncidents' total-count path, a single-id miss has no ambiguous "zero" to misreport). */
+  private async getCachedSummaryOrNull(workItemId: string): Promise<IncidentSummary | null> {
+    try {
+      return await this.cache.getIncidentSummary(workItemId);
+    } catch (error) {
+      if (error instanceof CacheUnavailableError) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   private async repopulateActiveCache(): Promise<void> {

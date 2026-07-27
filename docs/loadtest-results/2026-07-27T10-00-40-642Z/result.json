@@ -1,0 +1,254 @@
+{
+  "runId": "2026-07-27T10-00-40-642Z",
+  "scenario": "debounce-spread",
+  "startedAt": "2026-07-27T10:00:40.720Z",
+  "endedAt": "2026-07-27T10:01:06.216Z",
+  "durationSec": 25.496,
+  "config": {
+    "componentCount": 5000,
+    "rate": 400,
+    "durationS": 20,
+    "shardCount": 5,
+    "sampleRate": 0.02,
+    "pollIntervalMs": 1000
+  },
+  "environment": {
+    "dockerCpus": 16,
+    "dockerMemTotalBytes": 3940745216,
+    "backendContainer": "inveniops-ims-backend-1",
+    "note": "Load generator (k6) and the system under test share this single machine's CPU/memory — this is a local baseline, not an isolated-generator measurement. See README.md."
+  },
+  "edge": {
+    "totalRequests": 8004,
+    "accepted202": 2245,
+    "rateLimited429": 5759,
+    "bufferSaturated503": 0,
+    "otherStatus": 0,
+    "requestErrors": 0,
+    "acceptedPerSec": 88.05302792594917,
+    "latencyMs": {
+      "avg": 8.16327001208284,
+      "p50": 3.5450607000000005,
+      "p95": 17.78247538,
+      "p99": 56.984135,
+      "max": 439.349193
+    },
+    "droppedIterations": 0,
+    "generatorMayHaveBottlenecked": false
+  },
+  "backendCounters": {
+    "receivedBySeverity": {
+      "P0": 108,
+      "P1": 327,
+      "P2": 784,
+      "P3": 1026
+    },
+    "acceptedBySeverity": {
+      "P0": 108,
+      "P1": 327,
+      "P2": 784,
+      "P3": 1026
+    },
+    "droppedBySeverityAndReason": {
+      "P0": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P1": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P2": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P3": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      }
+    },
+    "jobsProcessed": 393,
+    "jobsFailed": 0,
+    "e2eHistogram": {
+      "p50Ms": 250,
+      "p95Ms": 2500,
+      "p99Ms": 2500,
+      "count": 393,
+      "sum": 102588
+    }
+  },
+  "persistence": {
+    "totalPersisted": 2245,
+    "persistedPerSec": 88.05302792594917,
+    "timeSeries": [
+      {
+        "atMs": 1785146440779,
+        "elapsedMs": 59,
+        "count": 0
+      },
+      {
+        "atMs": 1785146441786,
+        "elapsedMs": 1066,
+        "count": 0
+      },
+      {
+        "atMs": 1785146442797,
+        "elapsedMs": 2077,
+        "count": 68
+      },
+      {
+        "atMs": 1785146443801,
+        "elapsedMs": 3081,
+        "count": 220
+      },
+      {
+        "atMs": 1785146444813,
+        "elapsedMs": 4093,
+        "count": 445
+      },
+      {
+        "atMs": 1785146445819,
+        "elapsedMs": 5099,
+        "count": 640
+      },
+      {
+        "atMs": 1785146446827,
+        "elapsedMs": 6107,
+        "count": 748
+      },
+      {
+        "atMs": 1785146447836,
+        "elapsedMs": 7116,
+        "count": 849
+      },
+      {
+        "atMs": 1785146448844,
+        "elapsedMs": 8124,
+        "count": 950
+      },
+      {
+        "atMs": 1785146449863,
+        "elapsedMs": 9143,
+        "count": 1050
+      },
+      {
+        "atMs": 1785146450867,
+        "elapsedMs": 10147,
+        "count": 1150
+      },
+      {
+        "atMs": 1785146451877,
+        "elapsedMs": 11157,
+        "count": 1251
+      },
+      {
+        "atMs": 1785146452882,
+        "elapsedMs": 12162,
+        "count": 1359
+      },
+      {
+        "atMs": 1785146453892,
+        "elapsedMs": 13172,
+        "count": 1454
+      },
+      {
+        "atMs": 1785146454903,
+        "elapsedMs": 14183,
+        "count": 1555
+      },
+      {
+        "atMs": 1785146455913,
+        "elapsedMs": 15193,
+        "count": 1660
+      },
+      {
+        "atMs": 1785146456928,
+        "elapsedMs": 16208,
+        "count": 1760
+      },
+      {
+        "atMs": 1785146457934,
+        "elapsedMs": 17214,
+        "count": 1860
+      },
+      {
+        "atMs": 1785146458940,
+        "elapsedMs": 18220,
+        "count": 1959
+      },
+      {
+        "atMs": 1785146459947,
+        "elapsedMs": 19227,
+        "count": 2060
+      },
+      {
+        "atMs": 1785146460955,
+        "elapsedMs": 20235,
+        "count": 2160
+      },
+      {
+        "atMs": 1785146461978,
+        "elapsedMs": 21258,
+        "count": 2245
+      },
+      {
+        "atMs": 1785146462999,
+        "elapsedMs": 22279,
+        "count": 2245
+      },
+      {
+        "atMs": 1785146464015,
+        "elapsedMs": 23295,
+        "count": 2245
+      },
+      {
+        "atMs": 1785146465023,
+        "elapsedMs": 24303,
+        "count": 2245
+      },
+      {
+        "atMs": 1785146466037,
+        "elapsedMs": 25317,
+        "count": 2245
+      }
+    ],
+    "gapVsAccepted": {
+      "acceptedTotal": 2245,
+      "persistedTotal": 2245,
+      "gapCount": 0,
+      "gapPercent": 0
+    }
+  },
+  "endToEndLatency": {
+    "backendBatchHistogram": {
+      "note": "Recorded once per BullMQ batch job, using the OLDEST signal's wait time in that batch — a worst-case-in-batch proxy, not a true per-signal distribution. See ims_signal_e2e_latency_ms in backend/src/workers/signalWorker.ts.",
+      "p50Ms": 250,
+      "p95Ms": 2500,
+      "p99Ms": 2500,
+      "observationCount": 393
+    },
+    "perSignalPollingSample": {
+      "note": "External measurement: 2% of signals tagged, polled for first appearance in Mongo every 1000ms. Accurate to within one poll interval. Independent cross-check against the backend's own histogram above.",
+      "sampleSize": 55,
+      "p50Ms": 718,
+      "p95Ms": 2433,
+      "p99Ms": 2803,
+      "minMs": 78,
+      "maxMs": 2803
+    }
+  },
+  "resourceUsage": {
+    "peakBufferFillRatio": 0.00075,
+    "peakQueueDepth": 28,
+    "peakDlqSize": 0,
+    "peakBackendMemoryBytes": 109785907.2,
+    "peakBackendMemoryMiB": 104.7
+  },
+  "warnings": [
+    "edge.latencyMs is merged across 5 shards: avg/p50/p95 are averaged (approximate), p99/max are the worst observed across shards (not averaged away). See k6Summary.note in the raw shard files for detail."
+  ]
+}

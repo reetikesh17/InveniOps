@@ -70,6 +70,14 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql://ims_user:ims_password@postgres:5432/ims}
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/ims}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      # Tuned from the zod-schema defaults (200 / 50ms) after measuring the
+      # ingestion pipeline's actual bottleneck — see docs/performance.md.
+      # Larger, less-frequent drain batches amortize each batch's fixed
+      # per-job cost (one BullMQ dequeue, one Mongo insertMany round trip,
+      # one grouped Postgres transaction) over more signals; still small
+      # enough to keep end-to-end latency reasonable under normal load.
+      BUFFER_DRAIN_BATCH_SIZE: ${BUFFER_DRAIN_BATCH_SIZE:-500}
+      BUFFER_DRAIN_INTERVAL_MS: ${BUFFER_DRAIN_INTERVAL_MS:-15}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     depends_on:

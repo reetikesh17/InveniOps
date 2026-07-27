@@ -4,6 +4,7 @@ import { ComponentType, Severity } from "@prisma/client";
 import { z } from "zod";
 import { config } from "../../config/index.js";
 import { redis } from "../../repositories/clients.js";
+import { logger } from "../../utils/logger.js";
 import { throughputCounter, signalCounters } from "../../utils/metrics.js";
 import type { IngestionSignal } from "../../services/ingestion/buffer.js";
 import { signalBuffer } from "../../services/ingestion/signalBufferInstance.js";
@@ -22,6 +23,39 @@ interface ErrorResponseBody {
 interface IngestResponseBody {
   readonly accepted: number;
   readonly signalIds?: readonly string[];
+}
+
+/**
+ * FAIL OPEN, not closed: if Redis itself is unreachable, this treats the
+ * request as allowed rather than rejecting it. Rationale — the rate
+ * limiter's job is abuse protection against a single misbehaving source,
+ * not the system's primary backpressure mechanism; that's the in-memory
+ * ingestion buffer (signalBuffer), which enforces its own bounded capacity
+ * and severity-aware shedding entirely independently of Redis. Failing
+ * closed here would mean a non-critical dependency (rate-limit bookkeeping)
+ * taking down ingestion entirely, directly contradicting this system's
+ * core design constraint that ingestion must never block on a persistence/
+ * infra dependency (see CLAUDE.md, docs/backpressure.md). A real abuse
+ * flood during a Redis outage still can't exhaust memory or crash the
+ * process — the buffer's own capacity ceiling still applies regardless of
+ * whether the rate limiter itself is working. See
+ * tests/chaos/redisOutage.test.ts.
+ */
+async function checkRateLimitFailOpen(params: Parameters<typeof checkTokenBuckets>[1]): Promise<TokenBucketResult> {
+  try {
+    return await checkTokenBuckets(redis, params);
+  } catch (error) {
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      "rate limit check failed (Redis unreachable?) — failing open, allowing the request through",
+    );
+    return {
+      allowed: true,
+      limitedBy: null,
+      ip: { remaining: params.ip.capacity, capacity: params.ip.capacity },
+      global: { remaining: params.global.capacity, capacity: params.global.capacity },
+    };
+  }
 }
 
 function setRateLimitHeaders(res: Response, result: TokenBucketResult): void {
@@ -88,7 +122,7 @@ async function handleIngest(
   }
 
   const cost = parsed.signals.length;
-  const rateLimitResult = await checkTokenBuckets(redis, {
+  const rateLimitResult = await checkRateLimitFailOpen({
     ipKey: `ratelimit:signals:ip:${req.ip}`,
     globalKey: "ratelimit:signals:global",
     ip: config.rateLimit.ip,

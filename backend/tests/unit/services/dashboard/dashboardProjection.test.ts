@@ -7,7 +7,7 @@ import {
   type DashboardCache,
   type Pagination,
 } from "../../../../src/services/dashboard/dashboardProjection.js";
-import type { IncidentSummary, ActiveIncidentPage } from "../../../../src/repositories/redis/dashboardCache.js";
+import { CacheUnavailableError, type IncidentSummary, type ActiveIncidentPage } from "../../../../src/repositories/redis/dashboardCache.js";
 import type { SignalDocument } from "../../../../src/repositories/mongo/signalRepository.js";
 import type { WorkItemWithRca } from "../../../../src/repositories/postgres/index.js";
 
@@ -59,6 +59,9 @@ function fakeWorkItemStore(
     listActive(pagination: Pagination): Promise<WorkItem[]> {
       const active = workItems.filter((workItem) => workItem.state !== "CLOSED");
       return Promise.resolve(active.slice(pagination.offset, pagination.offset + pagination.limit));
+    },
+    countActive(): Promise<number> {
+      return Promise.resolve(workItems.filter((workItem) => workItem.state !== "CLOSED").length);
     },
     listClosed(pagination: Pagination): Promise<WorkItem[]> {
       const closed = workItems.filter((workItem) => workItem.state === "CLOSED");
@@ -119,6 +122,70 @@ function fakeCache(): DashboardCache & { readonly upsertCalls: WorkItem[] } {
     },
   };
 }
+
+/** Every read throws CacheUnavailableError, as the real DashboardCacheRepository does when Redis itself can't be reached — writes are swallowed (best-effort), matching real behavior too. */
+function unavailableCache(): DashboardCache & { readonly upsertCalls: WorkItem[] } {
+  const upsertCalls: WorkItem[] = [];
+  return {
+    upsertCalls,
+    upsertActiveIncident(workItem: WorkItem): Promise<IncidentSummary | null> {
+      upsertCalls.push(workItem);
+      return Promise.resolve(workItem.state === "CLOSED" ? null : toSummary(workItem));
+    },
+    getIncidentSummary(): Promise<IncidentSummary | null> {
+      return Promise.reject(new CacheUnavailableError(new Error("ECONNREFUSED")));
+    },
+    getActiveIncidentIds(): Promise<ActiveIncidentPage> {
+      return Promise.reject(new CacheUnavailableError(new Error("ECONNREFUSED")));
+    },
+  };
+}
+
+describe("DashboardProjectionService — cache genuinely unavailable (not just cold)", () => {
+  it("getActiveIncidents reads real data from Postgres instead of reporting zero", async () => {
+    const workItems = [
+      makeWorkItem({ id: "wi-1", severity: Severity.P0 }),
+      makeWorkItem({ id: "wi-2", severity: Severity.P1 }),
+    ];
+    const workItemStore = fakeWorkItemStore(workItems.map((workItem) => ({ ...workItem, rca: null })));
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), unavailableCache(), {
+      repopulateCap: 100,
+    });
+
+    const page = await service.getActiveIncidents({ limit: 10, offset: 0 });
+
+    // The point of this test: NOT { items: [], total: 0 } — that would be
+    // indistinguishable from "no active incidents," which is false here.
+    expect(page.total).toBe(2);
+    expect(page.items.map((item) => item.id).sort()).toEqual(["wi-1", "wi-2"]);
+  });
+
+  it("getIncidentDetail falls back to Postgres for an active incident instead of throwing", async () => {
+    const workItem = makeWorkItem({ id: "wi-1", state: WorkItemStatus.INVESTIGATING });
+    const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }]);
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), unavailableCache(), {
+      repopulateCap: 100,
+    });
+
+    const detail = await service.getIncidentDetail("wi-1");
+
+    expect(detail?.id).toBe("wi-1");
+    expect(detail?.legalNextStates).toEqual(["RESOLVED"]);
+  });
+
+  it("getIncidentSignals still resolves (existence check degrades to Postgres) instead of throwing", async () => {
+    const workItem = makeWorkItem({ id: "wi-1" });
+    const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }]);
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), unavailableCache(), {
+      repopulateCap: 100,
+    });
+
+    const page = await service.getIncidentSignals("wi-1", { limit: 10, offset: 0 });
+
+    expect(page).not.toBeNull();
+    expect(page?.total).toBe(0);
+  });
+});
 
 describe("DashboardProjectionService.getActiveIncidents", () => {
   it("serves from a warm cache without touching Postgres", async () => {

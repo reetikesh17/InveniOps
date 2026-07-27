@@ -1,5 +1,6 @@
 import type { Redis } from "ioredis";
 import type { WorkItem } from "@prisma/client";
+import { logger } from "../../utils/logger.js";
 
 // Key layout documented in full in docs/data-model.md — a sorted set of
 // active incidents (for the dashboard's Live Feed) plus a per-incident
@@ -42,6 +43,24 @@ export interface ActiveIncidentPage {
   readonly total: number;
 }
 
+/**
+ * Thrown by every READ method when Redis itself is unreachable — distinct
+ * from a normal cache miss (which returns null/empty, not an error).
+ * DashboardProjectionService catches this specifically and reads Postgres
+ * directly instead; letting it look like an ordinary miss would be wrong,
+ * because "getActiveIncidentIds() returned empty" today means "safe to
+ * repopulate and re-read the cache," and against a genuinely unreachable
+ * cache that repopulate-then-reread cycle would just fail again and
+ * silently report zero active incidents instead of degrading. See
+ * tests/chaos/redisOutage.test.ts.
+ */
+export class CacheUnavailableError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause));
+    this.name = "CacheUnavailableError";
+  }
+}
+
 export class DashboardCacheRepository {
   constructor(
     private readonly redis: Redis,
@@ -54,6 +73,11 @@ export class DashboardCacheRepository {
    * part of the active-incident cache at all (see docs/data-model.md).
    * Returns the summary written, or null if this call removed the entry
    * instead.
+   *
+   * Best-effort on a Redis failure — logged, not thrown. A write is never
+   * itself the reason an API call would need to fail, and the self-healing
+   * repopulation path (DashboardProjectionService.repopulateActiveCache)
+   * covers a write that silently didn't stick once Redis recovers.
    */
   async upsertActiveIncident(workItem: WorkItem): Promise<IncidentSummary | null> {
     if (workItem.state === "CLOSED") {
@@ -73,36 +97,56 @@ export class DashboardCacheRepository {
       updatedAt: new Date().toISOString(),
     };
 
-    await Promise.all([
-      this.redis.set(incidentKey(workItem.id), JSON.stringify(summary), "EX", this.ttlSeconds),
-      this.redis.zadd(ACTIVE_INCIDENTS_KEY, activeScore(workItem), workItem.id),
-    ]);
+    try {
+      await Promise.all([
+        this.redis.set(incidentKey(workItem.id), JSON.stringify(summary), "EX", this.ttlSeconds),
+        this.redis.zadd(ACTIVE_INCIDENTS_KEY, activeScore(workItem), workItem.id),
+      ]);
+    } catch (error) {
+      logger.warn({ workItemId: workItem.id, error }, "dashboard cache write failed (Redis unreachable?) — continuing without it");
+    }
 
     return summary;
   }
 
+  /** Best-effort, same reasoning as upsertActiveIncident. */
   async removeIncident(workItemId: string): Promise<void> {
-    await Promise.all([
-      this.redis.del(incidentKey(workItemId)),
-      this.redis.zrem(ACTIVE_INCIDENTS_KEY, workItemId),
-    ]);
+    try {
+      await Promise.all([
+        this.redis.del(incidentKey(workItemId)),
+        this.redis.zrem(ACTIVE_INCIDENTS_KEY, workItemId),
+      ]);
+    } catch (error) {
+      logger.warn({ workItemId, error }, "dashboard cache removal failed (Redis unreachable?) — continuing without it");
+    }
   }
 
-  /** Null on a miss — the TTL expired, it was never populated, or it's not (or no longer) active. Caller repopulates. */
+  /** Null on a miss — the TTL expired, it was never populated, or it's not (or no longer) active. Caller repopulates. Throws CacheUnavailableError if Redis itself can't be reached — a caller must not treat that the same as a miss. */
   async getIncidentSummary(workItemId: string): Promise<IncidentSummary | null> {
-    const raw = await this.redis.get(incidentKey(workItemId));
+    let raw: string | null;
+    try {
+      raw = await this.redis.get(incidentKey(workItemId));
+    } catch (error) {
+      logger.warn({ workItemId, error }, "dashboard cache read failed (Redis unreachable?)");
+      throw new CacheUnavailableError(error);
+    }
     if (!raw) {
       return null;
     }
     return JSON.parse(raw) as IncidentSummary;
   }
 
-  /** Severity-then-recency order comes for free from the ZSET's score encoding — see docs/data-model.md. */
+  /** Severity-then-recency order comes for free from the ZSET's score encoding — see docs/data-model.md. Throws CacheUnavailableError if Redis itself can't be reached. */
   async getActiveIncidentIds(pagination: { limit: number; offset: number }): Promise<ActiveIncidentPage> {
-    const [total, ids] = await Promise.all([
-      this.redis.zcard(ACTIVE_INCIDENTS_KEY),
-      this.redis.zrange(ACTIVE_INCIDENTS_KEY, pagination.offset, pagination.offset + pagination.limit - 1),
-    ]);
-    return { ids, total };
+    try {
+      const [total, ids] = await Promise.all([
+        this.redis.zcard(ACTIVE_INCIDENTS_KEY),
+        this.redis.zrange(ACTIVE_INCIDENTS_KEY, pagination.offset, pagination.offset + pagination.limit - 1),
+      ]);
+      return { ids, total };
+    } catch (error) {
+      logger.warn({ error }, "dashboard cache read failed (Redis unreachable?)");
+      throw new CacheUnavailableError(error);
+    }
   }
 }

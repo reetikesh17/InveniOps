@@ -115,10 +115,17 @@ export class PostgresWorkItemRepository {
   }
 
   async findById(id: string): Promise<WorkItemWithRca | null> {
-    return this.prisma.workItem.findUnique({
-      where: { id },
-      include: { rca: true },
-    });
+    // On the retry wrapper, same as the writes below — this read sits
+    // directly on the transition path (transitionWorkItem/submitIncidentRca
+    // fetch current state here before their guarded write), so a transient
+    // Postgres blip here must retry too, not fail the whole request one
+    // read before the part that was already resilient.
+    return withPostgresRetry(() =>
+      this.prisma.workItem.findUnique({
+        where: { id },
+        include: { rca: true },
+      }),
+    );
   }
 
   /** Full audit trail for one work item, oldest first — includes escalation rows (fromState === toState), which the caller distinguishes by that equality, not by a separate flag. */

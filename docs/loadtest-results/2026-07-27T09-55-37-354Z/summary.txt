@@ -1,0 +1,37 @@
+────────────────────────────────────────────────────────────────────────
+LOAD TEST — sustained-ramp  (run 2026-07-27T09-55-37-354Z)
+2026-07-27T09:55:37.515Z → 2026-07-27T09:56:53.663Z  (76.1s)
+Generator: 5 k6 shard(s) (source IPs) — per-IP limiter theoretical ceiling ≈ 100/s sustained, 250/s burst
+────────────────────────────────────────────────────────────────────────
+
+EDGE (HTTP)
+  Total requests:        27462
+  202 accepted:          6935  (25.3%)
+  429 rate-limited:      20527  (74.7%)
+  503 buffer-saturated:  0  (0.0%)
+  Other status:          0
+  Request errors:        0
+  Accepted/sec (avg):    91.1
+  Edge latency:          p50 4ms  p95 15ms  p99 39ms  max 452ms
+  ⚠ dropped_iterations=33 — the GENERATOR could not keep up with the configured rate; the reported rate above is not the full offered load.
+
+PERSISTENCE (the actual result of this test)
+  Persisted to Mongo:    6935
+  Persisted/sec (avg):   91.1
+  ACCEPTED vs PERSISTED GAP: 0 (0.0%) — signals the edge said "202 accepted" for but that had not landed in Mongo by the time this run's measurement window closed.
+
+SHED / DROPPED (by severity, from the backend's own counters)
+
+END-TO-END LATENCY (receipt → persisted)
+  Backend batch histogram (job-level, oldest-in-batch): p50 100ms  p95 250ms  p99 500ms  (n=1321)
+  Per-signal polling sample: p50 559ms  p95 1011ms  p99 1047ms  (n=139)
+
+RESOURCE USAGE
+  Peak buffer fill:      0.0%
+  Peak queue depth:      1
+  Peak DLQ size:         0
+  Peak backend memory:   109.0 MiB
+
+WARNINGS
+  ⚠ edge.latencyMs is merged across 5 shards: avg/p50/p95 are averaged (approximate), p99/max are the worst observed across shards (not averaged away). See k6Summary.note in the raw shard files for detail.
+────────────────────────────────────────────────────────────────────────

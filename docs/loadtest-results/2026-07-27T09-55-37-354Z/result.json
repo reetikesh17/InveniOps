@@ -1,0 +1,501 @@
+{
+  "runId": "2026-07-27T09-55-37-354Z",
+  "scenario": "sustained-ramp",
+  "startedAt": "2026-07-27T09:55:37.515Z",
+  "endedAt": "2026-07-27T09:56:53.663Z",
+  "durationSec": 76.148,
+  "config": {
+    "componentCount": 300,
+    "targetRate": 500,
+    "rampUpS": 20,
+    "holdS": 40,
+    "rampDownS": 10,
+    "shardCount": 5,
+    "sampleRate": 0.02,
+    "pollIntervalMs": 1000
+  },
+  "environment": {
+    "dockerCpus": 16,
+    "dockerMemTotalBytes": 3940745216,
+    "backendContainer": "inveniops-ims-backend-1",
+    "note": "Load generator (k6) and the system under test share this single machine's CPU/memory — this is a local baseline, not an isolated-generator measurement. See README.md."
+  },
+  "edge": {
+    "totalRequests": 27462,
+    "accepted202": 6935,
+    "rateLimited429": 20527,
+    "bufferSaturated503": 0,
+    "otherStatus": 0,
+    "requestErrors": 0,
+    "acceptedPerSec": 91.0726480012607,
+    "latencyMs": {
+      "avg": 5.675110157856581,
+      "p50": 3.8024423999999994,
+      "p95": 14.631653299999993,
+      "p99": 39.13935870000077,
+      "max": 451.512269
+    },
+    "droppedIterations": 33,
+    "generatorMayHaveBottlenecked": true
+  },
+  "backendCounters": {
+    "receivedBySeverity": {
+      "P0": 353,
+      "P1": 1051,
+      "P2": 2342,
+      "P3": 3189
+    },
+    "acceptedBySeverity": {
+      "P0": 353,
+      "P1": 1051,
+      "P2": 2342,
+      "P3": 3189
+    },
+    "droppedBySeverityAndReason": {
+      "P0": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P1": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P2": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P3": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      }
+    },
+    "jobsProcessed": 1321,
+    "jobsFailed": 0,
+    "e2eHistogram": {
+      "p50Ms": 100,
+      "p95Ms": 250,
+      "p99Ms": 500,
+      "count": 1321,
+      "sum": 104333
+    }
+  },
+  "persistence": {
+    "totalPersisted": 6935,
+    "persistedPerSec": 91.0726480012607,
+    "timeSeries": [
+      {
+        "atMs": 1785146137595,
+        "elapsedMs": 81,
+        "count": 0
+      },
+      {
+        "atMs": 1785146138603,
+        "elapsedMs": 1089,
+        "count": 0
+      },
+      {
+        "atMs": 1785146139609,
+        "elapsedMs": 2095,
+        "count": 0
+      },
+      {
+        "atMs": 1785146140621,
+        "elapsedMs": 3107,
+        "count": 20
+      },
+      {
+        "atMs": 1785146141636,
+        "elapsedMs": 4122,
+        "count": 70
+      },
+      {
+        "atMs": 1785146142647,
+        "elapsedMs": 5133,
+        "count": 145
+      },
+      {
+        "atMs": 1785146143653,
+        "elapsedMs": 6139,
+        "count": 245
+      },
+      {
+        "atMs": 1785146144663,
+        "elapsedMs": 7149,
+        "count": 370
+      },
+      {
+        "atMs": 1785146145672,
+        "elapsedMs": 8158,
+        "count": 520
+      },
+      {
+        "atMs": 1785146146679,
+        "elapsedMs": 9165,
+        "count": 695
+      },
+      {
+        "atMs": 1785146147686,
+        "elapsedMs": 10172,
+        "count": 890
+      },
+      {
+        "atMs": 1785146148692,
+        "elapsedMs": 11178,
+        "count": 985
+      },
+      {
+        "atMs": 1785146149715,
+        "elapsedMs": 12201,
+        "count": 1090
+      },
+      {
+        "atMs": 1785146150726,
+        "elapsedMs": 13212,
+        "count": 1195
+      },
+      {
+        "atMs": 1785146151734,
+        "elapsedMs": 14220,
+        "count": 1290
+      },
+      {
+        "atMs": 1785146152749,
+        "elapsedMs": 15235,
+        "count": 1390
+      },
+      {
+        "atMs": 1785146153762,
+        "elapsedMs": 16248,
+        "count": 1492
+      },
+      {
+        "atMs": 1785146154776,
+        "elapsedMs": 17262,
+        "count": 1600
+      },
+      {
+        "atMs": 1785146155788,
+        "elapsedMs": 18274,
+        "count": 1700
+      },
+      {
+        "atMs": 1785146156798,
+        "elapsedMs": 19284,
+        "count": 1800
+      },
+      {
+        "atMs": 1785146157806,
+        "elapsedMs": 20292,
+        "count": 1900
+      },
+      {
+        "atMs": 1785146158820,
+        "elapsedMs": 21306,
+        "count": 2000
+      },
+      {
+        "atMs": 1785146159831,
+        "elapsedMs": 22317,
+        "count": 2103
+      },
+      {
+        "atMs": 1785146160841,
+        "elapsedMs": 23327,
+        "count": 2205
+      },
+      {
+        "atMs": 1785146161851,
+        "elapsedMs": 24337,
+        "count": 2305
+      },
+      {
+        "atMs": 1785146162872,
+        "elapsedMs": 25358,
+        "count": 2405
+      },
+      {
+        "atMs": 1785146163890,
+        "elapsedMs": 26376,
+        "count": 2510
+      },
+      {
+        "atMs": 1785146164905,
+        "elapsedMs": 27391,
+        "count": 2610
+      },
+      {
+        "atMs": 1785146165924,
+        "elapsedMs": 28410,
+        "count": 2640
+      },
+      {
+        "atMs": 1785146166936,
+        "elapsedMs": 29422,
+        "count": 2815
+      },
+      {
+        "atMs": 1785146167947,
+        "elapsedMs": 30433,
+        "count": 2915
+      },
+      {
+        "atMs": 1785146168957,
+        "elapsedMs": 31443,
+        "count": 3015
+      },
+      {
+        "atMs": 1785146169973,
+        "elapsedMs": 32459,
+        "count": 3115
+      },
+      {
+        "atMs": 1785146170980,
+        "elapsedMs": 33466,
+        "count": 3220
+      },
+      {
+        "atMs": 1785146171991,
+        "elapsedMs": 34477,
+        "count": 3320
+      },
+      {
+        "atMs": 1785146173009,
+        "elapsedMs": 35495,
+        "count": 3423
+      },
+      {
+        "atMs": 1785146174021,
+        "elapsedMs": 36507,
+        "count": 3520
+      },
+      {
+        "atMs": 1785146175028,
+        "elapsedMs": 37514,
+        "count": 3625
+      },
+      {
+        "atMs": 1785146176038,
+        "elapsedMs": 38524,
+        "count": 3722
+      },
+      {
+        "atMs": 1785146177046,
+        "elapsedMs": 39532,
+        "count": 3825
+      },
+      {
+        "atMs": 1785146178059,
+        "elapsedMs": 40545,
+        "count": 3914
+      },
+      {
+        "atMs": 1785146179067,
+        "elapsedMs": 41553,
+        "count": 4025
+      },
+      {
+        "atMs": 1785146180079,
+        "elapsedMs": 42565,
+        "count": 4127
+      },
+      {
+        "atMs": 1785146181093,
+        "elapsedMs": 43579,
+        "count": 4230
+      },
+      {
+        "atMs": 1785146182104,
+        "elapsedMs": 44590,
+        "count": 4330
+      },
+      {
+        "atMs": 1785146183120,
+        "elapsedMs": 45606,
+        "count": 4430
+      },
+      {
+        "atMs": 1785146184146,
+        "elapsedMs": 46632,
+        "count": 4530
+      },
+      {
+        "atMs": 1785146185162,
+        "elapsedMs": 47648,
+        "count": 4638
+      },
+      {
+        "atMs": 1785146186185,
+        "elapsedMs": 48671,
+        "count": 4736
+      },
+      {
+        "atMs": 1785146187200,
+        "elapsedMs": 49686,
+        "count": 4841
+      },
+      {
+        "atMs": 1785146188222,
+        "elapsedMs": 50708,
+        "count": 4945
+      },
+      {
+        "atMs": 1785146189237,
+        "elapsedMs": 51723,
+        "count": 5045
+      },
+      {
+        "atMs": 1785146190250,
+        "elapsedMs": 52736,
+        "count": 5145
+      },
+      {
+        "atMs": 1785146191279,
+        "elapsedMs": 53765,
+        "count": 5250
+      },
+      {
+        "atMs": 1785146192300,
+        "elapsedMs": 54786,
+        "count": 5350
+      },
+      {
+        "atMs": 1785146193312,
+        "elapsedMs": 55798,
+        "count": 5450
+      },
+      {
+        "atMs": 1785146194331,
+        "elapsedMs": 56817,
+        "count": 5554
+      },
+      {
+        "atMs": 1785146195346,
+        "elapsedMs": 57832,
+        "count": 5655
+      },
+      {
+        "atMs": 1785146196368,
+        "elapsedMs": 58854,
+        "count": 5760
+      },
+      {
+        "atMs": 1785146197386,
+        "elapsedMs": 59872,
+        "count": 5860
+      },
+      {
+        "atMs": 1785146198401,
+        "elapsedMs": 60887,
+        "count": 5960
+      },
+      {
+        "atMs": 1785146199411,
+        "elapsedMs": 61897,
+        "count": 6063
+      },
+      {
+        "atMs": 1785146200423,
+        "elapsedMs": 62909,
+        "count": 6165
+      },
+      {
+        "atMs": 1785146201433,
+        "elapsedMs": 63919,
+        "count": 6265
+      },
+      {
+        "atMs": 1785146202459,
+        "elapsedMs": 64945,
+        "count": 6365
+      },
+      {
+        "atMs": 1785146203476,
+        "elapsedMs": 65962,
+        "count": 6465
+      },
+      {
+        "atMs": 1785146204499,
+        "elapsedMs": 66985,
+        "count": 6565
+      },
+      {
+        "atMs": 1785146205518,
+        "elapsedMs": 68004,
+        "count": 6670
+      },
+      {
+        "atMs": 1785146206536,
+        "elapsedMs": 69022,
+        "count": 6770
+      },
+      {
+        "atMs": 1785146207560,
+        "elapsedMs": 70046,
+        "count": 6867
+      },
+      {
+        "atMs": 1785146208573,
+        "elapsedMs": 71059,
+        "count": 6930
+      },
+      {
+        "atMs": 1785146209589,
+        "elapsedMs": 72075,
+        "count": 6935
+      },
+      {
+        "atMs": 1785146210616,
+        "elapsedMs": 73102,
+        "count": 6935
+      },
+      {
+        "atMs": 1785146211653,
+        "elapsedMs": 74139,
+        "count": 6935
+      },
+      {
+        "atMs": 1785146212663,
+        "elapsedMs": 75149,
+        "count": 6935
+      }
+    ],
+    "gapVsAccepted": {
+      "acceptedTotal": 6935,
+      "persistedTotal": 6935,
+      "gapCount": 0,
+      "gapPercent": 0
+    }
+  },
+  "endToEndLatency": {
+    "backendBatchHistogram": {
+      "note": "Recorded once per BullMQ batch job, using the OLDEST signal's wait time in that batch — a worst-case-in-batch proxy, not a true per-signal distribution. See ims_signal_e2e_latency_ms in backend/src/workers/signalWorker.ts.",
+      "p50Ms": 100,
+      "p95Ms": 250,
+      "p99Ms": 500,
+      "observationCount": 1321
+    },
+    "perSignalPollingSample": {
+      "note": "External measurement: 2% of signals tagged, polled for first appearance in Mongo every 1000ms. Accurate to within one poll interval. Independent cross-check against the backend's own histogram above.",
+      "sampleSize": 139,
+      "p50Ms": 559,
+      "p95Ms": 1011,
+      "p99Ms": 1047,
+      "minMs": 39,
+      "maxMs": 1697
+    }
+  },
+  "resourceUsage": {
+    "peakBufferFillRatio": 0.00045,
+    "peakQueueDepth": 1,
+    "peakDlqSize": 0,
+    "peakBackendMemoryBytes": 114294784,
+    "peakBackendMemoryMiB": 109
+  },
+  "warnings": [
+    "edge.latencyMs is merged across 5 shards: avg/p50/p95 are averaged (approximate), p99/max are the worst observed across shards (not averaged away). See k6Summary.note in the raw shard files for detail."
+  ]
+}

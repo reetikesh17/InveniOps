@@ -1,0 +1,482 @@
+{
+  "backendSamples": [
+    {
+      "atMs": 1785146402009,
+      "elapsedMs": 66,
+      "bufferFillRatio": 0,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146403034,
+      "elapsedMs": 1091,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146404045,
+      "elapsedMs": 2102,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 6,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146405063,
+      "elapsedMs": 3120,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 6,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146406075,
+      "elapsedMs": 4132,
+      "bufferFillRatio": 0.0002,
+      "queueDepth": 6,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146407098,
+      "elapsedMs": 5155,
+      "bufferFillRatio": 0,
+      "queueDepth": 6,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146408109,
+      "elapsedMs": 6166,
+      "bufferFillRatio": 0,
+      "queueDepth": 6,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146409130,
+      "elapsedMs": 7187,
+      "bufferFillRatio": 0.00015,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146410163,
+      "elapsedMs": 8220,
+      "bufferFillRatio": 0.00005,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146411170,
+      "elapsedMs": 9227,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146412180,
+      "elapsedMs": 10237,
+      "bufferFillRatio": 0.0002,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146413187,
+      "elapsedMs": 11244,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146414216,
+      "elapsedMs": 12273,
+      "bufferFillRatio": 0,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146415233,
+      "elapsedMs": 13290,
+      "bufferFillRatio": 0.00015,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146416253,
+      "elapsedMs": 14310,
+      "bufferFillRatio": 0.0002,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146417259,
+      "elapsedMs": 15316,
+      "bufferFillRatio": 0.0001,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146418278,
+      "elapsedMs": 16335,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 1,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146419319,
+      "elapsedMs": 17376,
+      "bufferFillRatio": 0,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146420332,
+      "elapsedMs": 18389,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146421344,
+      "elapsedMs": 19401,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146422359,
+      "elapsedMs": 20416,
+      "bufferFillRatio": 0.00025,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146423377,
+      "elapsedMs": 21434,
+      "bufferFillRatio": 0,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146424390,
+      "elapsedMs": 22447,
+      "bufferFillRatio": 0,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146425403,
+      "elapsedMs": 23460,
+      "bufferFillRatio": 0,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146426410,
+      "elapsedMs": 24467,
+      "bufferFillRatio": 0,
+      "queueDepth": 0,
+      "dlqSize": 0
+    },
+    {
+      "atMs": 1785146427423,
+      "elapsedMs": 25480,
+      "bufferFillRatio": 0,
+      "queueDepth": 0,
+      "dlqSize": 0
+    }
+  ],
+  "memorySamples": [
+    {
+      "atMs": 1785146403089,
+      "elapsedMs": 1146,
+      "memUsedBytes": 53592719.36,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 8.45
+    },
+    {
+      "atMs": 1785146405186,
+      "elapsedMs": 3243,
+      "memUsedBytes": 86895493.12,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 132.46
+    },
+    {
+      "atMs": 1785146407295,
+      "elapsedMs": 5352,
+      "memUsedBytes": 90942996.48,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 101.94
+    },
+    {
+      "atMs": 1785146410363,
+      "elapsedMs": 8420,
+      "memUsedBytes": 91058339.84,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 114.73
+    },
+    {
+      "atMs": 1785146412441,
+      "elapsedMs": 10498,
+      "memUsedBytes": 106325606.4,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 116.2
+    },
+    {
+      "atMs": 1785146414542,
+      "elapsedMs": 12599,
+      "memUsedBytes": 102288588.8,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 108.04
+    },
+    {
+      "atMs": 1785146416633,
+      "elapsedMs": 14690,
+      "memUsedBytes": 105801318.4,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 110.65
+    },
+    {
+      "atMs": 1785146419707,
+      "elapsedMs": 17764,
+      "memUsedBytes": 106115891.2,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 106.41
+    },
+    {
+      "atMs": 1785146421805,
+      "elapsedMs": 19862,
+      "memUsedBytes": 107479040,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 103.61
+    },
+    {
+      "atMs": 1785146424072,
+      "elapsedMs": 22129,
+      "memUsedBytes": 97538539.52,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 21.66
+    },
+    {
+      "atMs": 1785146426203,
+      "elapsedMs": 24260,
+      "memUsedBytes": 97748254.72,
+      "memLimitBytes": 3940632494.08,
+      "cpuPercent": 2.22
+    }
+  ],
+  "perSignalSamples": [
+    {
+      "sentAtMs": 1785146403156,
+      "firstSeenAtMs": 1785146404036,
+      "latencyMs": 880
+    },
+    {
+      "sentAtMs": 1785146403331,
+      "firstSeenAtMs": 1785146404036,
+      "latencyMs": 705
+    },
+    {
+      "sentAtMs": 1785146403592,
+      "firstSeenAtMs": 1785146404036,
+      "latencyMs": 444
+    },
+    {
+      "sentAtMs": 1785146403392,
+      "firstSeenAtMs": 1785146404036,
+      "latencyMs": 644
+    },
+    {
+      "sentAtMs": 1785146403007,
+      "firstSeenAtMs": 1785146404036,
+      "latencyMs": 1029
+    },
+    {
+      "sentAtMs": 1785146403133,
+      "firstSeenAtMs": 1785146404036,
+      "latencyMs": 903
+    },
+    {
+      "sentAtMs": 1785146403696,
+      "firstSeenAtMs": 1785146404036,
+      "latencyMs": 340
+    },
+    {
+      "sentAtMs": 1785146404068,
+      "firstSeenAtMs": 1785146405046,
+      "latencyMs": 978
+    },
+    {
+      "sentAtMs": 1785146404081,
+      "firstSeenAtMs": 1785146405046,
+      "latencyMs": 965
+    },
+    {
+      "sentAtMs": 1785146404316,
+      "firstSeenAtMs": 1785146405046,
+      "latencyMs": 730
+    },
+    {
+      "sentAtMs": 1785146405832,
+      "firstSeenAtMs": 1785146406056,
+      "latencyMs": 224
+    },
+    {
+      "sentAtMs": 1785146405531,
+      "firstSeenAtMs": 1785146406056,
+      "latencyMs": 525
+    },
+    {
+      "sentAtMs": 1785146405945,
+      "firstSeenAtMs": 1785146406056,
+      "latencyMs": 111
+    },
+    {
+      "sentAtMs": 1785146405709,
+      "firstSeenAtMs": 1785146406056,
+      "latencyMs": 347
+    },
+    {
+      "sentAtMs": 1785146406667,
+      "firstSeenAtMs": 1785146407063,
+      "latencyMs": 396
+    },
+    {
+      "sentAtMs": 1785146406782,
+      "firstSeenAtMs": 1785146407063,
+      "latencyMs": 281
+    },
+    {
+      "sentAtMs": 1785146407408,
+      "firstSeenAtMs": 1785146408069,
+      "latencyMs": 661
+    },
+    {
+      "sentAtMs": 1785146408032,
+      "firstSeenAtMs": 1785146409083,
+      "latencyMs": 1051
+    },
+    {
+      "sentAtMs": 1785146409616,
+      "firstSeenAtMs": 1785146410089,
+      "latencyMs": 473
+    },
+    {
+      "sentAtMs": 1785146410118,
+      "firstSeenAtMs": 1785146411095,
+      "latencyMs": 977
+    },
+    {
+      "sentAtMs": 1785146410809,
+      "firstSeenAtMs": 1785146411095,
+      "latencyMs": 286
+    },
+    {
+      "sentAtMs": 1785146411806,
+      "firstSeenAtMs": 1785146412105,
+      "latencyMs": 299
+    },
+    {
+      "sentAtMs": 1785146411467,
+      "firstSeenAtMs": 1785146412105,
+      "latencyMs": 638
+    },
+    {
+      "sentAtMs": 1785146411481,
+      "firstSeenAtMs": 1785146412105,
+      "latencyMs": 624
+    },
+    {
+      "sentAtMs": 1785146412818,
+      "firstSeenAtMs": 1785146413116,
+      "latencyMs": 298
+    },
+    {
+      "sentAtMs": 1785146412968,
+      "firstSeenAtMs": 1785146413116,
+      "latencyMs": 148
+    },
+    {
+      "sentAtMs": 1785146412082,
+      "firstSeenAtMs": 1785146413116,
+      "latencyMs": 1034
+    },
+    {
+      "sentAtMs": 1785146412732,
+      "firstSeenAtMs": 1785146413116,
+      "latencyMs": 384
+    },
+    {
+      "sentAtMs": 1785146413667,
+      "firstSeenAtMs": 1785146414119,
+      "latencyMs": 452
+    },
+    {
+      "sentAtMs": 1785146414667,
+      "firstSeenAtMs": 1785146415129,
+      "latencyMs": 462
+    },
+    {
+      "sentAtMs": 1785146414458,
+      "firstSeenAtMs": 1785146415129,
+      "latencyMs": 671
+    },
+    {
+      "sentAtMs": 1785146415332,
+      "firstSeenAtMs": 1785146416134,
+      "latencyMs": 802
+    },
+    {
+      "sentAtMs": 1785146415117,
+      "firstSeenAtMs": 1785146416134,
+      "latencyMs": 1017
+    },
+    {
+      "sentAtMs": 1785146416132,
+      "firstSeenAtMs": 1785146417146,
+      "latencyMs": 1014
+    },
+    {
+      "sentAtMs": 1785146417568,
+      "firstSeenAtMs": 1785146418151,
+      "latencyMs": 583
+    },
+    {
+      "sentAtMs": 1785146418917,
+      "firstSeenAtMs": 1785146419162,
+      "latencyMs": 245
+    },
+    {
+      "sentAtMs": 1785146418217,
+      "firstSeenAtMs": 1785146419162,
+      "latencyMs": 945
+    },
+    {
+      "sentAtMs": 1785146418817,
+      "firstSeenAtMs": 1785146419162,
+      "latencyMs": 345
+    },
+    {
+      "sentAtMs": 1785146418558,
+      "firstSeenAtMs": 1785146419162,
+      "latencyMs": 604
+    },
+    {
+      "sentAtMs": 1785146419967,
+      "firstSeenAtMs": 1785146420177,
+      "latencyMs": 210
+    },
+    {
+      "sentAtMs": 1785146420767,
+      "firstSeenAtMs": 1785146421182,
+      "latencyMs": 415
+    },
+    {
+      "sentAtMs": 1785146420320,
+      "firstSeenAtMs": 1785146421182,
+      "latencyMs": 862
+    },
+    {
+      "sentAtMs": 1785146422617,
+      "firstSeenAtMs": 1785146423200,
+      "latencyMs": 583
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: /scripts/loadtest.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 98 max VUs, 50s max duration (incl. graceful stop):
+              * debounce_concentrated: 80.00 iterations/s for 20s (maxVUs: 26-98, gracefulStop: 30s)
+
+
+running (01.0s), 01/26 VUs, 77 complete and 0 interrupted iterations
+debounce_concentrated   [   5% ] 01/26 VUs  01.0s/20s  80.00 iters/s
+
+running (02.0s), 00/26 VUs, 158 complete and 0 interrupted iterations
+debounce_concentrated   [  10% ] 00/26 VUs  02.0s/20s  80.00 iters/s
+
+running (03.0s), 01/26 VUs, 237 complete and 0 interrupted iterations
+debounce_concentrated   [  15% ] 01/26 VUs  03.0s/20s  80.00 iters/s
+
+running (04.0s), 01/26 VUs, 317 complete and 0 interrupted iterations
+debounce_concentrated   [  20% ] 01/26 VUs  04.0s/20s  80.00 iters/s
+
+running (05.0s), 01/26 VUs, 397 complete and 0 interrupted iterations
+debounce_concentrated   [  25% ] 01/26 VUs  05.0s/20s  80.00 iters/s
+
+running (06.0s), 00/26 VUs, 478 complete and 0 interrupted iterations
+debounce_concentrated   [  30% ] 00/26 VUs  06.0s/20s  80.00 iters/s
+
+running (07.0s), 00/26 VUs, 558 complete and 0 interrupted iterations
+debounce_concentrated   [  35% ] 00/26 VUs  07.0s/20s  80.00 iters/s
+
+running (08.0s), 01/26 VUs, 637 complete and 0 interrupted iterations
+debounce_concentrated   [  40% ] 01/26 VUs  08.0s/20s  80.00 iters/s
+
+running (09.0s), 01/26 VUs, 717 complete and 0 interrupted iterations
+debounce_concentrated   [  45% ] 01/26 VUs  09.0s/20s  80.00 iters/s
+
+running (10.0s), 01/26 VUs, 797 complete and 0 interrupted iterations
+debounce_concentrated   [  50% ] 01/26 VUs  10.0s/20s  80.00 iters/s
+
+running (11.0s), 01/26 VUs, 877 complete and 0 interrupted iterations
+debounce_concentrated   [  55% ] 01/26 VUs  11.0s/20s  80.00 iters/s
+
+running (12.0s), 02/26 VUs, 956 complete and 0 interrupted iterations
+debounce_concentrated   [  60% ] 02/26 VUs  12.0s/20s  80.00 iters/s
+
+running (13.0s), 01/26 VUs, 1037 complete and 0 interrupted iterations
+debounce_concentrated   [  65% ] 01/26 VUs  13.0s/20s  80.00 iters/s
+
+running (14.0s), 01/26 VUs, 1117 complete and 0 interrupted iterations
+debounce_concentrated   [  70% ] 01/26 VUs  14.0s/20s  80.00 iters/s
+
+running (15.0s), 00/26 VUs, 1198 complete and 0 interrupted iterations
+debounce_concentrated   [  75% ] 00/26 VUs  15.0s/20s  80.00 iters/s
+
+running (16.0s), 01/26 VUs, 1277 complete and 0 interrupted iterations
+debounce_concentrated   [  80% ] 01/26 VUs  16.0s/20s  80.00 iters/s
+
+running (17.0s), 01/26 VUs, 1357 complete and 0 interrupted iterations
+debounce_concentrated   [  85% ] 01/26 VUs  17.0s/20s  80.00 iters/s
+
+running (18.0s), 01/26 VUs, 1437 complete and 0 interrupted iterations
+debounce_concentrated   [  90% ] 01/26 VUs  18.0s/20s  80.00 iters/s
+
+running (19.0s), 00/26 VUs, 1518 complete and 0 interrupted iterations
+debounce_concentrated   [  95% ] 00/26 VUs  19.0s/20s  80.00 iters/s
+
+running (20.0s), 00/26 VUs, 1598 complete and 0 interrupted iterations
+debounce_concentrated   [ 100% ] 00/26 VUs  20.0s/20s  80.00 iters/s
+
+
+  █ TOTAL RESULTS 
+
+    CUSTOM
+    signals_accepted_202...........: 449    22.447773/s
+    signals_rate_limited_429.......: 1151   57.54429/s
+    signals_sampled_sent...........: 20     0.999901/s
+
+    HTTP
+    http_req_duration..............: avg=8.68ms min=1.01ms med=3.58ms max=396.8ms p(50)=3.58ms p(95)=15.69ms p(99)=157.89ms
+      { expected_response:true }...: avg=8.68ms min=1.01ms med=3.58ms max=396.8ms p(50)=3.58ms p(95)=15.69ms p(99)=157.89ms
+    http_req_failed................: 0.00%  0 out of 1600
+    http_reqs......................: 1600   79.992063/s
+
+    EXECUTION
+    iteration_duration.............: avg=9.12ms min=1.26ms med=4.04ms max=398.6ms p(50)=4.04ms p(95)=16.21ms p(99)=158.86ms
+    iterations.....................: 1600   79.992063/s
+    vus............................: 0      min=0         max=2 
+    vus_max........................: 26     min=26        max=26
+
+    NETWORK
+    data_received..................: 1.8 MB 90 kB/s
+    data_sent......................: 784 kB 39 kB/s
+
+
+
+
+running (20.0s), 00/26 VUs, 1600 complete and 0 interrupted iterations
+debounce_concentrated ✓ [ 100% ] 00/26 VUs  20s  80.00 iters/s

@@ -1,0 +1,263 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # --- Fast, no-service jobs first: fail here before ever paying for docker compose. ---
+
+  lint-and-typecheck:
+    name: Backend — lint & typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      # @prisma/client's own postinstall already runs this, but making it
+      # explicit means a lint/typecheck failure here can never be
+      # mistaken for a Prisma-generation problem.
+      - run: npx prisma generate
+      - run: npm run lint
+      - run: npx tsc -p tsconfig.json --noEmit
+
+  unit-tests:
+    name: Backend — unit tests (coverage-gated)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npx prisma generate
+      # Zero I/O, no services needed. vitest.config.ts's coverage.thresholds
+      # (85% statements/lines, 90% branches, 78% functions, scoped to
+      # domain/services/retry) make `npm test` itself fail the build if
+      # coverage regresses — no separate CI-only gate to keep in sync.
+      - run: npm test
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: backend/coverage/
+          retention-days: 14
+
+  frontend:
+    name: Frontend — typecheck & unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
+
+  # --- The real stack: only pays for docker compose once the cheap jobs already passed. ---
+
+  integration-e2e-loadtest:
+    name: Integration, E2E & load-test regression gate
+    needs: [lint-and-typecheck, unit-tests]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ims_user:ims_password@localhost:5432/ims
+      MONGODB_URI: mongodb://localhost:27017/ims
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            scripts/loadtest/package-lock.json
+
+      # Only postgres/mongo/redis/backend — frontend has no role in any
+      # test this job runs, and skipping its build saves real CI time.
+      - name: Start the real stack
+        run: docker compose up -d --build postgres mongo redis backend
+
+      - name: Wait for backend to report healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/health | grep -q '"status":"healthy"'; then
+              echo "backend healthy after ${i}0s max"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "backend never became healthy within the timeout" >&2
+          docker compose logs
+          exit 1
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      # The backend image doesn't run migrations on startup (see
+      # backend/Dockerfile) — the app connects fine against an empty
+      # schema (health probes are schema-independent SELECT 1 / ping), but
+      # any real signal/work-item write needs the schema applied first.
+      # `migrate deploy` (not `migrate dev`, which is interactive and
+      # dev-only) is the CI/production-safe way to apply committed
+      # migrations non-interactively.
+      - name: Apply Postgres migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      # In-process app instance against the real Postgres/Mongo/Redis —
+      # does not touch the docker `backend` container at all.
+      - name: Integration tests
+        working-directory: backend
+        run: npm run test:integration
+
+      # Against the real docker `backend` container over the real HTTP
+      # API (localhost:3000) — the actually-deployed system, not an
+      # in-process shortcut.
+      - name: E2E tests
+        working-directory: backend
+        run: npm run test:e2e
+
+      - name: Install load-test harness dependencies
+        working-directory: scripts/loadtest
+        run: npm ci
+
+      # debounce-concentrated is the fastest scenario (~25s) — see
+      # docs/performance.md for the full methodology and why this floor
+      # is set well below the local dev-machine baseline (~82-91
+      # persisted/sec measured there): GitHub-hosted runners are weaker,
+      # more variable, shared hardware, and this job also has Postgres,
+      # Mongo, Redis, the backend, and 5 k6 shard containers all
+      # competing for the same 2 vCPUs — a floor calibrated to local
+      # numbers would flake on hardware differences alone, which defeats
+      # the point of a regression gate. Tighten this once real CI runs
+      # establish an actual CI-hardware baseline (see docs/performance.md).
+      - name: Short load test (throughput regression gate)
+        working-directory: scripts/loadtest
+        run: node orchestrator/run.js --scenario debounce-concentrated --min-persisted-per-sec 30
+
+      - name: Upload load-test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: loadtest-report
+          path: docs/loadtest-results/
+          retention-days: 14
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs --tail=500
+
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v
+
+  # --- Chaos / resilience suite: manual trigger only. ---
+  #
+  # Deliberately NOT run on every push/PR:
+  #
+  #  1. Disruptive by design. These tests docker-pause, docker-stop, and
+  #     SIGKILL the real Postgres/Mongo/Redis/backend containers this
+  #     workflow itself brings up. That's the entire point of the suite,
+  #     but it's a bad fit for something that runs unattended on every
+  #     commit next to other jobs sharing the same runner.
+  #
+  #  2. Genuinely variable runtime, not just "slow." The full suite takes
+  #     roughly 1.5-3 minutes, and workerCrash.test.ts alone has measured
+  #     anywhere from ~7s to ~90s across otherwise-identical runs, because
+  #     it's waiting on BullMQ's real stalled-job recovery (lock duration +
+  #     stalled-check interval), not a fixed sleep — see
+  #     backend/tests/chaos/README.md. A PR gate needs a predictable
+  #     pass/fail latency; this suite's whole value is in NOT faking that
+  #     predictability by shortening real recovery windows.
+  #
+  #  3. What it verifies doesn't track code diffs the way correctness
+  #     tests do. It answers "does the system recover from a dependency
+  #     outage or a mid-job crash," a property of the architecture that
+  #     doesn't shift with most day-to-day changes — worth checking before
+  #     a release or when deliberately touching resilience-relevant code,
+  #     not on every push to a feature branch.
+  #
+  # Trigger from the Actions tab ("Run workflow") or `gh workflow run ci.yml`.
+  chaos-tests:
+    name: Chaos / resilience suite (manual trigger only)
+    if: github.event_name == 'workflow_dispatch'
+    needs: [lint-and-typecheck, unit-tests]
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ims_user:ims_password@localhost:5432/ims
+      MONGODB_URI: mongodb://localhost:27017/ims
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Start the stack (postgres/mongo/redis/backend — chaos tests don't touch frontend either)
+        run: docker compose up -d --build postgres mongo redis backend
+
+      - name: Wait for backend to report healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/health | grep -q '"status":"healthy"'; then
+              echo "backend healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "backend never became healthy within the timeout" >&2
+          docker compose logs
+          exit 1
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Apply Postgres migrations
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Chaos / resilience tests
+        working-directory: backend
+        run: npm run test:chaos
+
+      - name: Dump container logs on failure
+        if: failure()
+        run: docker compose logs --tail=1000
+
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v

@@ -1,0 +1,46 @@
+{
+  "targetUrl": "http://localhost:3000",
+  "k6TargetUrl": "http://backend:3000",
+  "mongoUri": "mongodb://localhost:27017",
+  "mongoDb": "ims",
+  "dockerNetwork": "inveniops-ims_ims-network",
+  "backendContainer": "inveniops-ims-backend-1",
+  "pollIntervalMs": 1000,
+  "sampleRate": 0.02,
+  "settleTimeoutMs": 60000,
+  "settleQuietChecks": 3,
+  "shardCount": 5,
+  "_shardCount_note": "Empirically validated on this machine (see README): 5 parallel k6 containers x up to 100/s offered each (500/s total) runs clean (0 request_errors, 0 dropped_iterations). 20 shards at a higher per-shard rate caused the GENERATOR to collapse (88% connection failures, 108k dropped_iterations) well before the backend showed any real strain -- see docs/loadtest-results for that run's numbers, kept as a documented finding, not the baseline.",
+  "scenarios": {
+    "sustained-ramp": {
+      "componentCount": 300,
+      "targetRate": 500,
+      "rampUpS": 20,
+      "holdS": 40,
+      "rampDownS": 10
+    },
+    "burst-recovery": {
+      "componentCount": 300,
+      "baselineRate": 100,
+      "spikeRate": 500,
+      "baselineS": 15,
+      "spikeS": 10,
+      "recoveryS": 20
+    },
+    "mixed-components": {
+      "componentCount": 600,
+      "rate": 400,
+      "durationS": 30
+    },
+    "debounce-concentrated": {
+      "componentCount": 8,
+      "rate": 400,
+      "durationS": 20
+    },
+    "debounce-spread": {
+      "componentCount": 5000,
+      "rate": 400,
+      "durationS": 20
+    }
+  }
+}

@@ -1,0 +1,104 @@
+{
+  "name": "cascading-failure",
+  "description": "RDBMS connection pool exhaustion cascades into API timeouts, an MCP host failure, and a cache miss storm, then recovers. Sample failure-event data for the assignment's 'mock a failure event across the stack' requirement (RDBMS outage followed by an MCP failure).",
+  "notes": [
+    "This file is the canonical, static event sequence — cascading-failure.ts reads it at runtime and replays it exactly as written, scaled only by the --speed flag. Nothing here is regenerated or duplicated by hand in the .ts file.",
+    "Each signal's `severity` is what the (simulated) monitoring source reported. The backend's alerting Strategy pattern applies a per-componentType severity FLOOR on top of this when it dispatches an alert (RDBMS=P0, API/MCP_HOST/NOSQL/QUEUE=P1, CACHE=P2 — see backend/src/domain/alerting/strategies/). The rdbms-failure beat deliberately reports P1 (an automated monitor under-calling a connection-pool warning is realistic) so the replay can demonstrate the floor actually correcting it up to P0 in the dispatched alert, not just trivially matching what was already sent.",
+    "role: 'incident' components are the ones this scenario's failure narrative is about; 'baseline' components represent the rest of a normally-operating fleet and never fail in this scenario — both create work items (any signal does), which is what gives the dashboard a realistic mix after replay-lifecycle.ts closes only the 'incident' ones."
+  ],
+  "beats": [
+    {
+      "id": "baseline",
+      "atSeconds": 0,
+      "label": "Baseline healthy traffic",
+      "narration": "Normal background signal traffic across every component type — occasional low-severity blips, nothing actionable.",
+      "signals": [
+        { "componentId": "RDBMS_REPLICA_02", "componentType": "RDBMS", "role": "baseline", "severity": "P3", "mode": "burst", "count": 2, "reason": "replica_minor_replication_lag" },
+        { "componentId": "API_STATIC_ASSETS_01", "componentType": "API", "role": "baseline", "severity": "P3", "mode": "burst", "count": 2, "reason": "minor_latency_blip" },
+        { "componentId": "MCP_HOST_AUX_01", "componentType": "MCP_HOST", "role": "baseline", "severity": "P3", "mode": "burst", "count": 2, "reason": "minor_latency_blip" },
+        { "componentId": "CACHE_STATIC_01", "componentType": "CACHE", "role": "baseline", "severity": "P3", "mode": "burst", "count": 2, "reason": "occasional_cache_miss" },
+        { "componentId": "QUEUE_EVENTS_01", "componentType": "QUEUE", "role": "baseline", "severity": "P3", "mode": "burst", "count": 2, "reason": "minor_consumer_lag" },
+        { "componentId": "NOSQL_AUDIT_01", "componentType": "NOSQL", "role": "baseline", "severity": "P3", "mode": "burst", "count": 2, "reason": "occasional_slow_write" }
+      ]
+    },
+    {
+      "id": "rdbms-failure",
+      "atSeconds": 30,
+      "label": "RDBMS primary begins failing",
+      "narration": "Connection pool exhaustion errors on DB_PRIMARY_01, rising from a trickle to a flood over 15s. Reported severity is P1 — expect the dispatched alert to be corrected up to P0 by RDBMS's Strategy floor.",
+      "signals": [
+        {
+          "componentId": "DB_PRIMARY_01",
+          "componentType": "RDBMS",
+          "role": "incident",
+          "severity": "P1",
+          "mode": "ramp",
+          "durationSeconds": 15,
+          "rampFromPerSecond": 1,
+          "rampToPerSecond": 10,
+          "reason": "connection_pool_exhausted"
+        }
+      ]
+    },
+    {
+      "id": "api-timeouts",
+      "atSeconds": 45,
+      "label": "Dependent API services start timing out",
+      "narration": "Three API components time out waiting on the backed-up database.",
+      "signals": [
+        { "componentId": "API_CHECKOUT_02", "componentType": "API", "role": "incident", "severity": "P1", "mode": "burst", "count": 18, "reason": "upstream_db_timeout" },
+        { "componentId": "API_SEARCH_03", "componentType": "API", "role": "incident", "severity": "P1", "mode": "burst", "count": 16, "reason": "upstream_db_timeout" },
+        { "componentId": "API_ORDERS_04", "componentType": "API", "role": "incident", "severity": "P1", "mode": "burst", "count": 14, "reason": "upstream_db_timeout" }
+      ]
+    },
+    {
+      "id": "mcp-host-failure",
+      "atSeconds": 60,
+      "label": "MCP host fails",
+      "narration": "MCP_HOST_01 fails as its downstream dependency (the database) stays unavailable.",
+      "signals": [
+        { "componentId": "MCP_HOST_01", "componentType": "MCP_HOST", "role": "incident", "severity": "P1", "mode": "burst", "count": 18, "reason": "downstream_dependency_unavailable" }
+      ]
+    },
+    {
+      "id": "cache-miss-storm",
+      "atSeconds": 75,
+      "label": "Cache miss storm",
+      "narration": "Services fall back to the failing database on every cache miss — CACHE_SESSION_01 reports a storm of misses, ramping over 20s.",
+      "signals": [
+        {
+          "componentId": "CACHE_SESSION_01",
+          "componentType": "CACHE",
+          "role": "incident",
+          "severity": "P2",
+          "mode": "ramp",
+          "durationSeconds": 20,
+          "rampFromPerSecond": 2,
+          "rampToPerSecond": 12,
+          "reason": "cache_miss_storm_fallback_to_db"
+        }
+      ]
+    },
+    {
+      "id": "partial-recovery",
+      "atSeconds": 120,
+      "label": "Partial recovery",
+      "narration": "Error rates decline across every previously-failing component as the database recovers.",
+      "signals": [
+        { "componentId": "DB_PRIMARY_01", "componentType": "RDBMS", "role": "incident", "severity": "P1", "mode": "burst", "count": 3, "reason": "residual_pool_pressure" },
+        { "componentId": "API_CHECKOUT_02", "componentType": "API", "role": "incident", "severity": "P1", "mode": "burst", "count": 2, "reason": "residual_timeouts" },
+        { "componentId": "API_SEARCH_03", "componentType": "API", "role": "incident", "severity": "P1", "mode": "burst", "count": 2, "reason": "residual_timeouts" },
+        { "componentId": "API_ORDERS_04", "componentType": "API", "role": "incident", "severity": "P1", "mode": "burst", "count": 1, "reason": "residual_timeouts" },
+        { "componentId": "MCP_HOST_01", "componentType": "MCP_HOST", "role": "incident", "severity": "P1", "mode": "burst", "count": 2, "reason": "residual_degradation" },
+        { "componentId": "CACHE_SESSION_01", "componentType": "CACHE", "role": "incident", "severity": "P2", "mode": "burst", "count": 3, "reason": "residual_misses" }
+      ]
+    },
+    {
+      "id": "steady-state",
+      "atSeconds": 180,
+      "label": "Steady state restored",
+      "narration": "No new signals — buffer fully drained, error rate back to baseline. The cascade is over.",
+      "signals": []
+    }
+  ]
+}

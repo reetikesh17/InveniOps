@@ -11,6 +11,18 @@ export const mongoClient = new MongoClient(config.mongo.uri);
 export const redis = new Redis(config.redis.url, {
   lazyConnect: true,
   maxRetriesPerRequest: 3,
+  // Without this, a command queued against a disconnected client waits
+  // through ioredis's own reconnection backoff (default up to ~2s per
+  // attempt, up to maxRetriesPerRequest attempts) before finally
+  // rejecting — several seconds in practice. That directly undermines
+  // both the rate limiter's fail-open path (checkRateLimitFailOpen,
+  // src/api/routes/signals.ts) and the dashboard cache's degrade-to-
+  // Postgres path (CacheUnavailableError, dashboardCache.ts): "fails
+  // open" or "degrades gracefully" isn't meaningfully true if it takes
+  // multiple seconds to happen. A command that hasn't completed in 2s is
+  // certainly not going to on a healthy connection, so this is a strict
+  // improvement, not a behavior tradeoff, on the success path.
+  commandTimeout: 2_000,
 });
 
 let mongoDb: Db | undefined;

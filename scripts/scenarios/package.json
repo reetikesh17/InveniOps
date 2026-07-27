@@ -1,0 +1,23 @@
+{
+  "name": "ims-scenarios",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Narrated, replayable failure scenarios for the InveniOps IMS — sample data for the assignment's 'mock a failure event across the stack' requirement, plus a companion script that walks the resulting incidents to CLOSED.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "cascading-failure": "tsx cascading-failure.ts",
+    "replay-lifecycle": "tsx replay-lifecycle.ts"
+  },
+  "dependencies": {
+    "pg": "^8.11.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.6",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4"
+  }
+}

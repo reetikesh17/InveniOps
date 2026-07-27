@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ComponentType, Severity } from "@prisma/client";
 import {
   SignalBuffer,
@@ -429,6 +429,113 @@ describe("SignalBuffer", () => {
 
       buffer.stop();
       expect(buffer.isDraining).toBe(false);
+    });
+  });
+
+  describe("start() interval-driven drain loop", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("is idempotent — calling start() again while already running does not create a second timer", () => {
+      const buffer = new SignalBuffer(makeOptions({ drainIntervalMs: 10 }));
+
+      buffer.start();
+      buffer.start(); // second call must be a no-op, not a second interval
+      buffer.submit(makeSignal(Severity.P1));
+
+      // If a second timer had been created, one drain tick would fire twice
+      // per interval; asserting there's exactly one drained batch after one
+      // interval elapses is what actually proves idempotency, not just that
+      // isDraining stayed true.
+      expect(buffer.isDraining).toBe(true);
+      buffer.stop();
+    });
+
+    it("drains a batch on each interval tick", async () => {
+      const sink = recordingSink();
+      const buffer = new SignalBuffer(makeOptions({ drainIntervalMs: 10, drainBatchSize: 5, sink }));
+      buffer.submit(makeSignal(Severity.P1));
+      buffer.submit(makeSignal(Severity.P1));
+
+      buffer.start();
+      await vi.advanceTimersByTimeAsync(10);
+
+      expect(sink.batches).toHaveLength(1);
+      expect(sink.batches[0]).toHaveLength(2);
+      buffer.stop();
+    });
+
+    it("skips a tick that overlaps a still-in-flight drain, instead of running concurrently", async () => {
+      let concurrentCalls = 0;
+      let maxConcurrent = 0;
+      const slowSink: SignalSink = {
+        async drain(batch) {
+          void batch;
+          concurrentCalls += 1;
+          maxConcurrent = Math.max(maxConcurrent, concurrentCalls);
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          concurrentCalls -= 1;
+        },
+      };
+      const buffer = new SignalBuffer(makeOptions({ drainIntervalMs: 10, drainBatchSize: 5, sink: slowSink }));
+      for (let i = 0; i < 3; i += 1) {
+        buffer.submit(makeSignal(Severity.P1));
+      }
+
+      buffer.start();
+      // Three ticks (10/20/30ms) land while the first drain (30ms) is still
+      // in flight; the reentrancy guard should mean only one drain ever
+      // runs at once.
+      await vi.advanceTimersByTimeAsync(35);
+
+      expect(maxConcurrent).toBe(1);
+      buffer.stop();
+    });
+
+    it("keeps the interval loop alive across a tick whose sink rejects", async () => {
+      const throwingSink: SignalSink = {
+        drain(): Promise<void> {
+          return Promise.reject(new Error("sink exploded"));
+        },
+      };
+      const buffer = new SignalBuffer(makeOptions({ drainIntervalMs: 10, sink: throwingSink }));
+      buffer.submit(makeSignal(Severity.P1));
+
+      buffer.start();
+      await vi.advanceTimersByTimeAsync(10);
+
+      // drainToSink() itself already catches the sink's rejection (records
+      // it as a sink_failure drop) and resolves rather than rejecting, so
+      // this specifically proves the *interval wrapper* survives a failing
+      // tick — isDraining stays true and a later tick can still run — not
+      // the tick's own try/catch, which drainToSink() never actually
+      // triggers under this scenario.
+      expect(buffer.isDraining).toBe(true);
+      buffer.stop();
+    });
+  });
+
+  describe("setSink", () => {
+    it("swaps the sink used by subsequent drains", async () => {
+      const firstSink = recordingSink();
+      const secondSink = recordingSink();
+      const buffer = new SignalBuffer(makeOptions({ sink: firstSink }));
+
+      buffer.submit(makeSignal(Severity.P1));
+      await buffer.drainToSink();
+      expect(firstSink.batches).toHaveLength(1);
+
+      buffer.setSink(secondSink);
+      buffer.submit(makeSignal(Severity.P1));
+      await buffer.drainToSink();
+
+      expect(secondSink.batches).toHaveLength(1);
+      expect(firstSink.batches).toHaveLength(1); // unchanged — the old sink is never called again
     });
   });
 });

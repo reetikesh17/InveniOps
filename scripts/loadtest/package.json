@@ -1,0 +1,13 @@
+{
+  "name": "ims-loadtest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Load-testing harness for InveniOps ingestion — orchestrates k6 (in Docker, on the compose network) plus Mongo/metrics/docker-stats sampling that k6 itself can't see.",
+  "scripts": {
+    "run": "node orchestrator/run.js"
+  },
+  "dependencies": {
+    "mongodb": "^6.8.0"
+  }
+}

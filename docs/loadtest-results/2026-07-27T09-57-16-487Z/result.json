@@ -1,0 +1,387 @@
+{
+  "runId": "2026-07-27T09-57-16-487Z",
+  "scenario": "burst-recovery",
+  "startedAt": "2026-07-27T09:57:16.591Z",
+  "endedAt": "2026-07-27T09:58:08.999Z",
+  "durationSec": 52.408,
+  "config": {
+    "componentCount": 300,
+    "baselineRate": 100,
+    "spikeRate": 500,
+    "baselineS": 15,
+    "spikeS": 10,
+    "recoveryS": 20,
+    "shardCount": 5,
+    "sampleRate": 0.02,
+    "pollIntervalMs": 1000
+  },
+  "environment": {
+    "dockerCpus": 16,
+    "dockerMemTotalBytes": 3940745216,
+    "backendContainer": "inveniops-ims-backend-1",
+    "note": "Load generator (k6) and the system under test share this single machine's CPU/memory — this is a local baseline, not an isolated-generator measurement. See README.md."
+  },
+  "edge": {
+    "totalRequests": 9096,
+    "accepted202": 4931,
+    "rateLimited429": 4165,
+    "bufferSaturated503": 0,
+    "otherStatus": 0,
+    "requestErrors": 0,
+    "acceptedPerSec": 94.0886887498092,
+    "latencyMs": {
+      "avg": 4.997710683871284,
+      "p50": 3.273264,
+      "p95": 13.846941139999995,
+      "p99": 24.635394439999985,
+      "max": 196.599188
+    },
+    "droppedIterations": 0,
+    "generatorMayHaveBottlenecked": false
+  },
+  "backendCounters": {
+    "receivedBySeverity": {
+      "P0": 264,
+      "P1": 738,
+      "P2": 1728,
+      "P3": 2201
+    },
+    "acceptedBySeverity": {
+      "P0": 264,
+      "P1": 738,
+      "P2": 1728,
+      "P3": 2201
+    },
+    "droppedBySeverityAndReason": {
+      "P0": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P1": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P2": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      },
+      "P3": {
+        "shed_ceiling": 0,
+        "hard_capacity": 0,
+        "sink_failure": 0
+      }
+    },
+    "jobsProcessed": 928,
+    "jobsFailed": 0,
+    "e2eHistogram": {
+      "p50Ms": 100,
+      "p95Ms": 250,
+      "p99Ms": 250,
+      "count": 928,
+      "sum": 64983
+    }
+  },
+  "persistence": {
+    "totalPersisted": 4931,
+    "persistedPerSec": 94.0886887498092,
+    "timeSeries": [
+      {
+        "atMs": 1785146236655,
+        "elapsedMs": 65,
+        "count": 0
+      },
+      {
+        "atMs": 1785146237659,
+        "elapsedMs": 1069,
+        "count": 10
+      },
+      {
+        "atMs": 1785146238667,
+        "elapsedMs": 2077,
+        "count": 114
+      },
+      {
+        "atMs": 1785146239675,
+        "elapsedMs": 3085,
+        "count": 214
+      },
+      {
+        "atMs": 1785146240682,
+        "elapsedMs": 4092,
+        "count": 314
+      },
+      {
+        "atMs": 1785146241698,
+        "elapsedMs": 5108,
+        "count": 414
+      },
+      {
+        "atMs": 1785146242705,
+        "elapsedMs": 6115,
+        "count": 514
+      },
+      {
+        "atMs": 1785146243720,
+        "elapsedMs": 7130,
+        "count": 614
+      },
+      {
+        "atMs": 1785146244729,
+        "elapsedMs": 8139,
+        "count": 720
+      },
+      {
+        "atMs": 1785146245739,
+        "elapsedMs": 9149,
+        "count": 823
+      },
+      {
+        "atMs": 1785146246747,
+        "elapsedMs": 10157,
+        "count": 924
+      },
+      {
+        "atMs": 1785146247753,
+        "elapsedMs": 11163,
+        "count": 1024
+      },
+      {
+        "atMs": 1785146248764,
+        "elapsedMs": 12174,
+        "count": 1124
+      },
+      {
+        "atMs": 1785146249778,
+        "elapsedMs": 13188,
+        "count": 1224
+      },
+      {
+        "atMs": 1785146250791,
+        "elapsedMs": 14201,
+        "count": 1324
+      },
+      {
+        "atMs": 1785146251800,
+        "elapsedMs": 15210,
+        "count": 1424
+      },
+      {
+        "atMs": 1785146252804,
+        "elapsedMs": 16214,
+        "count": 1542
+      },
+      {
+        "atMs": 1785146253812,
+        "elapsedMs": 17222,
+        "count": 1864
+      },
+      {
+        "atMs": 1785146254840,
+        "elapsedMs": 18250,
+        "count": 1969
+      },
+      {
+        "atMs": 1785146255848,
+        "elapsedMs": 19258,
+        "count": 2071
+      },
+      {
+        "atMs": 1785146256862,
+        "elapsedMs": 20272,
+        "count": 2174
+      },
+      {
+        "atMs": 1785146257878,
+        "elapsedMs": 21288,
+        "count": 2274
+      },
+      {
+        "atMs": 1785146258893,
+        "elapsedMs": 22303,
+        "count": 2369
+      },
+      {
+        "atMs": 1785146259901,
+        "elapsedMs": 23311,
+        "count": 2474
+      },
+      {
+        "atMs": 1785146260911,
+        "elapsedMs": 24321,
+        "count": 2574
+      },
+      {
+        "atMs": 1785146261919,
+        "elapsedMs": 25329,
+        "count": 2675
+      },
+      {
+        "atMs": 1785146262928,
+        "elapsedMs": 26338,
+        "count": 2775
+      },
+      {
+        "atMs": 1785146263945,
+        "elapsedMs": 27355,
+        "count": 2874
+      },
+      {
+        "atMs": 1785146264952,
+        "elapsedMs": 28362,
+        "count": 2975
+      },
+      {
+        "atMs": 1785146265964,
+        "elapsedMs": 29374,
+        "count": 3075
+      },
+      {
+        "atMs": 1785146266972,
+        "elapsedMs": 30382,
+        "count": 3180
+      },
+      {
+        "atMs": 1785146267990,
+        "elapsedMs": 31400,
+        "count": 3281
+      },
+      {
+        "atMs": 1785146268997,
+        "elapsedMs": 32407,
+        "count": 3381
+      },
+      {
+        "atMs": 1785146270020,
+        "elapsedMs": 33430,
+        "count": 3485
+      },
+      {
+        "atMs": 1785146271025,
+        "elapsedMs": 34435,
+        "count": 3585
+      },
+      {
+        "atMs": 1785146272030,
+        "elapsedMs": 35440,
+        "count": 3685
+      },
+      {
+        "atMs": 1785146273042,
+        "elapsedMs": 36452,
+        "count": 3785
+      },
+      {
+        "atMs": 1785146274065,
+        "elapsedMs": 37475,
+        "count": 3890
+      },
+      {
+        "atMs": 1785146275080,
+        "elapsedMs": 38490,
+        "count": 3990
+      },
+      {
+        "atMs": 1785146276087,
+        "elapsedMs": 39497,
+        "count": 4089
+      },
+      {
+        "atMs": 1785146277096,
+        "elapsedMs": 40506,
+        "count": 4190
+      },
+      {
+        "atMs": 1785146278109,
+        "elapsedMs": 41519,
+        "count": 4292
+      },
+      {
+        "atMs": 1785146279121,
+        "elapsedMs": 42531,
+        "count": 4394
+      },
+      {
+        "atMs": 1785146280130,
+        "elapsedMs": 43540,
+        "count": 4494
+      },
+      {
+        "atMs": 1785146281155,
+        "elapsedMs": 44565,
+        "count": 4593
+      },
+      {
+        "atMs": 1785146282175,
+        "elapsedMs": 45585,
+        "count": 4699
+      },
+      {
+        "atMs": 1785146283187,
+        "elapsedMs": 46597,
+        "count": 4799
+      },
+      {
+        "atMs": 1785146284203,
+        "elapsedMs": 47613,
+        "count": 4899
+      },
+      {
+        "atMs": 1785146285236,
+        "elapsedMs": 48646,
+        "count": 4931
+      },
+      {
+        "atMs": 1785146286260,
+        "elapsedMs": 49670,
+        "count": 4931
+      },
+      {
+        "atMs": 1785146287277,
+        "elapsedMs": 50687,
+        "count": 4931
+      },
+      {
+        "atMs": 1785146288296,
+        "elapsedMs": 51706,
+        "count": 4931
+      }
+    ],
+    "gapVsAccepted": {
+      "acceptedTotal": 4931,
+      "persistedTotal": 4931,
+      "gapCount": 0,
+      "gapPercent": 0
+    }
+  },
+  "endToEndLatency": {
+    "backendBatchHistogram": {
+      "note": "Recorded once per BullMQ batch job, using the OLDEST signal's wait time in that batch — a worst-case-in-batch proxy, not a true per-signal distribution. See ims_signal_e2e_latency_ms in backend/src/workers/signalWorker.ts.",
+      "p50Ms": 100,
+      "p95Ms": 250,
+      "p99Ms": 250,
+      "observationCount": 928
+    },
+    "perSignalPollingSample": {
+      "note": "External measurement: 2% of signals tagged, polled for first appearance in Mongo every 1000ms. Accurate to within one poll interval. Independent cross-check against the backend's own histogram above.",
+      "sampleSize": 90,
+      "p50Ms": 629,
+      "p95Ms": 1029,
+      "p99Ms": 1087,
+      "minMs": 35,
+      "maxMs": 1087
+    }
+  },
+  "resourceUsage": {
+    "peakBufferFillRatio": 0.00025,
+    "peakQueueDepth": 1,
+    "peakDlqSize": 0,
+    "peakBackendMemoryBytes": 112197632,
+    "peakBackendMemoryMiB": 107
+  },
+  "warnings": [
+    "edge.latencyMs is merged across 5 shards: avg/p50/p95 are averaged (approximate), p99/max are the worst observed across shards (not averaged away). See k6Summary.note in the raw shard files for detail."
+  ]
+}
