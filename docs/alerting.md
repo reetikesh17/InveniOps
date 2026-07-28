@@ -2,7 +2,7 @@
 
 How a work item's severity and channels get decided, how duplicate alerts are
 prevented, and how escalation works. Design pattern and extension mechanics
-are in the [README's Design Patterns section](../README.md#design-patterns);
+are in [docs/design-patterns.md](design-patterns.md#strategy--alert-severitychannel-selection);
 this doc is the behavioral reference. Implementation:
 `src/domain/alerting/` (pure policy) and `src/services/alerting/` (delivery,
 dedup, escalation — I/O).

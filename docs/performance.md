@@ -3,7 +3,12 @@
 This documents a single, focused round of performance work: establish an honest
 baseline, find the actual bottleneck from data (not guesswork), change one
 variable at a time, and measure the effect of each change independently before
-adopting any of them.
+adopting any of them. See [backpressure.md](backpressure.md) for the buffer/drain
+mechanism being tuned here, [observability.md](observability.md) for the metrics
+this methodology reads, and
+[requirements-traceability.md](requirements-traceability.md) for how these numbers
+hold up against the assignment's literal "10,000 signals/sec" target — stated
+honestly there, not just here.
 
 **Read this before the numbers below**: everything here was measured on one
 developer machine, with the load generator, Postgres, Mongo, Redis, and the

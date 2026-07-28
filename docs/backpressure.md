@@ -4,7 +4,11 @@
 (`POST /api/v1/signals`) and everything downstream. It's the piece that
 answers the assignment's core constraint: **the system cannot OOM or fall
 over when the persistence layer is slow, no matter how fast signals
-arrive.**
+arrive.** See [architecture.md](architecture.md) for where this sits in the
+write path, [performance.md](performance.md) for the load-test methodology
+and the tuning pass behind the numbers cited here, and
+[data-model.md](data-model.md) for what happens downstream once a batch
+leaves this buffer.
 
 ## Structure
 
@@ -118,10 +122,19 @@ remaining edge case is loud, not silent.
   arbitrary numbers in this design and the most likely to need tuning
   against real traffic shape — that's why they're three independent env
   vars, not a hardcoded curve.
-- **Drain batch 200 / interval 50ms.** Up to 4,000 signals/sec of drain
-  throughput at default settings — comfortably above what a stub sink
-  needs and a reasonable starting point for whatever the real sink (a
-  BullMQ producer) turns out to cost per batch.
+- **Drain batch 500 / interval 15ms** (`BUFFER_DRAIN_BATCH_SIZE` /
+  `BUFFER_DRAIN_INTERVAL_MS`, set in `docker-compose.yml`). The schema's own
+  defaults are more conservative (200 / 50ms) — these were *the* two levers
+  a real, measured tuning pass (see [performance.md](performance.md))
+  found to matter most: larger, more frequent batches amortize each BullMQ
+  job's fixed per-job cost (one dequeue, one Mongo `insertMany` round trip,
+  one grouped Postgres transaction) over more signals, worth roughly a
+  5x throughput improvement together over the schema defaults on the
+  measurement host. The schema defaults remain the fallback for anyone
+  running the backend outside `docker-compose.yml` without overriding them;
+  they're deliberately conservative rather than pre-tuned, so a fresh
+  environment's first run doesn't inherit numbers validated on different
+  hardware.
 
 ## Consumer: priority-ordered batch draining
 
@@ -137,31 +150,50 @@ export interface SignalSink {
 }
 ```
 
-**The sink is a stub today** (`noopSignalSink`), not a BullMQ producer.
-BullMQ isn't a project dependency yet, and standing up a queue (adding the
-package, defining the queue name/options, wiring a connection) is its own
-scoped piece of work — folding it into the buffer would mean this file's
-diff was answering two different questions at once. The buffer is written
-against the `SignalSink` interface specifically so that swapping in a real
-BullMQ producer later touches exactly one call site
+**The real sink is `BullMqSignalSink`** (`src/workers/bullMqSink.ts`) — one
+BullMQ job enqueued per drained batch:
+
+```ts
+export class BullMqSignalSink implements SignalSink {
+  constructor(private readonly queue: Queue<SignalBatchJobData>) {}
+  async drain(batch: readonly IngestionSignal[]): Promise<void> {
+    await enqueueSignalBatch(this.queue, batch);
+  }
+}
+```
+
+The buffer was deliberately written against the `SignalSink` interface
+first, before BullMQ was wired up, specifically so a real producer could be
+swapped in later by touching exactly one call site
 (`signalBufferInstance.ts`) and nothing about the buffer's own logic,
-tests, or the HTTP contract changes.
+tests, or HTTP contract. That's now the actual history of this file, not
+just the plan for it — the interface boundary held, and the buffer's own
+unit tests never needed to change when the stub was replaced with the real
+producer.
 
 If a tick overlaps a still-running drain (a slow sink), the tick is
 skipped rather than starting a second concurrent drain — `draining` is a
 simple boolean guard, not a queue of pending ticks, so a stalled sink
 doesn't build up parallel in-flight drains.
 
-**Sink failures drop the batch.** If `sink.drain()` throws, every signal
-in that batch is counted under `droppedByReason.sink_failure` and logged,
-not re-queued. Re-enqueuing on failure was considered and rejected here:
-doing it safely needs its own bounded-retry-with-backoff design (to avoid
-either an infinite loop on a permanently broken sink, or silently
-re-ordering signals around the priority queues), and that's exactly the
-kind of resilience a real BullMQ consumer already provides out of the box
-downstream. Building a second, buffer-level retry mechanism on top of a
-stub sink would be solving a problem the real sink will already solve
-differently.
+**Sink failures drop the batch.** If `sink.drain()` throws — in practice,
+`BullMqSignalSink.drain()`'s call to `queue.add()` failing, e.g. Redis is
+briefly unreachable — every signal in that batch is counted under
+`droppedByReason.sink_failure` and logged, not retried at this layer. This
+is a distinct failure mode from a BullMQ *job* failing after it was
+successfully enqueued (that has its own retry/backoff, then the DLQ — see
+[observability.md](observability.md#metrics-catalog)'s `ims_queue_dlq_size`);
+this is specifically the enqueue call itself never succeeding, so there is
+no job yet for BullMQ's own retry semantics to apply to. Retrying the
+enqueue at the buffer level was considered and rejected: doing it safely
+needs its own bounded-retry-with-backoff design, to avoid either an
+infinite loop against a permanently unreachable Redis or silently
+re-ordering signals around the priority queues — and building that here
+would duplicate machinery BullMQ's client already has for the exact same
+class of problem (`queue.add()`'s own connection retry behavior). The
+buffer's job is bounding memory and shedding by priority; a second,
+independent retry policy for the enqueue step is a different concern
+better left where the queue client already owns it.
 
 ## Graceful shutdown
 
@@ -200,12 +232,43 @@ pushed) from two places:
   service out of a load balancer's rotation (`503` would), but it's a
   real operational signal worth surfacing.
 
-## What this doesn't handle (by design, for now)
+## Measured under the chaos suite
 
-- **The real sink.** `noopSignalSink` is a placeholder; wiring BullMQ is
-  the next piece of work, not this one.
-- **Re-queuing failed batches.** Deliberately deferred to the real sink's
-  own retry semantics (see above).
+Everything above is the design. `backend/tests/chaos/` exercises it against
+the real running stack — real containers actually paused, stopped, or
+flooded, not a simulation — and asserts on data integrity, not just "the
+process stayed up." Full write-up of every scenario:
+[backend/tests/chaos/README.md](../backend/tests/chaos/README.md).
+
+- **`slowPersistence.test.ts`** pauses the real Mongo container (via
+  `docker pause`, which freezes the process rather than refusing
+  connections — closer to a real degraded-network condition than a clean
+  refusal) mid-burst, and confirms ingestion keeps returning `202` within a
+  tight latency budget for the entire outage — proving the buffer actually
+  decouples ingestion from persistence, not just "eventually." Once Mongo
+  is unpaused, it confirms every `signalId` accepted during the outage is
+  present in Mongo, by direct query — not inferred from the absence of
+  errors.
+- **`queueSaturation.test.ts`** floods an isolated instance until the
+  high-water mark engages, then confirms — from the backend's own
+  counters, over real HTTP — that `ims_signals_dropped_total{severity="P3"}`
+  is nonzero while `severity="P0"` stays exactly zero, even under
+  sustained pressure. It then submits a dedicated P0-only batch *while the
+  buffer is still under pressure* and confirms it's accepted in full — the
+  "P0 is exempt from ceiling shedding" claim above, proven, not assumed.
+- **`gracefulShutdown.test.ts`** sends SIGTERM to a backend under active
+  load and asserts the shutdown hook's own log line
+  (`"drained ingestion buffer on shutdown"`) actually appears, then that
+  every signal accepted before the signal arrived is persisted after
+  restart — confirming `drainAll` genuinely runs on the real shutdown path,
+  not just in its own unit test.
+- **`redisOutage.test.ts`** and **`postgresOutage.test.ts`** stop those
+  containers respectively and confirm the buffer keeps absorbing signals
+  regardless — since neither is in the ingestion request path — while
+  `/health` still honestly reports the outage.
+
+## What this doesn't handle (by design)
+
 - **Multi-process/replica buffer state.** This buffer is in-process
   memory, per replica — by design (that's what "in-memory buffer" means
   in the assignment), but it means shedding decisions are made locally,
@@ -213,3 +276,11 @@ pushed) from two places:
   limiter (`src/rateLimit/tokenBucket.ts`) is the one thing in this system
   that *is* cross-replica, via Redis, precisely because rate limiting
   needs a shared view and buffering doesn't.
+- **A literal, single, sustained 10,000/sec throughput number on real
+  hardware.** The buffer is sized and shedding-tested against this target
+  (see "Why these numbers" above and the chaos evidence above), but a
+  clean, reproducible "10,000 persisted signals/sec, sustained" figure was
+  never established — see [performance.md](performance.md) and
+  [requirements-traceability.md](requirements-traceability.md) for the
+  honest numbers actually measured and why they fall short of a single
+  clean claim.

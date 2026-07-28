@@ -18,7 +18,7 @@ Server-Sent Events: `GET /api/v1/incidents/stream`, one-directional
 backend replica handled a mutation reaches clients connected to any replica.
 Built on native platform primitives — Node's own HTTP response streaming
 and the browser's native `EventSource` — no new dependency on either side.
-`useIncidents` (`frontend/src/hooks/useIncidents.ts`) still falls back to
+`useIncidents` (`frontend/src/hooks/useIncidents.tsx`) still falls back to
 polling if the SSE connection can't be established or drops repeatedly, so
 polling isn't replaced, only pre-empted when available.
 

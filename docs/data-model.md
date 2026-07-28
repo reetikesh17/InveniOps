@@ -1,9 +1,10 @@
 # Data Model
 
 How the same incident data is shaped in each store, and why. See
-[architecture.md](architecture.md) for the three-store split rationale and
-[backpressure.md](backpressure.md) for the ingestion buffer this sits
-downstream of.
+[architecture.md](architecture.md) for the three-store split rationale and where each
+concern lives, [design-patterns.md](design-patterns.md) for the State/Strategy
+mechanics that operate on this data, and [backpressure.md](backpressure.md) for the
+ingestion buffer this sits downstream of.
 
 ## PostgreSQL — source of truth
 
@@ -94,10 +95,11 @@ cap and its limitation for a pathologically large active set.
 
 Backs assignment section 2B ("Sink (Aggregations): Support timeseries
 aggregations"). Deliberately a *second* role for the same MongoDB instance
-already used as the raw signal audit log, not a new engine — see the chat
-proposal that preceded this implementation for the full comparison against
-Redis TimeSeries / TimescaleDB / a dedicated store (InfluxDB/Prometheus)
-and why native time-series collections won for this project's scope.
+already used as the raw signal audit log, not a new engine — see
+[ADR 0005](decisions/0005-mongodb-timeseries-for-aggregation.md) for the
+full comparison against Redis TimeSeries / TimescaleDB / a dedicated store
+(InfluxDB/Prometheus) and why native time-series collections won for this
+project's scope.
 Implementation: `src/repositories/metrics/metricsRepository.ts` (write +
 query), `src/services/aggregation/` (batched, drop-on-failure write path
 and the read-side query service), `src/api/routes/analytics.ts` (the

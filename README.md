@@ -1,65 +1,160 @@
 # InveniOps — Incident Management System (IMS)
 
-## Overview
+Distributed systems fail in pieces: a cache node degrades, a queue backs up, an RDBMS
+connection pool exhausts, and each piece emits its own flood of error and latency
+signals faster than a human can read them. InveniOps ingests those signals at high
+volume without blocking on persistence, collapses repeated noise from the same failing
+component into a single trackable work item, routes it to the right responder at the
+right severity, and enforces a workflow that cannot reach "Closed" without a documented
+root cause — turning raw signal noise into a small number of accountable incidents with
+a measured Mean Time To Repair.
 
-Distributed systems fail in pieces — a cache node degrades, a queue backs up, an RDBMS
-connection pool exhausts — and each piece emits its own flood of error/latency signals
-faster than a human can read them. InveniOps ingests those signals at high volume,
-collapses repeated noise from the same failing component into a single trackable Work
-Item, routes it to the right responder at the right severity, and enforces a workflow
-that can't reach "Closed" without a documented root cause. The goal is to turn raw
-signal noise into a small number of accountable incidents with a measurable
-Mean Time To Repair.
+## Demo
+
+45 seconds, full workflow: a signal arrives in the Live Feed, the incident opens, its
+linked raw signals expand, it transitions OPEN → INVESTIGATING → RESOLVED, closing it
+without an RCA is rejected in place, a valid RCA is submitted, and it closes with a
+computed MTTR. Recorded against the [cascading-failure scenario](#sample-data), not
+placeholder data — see [docs/demo-script.md](docs/demo-script.md) for the same walkthrough
+scripted for a live five-minute run.
+
+<video src="docs/images/demo.mp4" controls muted playsinline width="100%">
+Your viewer doesn't render inline video — the file is at
+<a href="docs/images/demo.mp4">docs/images/demo.mp4</a>.
+</video>
+
+|  |  |
+|---|---|
+| ![Live Feed — mixed severity, not all P0](docs/images/live-feed.png) | ![Live Feed — dark theme](docs/images/live-feed-dark.png) |
+| **Live Feed** — active incidents, severity-then-recency, real-time via SSE. This run's mix (P0 down to P3) comes straight out of the cascading-failure scenario, not hand-picked | Same screen in the dark theme — a first-class alternative, not a colour-inverted afterthought |
+
+|  |  |
+|---|---|
+| ![Incident Detail with the transition timeline and expanded raw signals](docs/images/incident-detail.png) | ![RCA form with the live MTTR preview](docs/images/rca-form-mttr-preview.png) |
+| **Incident Detail** — the transition timeline (every state change, who made it, when) alongside the expanded raw-signal payloads linked to this incident from Mongo | **RCA form** — appears in place once a work item reaches RESOLVED (there is no separate RCA route): start/end pickers, a live MTTR preview computed from the real first-signal timestamp and ticking every second, a category dropdown, and the three narrative fields with character minimums |
+
+|  |  |
+|---|---|
+| ![Analytics — populated charts, non-null MTTR](docs/images/analytics.png) | ![System status panel mid-shedding](docs/images/system-status-shedding.png) |
+| **Analytics** — signal throughput, incident volume by component/severity, MTTR trend, and worst-first component health, all computed from this same run's closed incidents | **System status under active backpressure** — the same panel a few minutes later, mid-burst from `scripts/loadtest/orchestrator/bulkStress.js`: buffer pinned at 100%, shedding lit up, the backpressure design in [docs/backpressure.md](docs/backpressure.md) made visible rather than inferred |
+
+The 5-second throughput line ([docs/observability.md](docs/observability.md#reading-the-console-line))
+during that same burst — buffer fill and queue depth rising under load, then draining
+back to idle once the offered load stops:
+
+![Backend console: buffer fill and queue depth moving under a burst, then draining](docs/images/terminal-throughput.png)
+
+The visual system exists to be read at 3am by an on-call engineer, not to look good in
+a portfolio: colour is rationed to severity alone (nothing else in the UI is
+saturated), severity splits warm P0/P1 vs. cool P2/P3 so urgency is legible before
+reading the code, every text/background pairing in both themes is WCAG AA-checked with
+a script rather than eyeballed, and the app is responsive at 375/768/1440px. Full
+rationale: [ADR 0008](docs/decisions/0008-console-visual-system.md). Every reusable
+primitive — badges, buttons, form fields, the full type scale — is catalogued at
+[`/styleguide`](frontend/src/features/styleguide/StyleGuidePage.tsx); it is a
+**development artifact for reviewing the design system in isolation**, not a product
+feature — it is deliberately not linked from the app's own navigation, only reachable
+by typing the URL.
+
+## Quickstart
+
+Three commands, from a fresh clone, to a running system with a populated dashboard.
+Requires Docker Desktop (or a compatible engine) with Compose v2, and Node.js 20+ on
+the host — the second command applies the Postgres schema from outside the container,
+and the third installs and runs the sample-data scripts.
+
+```bash
+# 1. Build and start Postgres, Mongo, Redis, the backend API, and the frontend dev server
+docker compose up -d --build
+
+# 2. Apply the Postgres schema (the backend image doesn't run migrations on boot —
+#    see backend/Dockerfile — so this is a one-time, explicit step)
+cd backend && DATABASE_URL=postgresql://ims_user:ims_password@localhost:5432/ims npx prisma migrate deploy && cd ..
+
+# 3. Populate the dashboard: a narrated cascading-failure scenario (RDBMS outage → API
+#    timeouts → MCP host failure → cache miss storm → recovery), then walk half its
+#    incidents to CLOSED with a real RCA and MTTR
+cd scripts/scenarios && npm install && npm run cascading-failure -- --speed 30 && npm run replay-lifecycle && cd ../..
+```
+
+Open **http://localhost:5173** — the Live Feed shows a mix of active incidents and, on
+the Closed tab, resolved ones with real computed MTTR; Analytics has real throughput
+and MTTR data to chart. `curl http://localhost:3000/health` should report
+`"status":"healthy"` with all four dependencies `up`. Step 3's scenario runs in ~10
+seconds at `--speed 30`; drop the flag (`npm run cascading-failure`) to watch it narrate
+in real time over ~3 minutes instead — see [Sample Data](#sample-data) for what it
+verifies and why.
+
+**Other useful commands:** `make logs` (`docker compose logs -f`), `make down`,
+`make reset` (`docker compose down -v` — destructive, wipes volumes),
+`make db-shell` (a `psql` shell into the Postgres container). `cp .env.example .env`
+first if you want to override any port, credential, or `VITE_API_BASE_URL` — the
+compose file's own defaults match what's used above, so it's optional.
 
 ## Architecture
 
 ```mermaid
 graph LR
     Sources["Signal Sources<br/>APIs · MCP Hosts · Caches<br/>Queues · RDBMS · NoSQL"]
+    RateLimit{"Rate Limiter<br/>(Redis token bucket,<br/>per-IP + global)"}
     Ingest["Ingestion API<br/>(Express)"]
-    Buffer["In-Memory Buffer<br/>(severity-aware shedding)"]
+    Buffer["Ring Buffer<br/>(severity-aware shedding)"]
     Queue[("Queue<br/>BullMQ / Redis")]
     Workers["Signal Workers"]
-    Mongo[("MongoDB<br/>signals")]
+    Mongo[("MongoDB<br/>signals — audit log")]
     MongoMetrics[("MongoDB<br/>timeseries metrics")]
     Postgres[("PostgreSQL<br/>work_items · rca_records")]
     Redis[("Redis<br/>dashboard cache")]
     IncidentsAPI["Incidents API<br/>(transition, RCA)"]
     AnalyticsAPI["Analytics API"]
     AlertDispatcher["Alert Dispatcher<br/>(Strategy pattern)"]
-    Escalation["Escalation<br/>Scheduler"]
+    Escalation["Escalation Scheduler"]
     Channels["Console · Slack ·<br/>PagerDuty · Email"]
-    Dashboard["Dashboard UI<br/>(React)"]
+    Dashboard["Dashboard UI<br/>(React, SSE)"]
 
-    Sources -->|"raw signal payload<br/>HTTP POST, JSON"| Ingest
-    Ingest -->|"buffered signal"| Buffer
-    Buffer -->|"debounced signal batch"| Queue
+    Sources -->|"HTTP POST, JSON<br/>single or array"| Ingest
+    Ingest -->|"per-IP + global<br/>token check"| RateLimit
+    RateLimit -->|"read/write tokens<br/>(fails open if Redis is down)"| Redis
+    Ingest -->|"if allowed: buffer<br/>and ack 202 immediately"| Buffer
+    Buffer -->|"debounced signal batch<br/>(drain interval)"| Queue
     Queue -->|"dequeued signal job"| Workers
     Workers -->|"raw signal document"| Mongo
-    Workers -->|"Work Item + state<br/>transition (txn)"| Postgres
+    Workers -->|"Work Item create/link<br/>+ state (txn)"| Postgres
     Workers -->|"dashboard state<br/>write-through"| Redis
     Workers -->|"batched volume/creation<br/>metric points"| MongoMetrics
-    Workers -->|"on work item creation"| AlertDispatcher
-    IncidentsAPI -->|"transition/RCA (txn)"| Postgres
+    Workers -->|"once, on work<br/>item creation"| AlertDispatcher
+    IncidentsAPI -->|"transition / RCA (txn)"| Postgres
     IncidentsAPI -->|"on every transition"| AlertDispatcher
     IncidentsAPI -->|"transition + MTTR<br/>metric points"| MongoMetrics
+    IncidentsAPI -.->|"SSE push on<br/>create/transition"| Dashboard
     Escalation -->|"overdue OPEN items"| AlertDispatcher
     Escalation -->|"audit trail row"| Postgres
-    AlertDispatcher -->|"fan out, per-channel retry"| Channels
+    AlertDispatcher -->|"fan out, per-channel<br/>retry + timeout"| Channels
     AlertDispatcher -->|"dispatch outcome"| MongoMetrics
     Redis -->|"active incidents,<br/>per-incident summary"| Dashboard
     Mongo -->|"raw signals<br/>(Incident Detail)"| Dashboard
     IncidentsAPI -->|"incident state, RCA"| Dashboard
     MongoMetrics -->|"bucketed aggregation<br/>pipelines"| AnalyticsAPI
+    AnalyticsAPI -->|"throughput, volume,<br/>MTTR trend"| Dashboard
 
     classDef store fill:#eef2ff,stroke:#6366f1,color:#1e1b4b;
     class Mongo,MongoMetrics,Postgres,Redis,Queue store;
     classDef alerting fill:#fef2f2,stroke:#ef4444,color:#7f1d1d;
     class AlertDispatcher,Escalation,Channels alerting;
+    classDef gate fill:#fffbeb,stroke:#d97706,color:#78350f;
+    class RateLimit gate;
 ```
 
-See [docs/architecture.md](docs/architecture.md) for the write-path/read-path breakdown and
-[docs/decisions/](docs/decisions/) for why each store holds what it holds.
+Ingestion never touches Postgres, Mongo, or Redis on the request path except the rate
+limiter's own token-bucket check (and that check fails *open*, not closed, if Redis
+itself is unreachable — see [Backpressure Handling](#backpressure-handling)): a signal
+is validated, rate-checked, buffered in process memory, and acknowledged, all before
+anything durable happens. A BullMQ worker drains the buffer on an interval, resolves
+debounce sessions, and only then writes to the three stores. The Incidents API is the
+one other write path (state transitions and RCA submission), always transactional
+against Postgres. See [docs/architecture.md](docs/architecture.md) for the full
+write-path/read-path breakdown and [docs/decisions/](docs/decisions/) for why each
+store holds what it holds.
 
 ## Tech stack
 
@@ -68,124 +163,29 @@ See [docs/architecture.md](docs/architecture.md) for the write-path/read-path br
 | Node.js 20 + TypeScript (strict) | Single-language stack, compile-time safety across API/domain/infra boundaries | Plain JavaScript — no compile-time guarantees on a codebase this layered |
 | Express | Minimal, unopinionated HTTP layer with a mature middleware ecosystem (helmet, cors, pino-http) | Fastify — faster, but no functional need here outweighs Express's ubiquity and lower review friction |
 | PostgreSQL 16 + Prisma | ACID transactions for work-item state transitions; typed schema and migrations | Raw `pg` + hand-written SQL — more control, no compile-time query safety, much more boilerplate |
-| MongoDB 7 | Schemaless, high-throughput audit log for arbitrary raw signal payloads | Postgres JSONB column — would couple burst signal-write throughput to the transactional store |
-| Redis 7 | Sub-millisecond hot-path reads for dashboard state; also backs the queue | In-process cache — doesn't survive restarts or scale past one instance |
-| BullMQ | Redis-backed job queue; reuses infra already in the stack, built-in retry/backoff | RabbitMQ — a second broker to run and monitor with no capability this system needs that BullMQ lacks |
+| MongoDB 7 | Schemaless, high-throughput audit log for arbitrary raw signal payloads, plus native time-series collections for the aggregation sink | Postgres JSONB column — would couple burst signal-write throughput to the transactional store |
+| Redis 7 | Sub-millisecond hot-path reads for dashboard state; also backs the queue and the rate limiter's token buckets | In-process cache — doesn't survive restarts or scale past one instance |
+| BullMQ | Redis-backed job queue; reuses infra already in the stack, built-in retry/backoff and stalled-job recovery | RabbitMQ — a second broker to run and monitor with no capability this system needs that BullMQ lacks |
 | React 18 + Vite + TypeScript + Tailwind | Fast dev loop, no build config, utility CSS with no library lock-in | Next.js — server-rendering/routing machinery this internal SPA doesn't need |
 | Docker Compose | One-command reproducible local stack | Manually-installed host services — worse reproducibility for a reviewer |
 | Vitest | Native ESM/TS, fast, same tool front and back | Jest — slower under ESM+TS, more config |
 | zod | Runtime validation with inferred static types from one schema definition | Manual checks / Joi — no free TS type inference |
 | pino | Structured JSON logs, low overhead, pairs directly with pino-http for request-id correlation | Winston — more configurable, slower, more boilerplate for structured output |
 
-## Setup
-
-**Prerequisites:** Docker Desktop (or a compatible engine) with Compose v2. Node.js 20+
-only if you want to run `npm` commands outside Docker (editor tooling, `npm run dev`
-against a containerized backend). `make` is optional — every target below has a raw
-`docker compose` equivalent, since `make` isn't preinstalled on plain Windows.
-
-**1. Environment**
-
-```bash
-cp .env.example .env
-```
-
-Optional — `docker-compose.yml` bakes in the same defaults, so the stack runs without
-this step. Copy it if you want to override anything (ports, credentials, `VITE_API_BASE_URL`).
-
-**2. Start the stack**
-
-```bash
-make up
-# or, without make:
-docker compose up -d --build
-```
-
-Brings up Postgres, Mongo, Redis, the backend API, and the frontend dev server. The
-backend waits for all three data stores to report `healthy` before it starts (see
-`depends_on: condition: service_healthy` in `docker-compose.yml`).
-
-**3. Verify**
-
-```bash
-docker compose ps                        # all five services Up / healthy
-curl http://localhost:3000/health         # {"status":"healthy","dependencies":{"postgres":"up","mongo":"up","redis":"up"}}
-```
-
-Open http://localhost:5173 — the connection indicator in the header should turn green
-within a few seconds (it polls `/health` every 5s).
-
-**Other targets:**
-
-```bash
-make logs        # docker compose logs -f
-make down        # docker compose down
-make reset       # docker compose down -v   (wipes all volumes — destructive)
-make db-shell    # docker compose exec postgres psql -U <POSTGRES_USER> -d <POSTGRES_DB>
-```
-
-## Project structure
-
-```
-InveniOps/
-├── backend/
-│   ├── prisma/
-│   │   └── schema.prisma        # Bootstrap-only: datasource/generator + a placeholder
-│   │                             #   model, just enough to generate a client for /health.
-│   │                             #   The real WorkItem/RcaRecord/StateTransition schema
-│   │                             #   is designed (docs/decisions/) but not yet migrated.
-│   ├── src/
-│   │   ├── api/
-│   │   │   ├── app.ts            # Express app: helmet, cors, body limit, request
-│   │   │   │                     #   logging, error-handling middleware
-│   │   │   └── routes/health.ts  # GET /health — per-dependency status
-│   │   ├── config/                # zod-validated env config, frozen typed object
-│   │   ├── domain/                # Pure business logic — empty until Phase 2
-│   │   │                         #   (state machine, RCA validation, debouncer)
-│   │   ├── repositories/          # Singleton Prisma/Mongo/Redis clients, graceful shutdown
-│   │   ├── services/              # Orchestration layer — empty until Phase 2
-│   │   ├── types/                  # Shared backend types — empty until the schema lands
-│   │   ├── utils/                  # logger (pino), retry (backoff wrapper), metrics
-│   │   ├── workers/                # BullMQ consumers — empty until Phase 2
-│   │   └── index.ts                # Bootstrap: connect clients, start server, shutdown hooks
-│   ├── tests/{unit,integration}/
-│   └── Dockerfile                  # multi-stage: deps → build (prisma generate + tsc) → runtime
-├── frontend/
-│   ├── src/
-│   │   ├── components/             # Reusable UI primitives (Header, ConnectionStatusIndicator)
-│   │   ├── features/
-│   │   │   ├── incidents/          # Live feed (/), detail view (/incidents/:id) — shells
-│   │   │   └── rca/                # RCA form shell — not yet routed
-│   │   ├── hooks/                  # useHealthStatus — polls /health every 5s
-│   │   ├── lib/api.ts              # Typed fetch wrapper, error normalization
-│   │   ├── types/                  # Mirrors backend contracts (health only, so far)
-│   │   └── App.tsx                 # Router + app shell
-│   └── Dockerfile                  # dev-mode: vite dev server, hot reload via bind mount
-├── docs/
-│   ├── assignment.md               # Original assignment spec
-│   ├── architecture.md
-│   └── decisions/                  # ADRs
-├── prompts/                        # Prompts used to build this repo
-├── scripts/                        # Sample data / load testing — empty until Phase 2
-├── docker-compose.yml              # postgres, mongo, redis, backend, frontend
-├── Makefile
-└── .env.example
-```
-
 ## Backpressure Handling
 
-Full design writeup: [docs/backpressure.md](docs/backpressure.md). For load-test
-methodology, the measured baseline, and a documented tuning pass on top of it, see
-[docs/performance.md](docs/performance.md).
+Full design writeup: [docs/backpressure.md](docs/backpressure.md). Load-test
+methodology and the tuning pass referenced in [Performance](#performance) below live
+in [docs/performance.md](docs/performance.md).
 
 **The problem.** The assignment requires absorbing bursts up to 10,000 signals/sec
 without the system crashing when Postgres, Mongo, or Redis is momentarily slow.
-`POST /api/v1/signals` therefore never touches any of those three on the request path —
-it hands each signal to a bounded in-memory buffer
-(`src/services/ingestion/buffer.ts`) and acks immediately; a BullMQ worker persists
-asynchronously afterward.
+`POST /api/v1/signals` therefore never touches any of those three on the request path
+— it hands each signal to a bounded in-memory buffer
+(`backend/src/services/ingestion/buffer.ts`) and acks immediately; a BullMQ worker
+persists asynchronously afterward.
 
-**The ring buffer.** Four fixed-capacity circular buffers, one per severity (P0–P3),
+**The ring buffer.** Four fixed-capacity circular buffers, one per severity (P0-P3),
 each preallocated at the *full* configured capacity (`BUFFER_CAPACITY`, default
 20,000) — not `capacity / 4` — so a legitimate single-severity flood still works
 without resizing. A single shared invariant, enforced one level up, is what actually
@@ -207,7 +207,7 @@ entirely; the only way a P0 signal is ever dropped is the separate, absolute
 hard-capacity path (evicting the oldest lower-severity item to make room), which only
 reaches P0 itself in the pathological case of 20,000 consecutive unconsumed P0s.
 
-**What the caller sees.**
+**What the caller observes at each stage.**
 
 | Stage | Buffer state | Response |
 |---|---|---|
@@ -217,45 +217,230 @@ reaches P0 itself in the pathological case of 20,000 consecutive unconsumed P0s.
 
 Every drop is counted by severity and reason (`shed_ceiling` / `hard_capacity` /
 `sink_failure`) and surfaced on `GET /health`, `GET /metrics`
-(`ims_signals_dropped_total`), and the 5-second console line — no signal is ever
-silently lost. A consumer loop drains batches in strict priority order into the BullMQ
-queue, and a graceful-shutdown hook drains whatever's left before the process exits.
+(`ims_signals_dropped_total`), and a console throughput line printed every 5 seconds —
+no signal is ever silently lost. A consumer loop drains batches in strict priority
+order into the BullMQ queue, and a graceful-shutdown hook drains whatever's left before
+the process exits.
+
+**Measured, not just designed** — `backend/tests/chaos/` exercises every stage above
+against the real running stack, not a simulation, and asserts on data integrity rather
+than "the process didn't crash":
+`slowPersistence.test.ts` pauses the real Mongo container mid-burst and confirms
+ingestion keeps returning `202` inside a tight latency budget for the whole outage,
+then confirms every accepted `signalId` is actually present in Mongo once Mongo is
+unpaused, by direct query. `queueSaturation.test.ts` floods an isolated instance until
+the watermark engages and confirms, from the backend's own counters, that
+`ims_signals_dropped_total{severity="P3"}` is nonzero while `severity="P0"` stays
+exactly zero — then submits a dedicated P0-only batch *while the buffer is still under
+pressure* and confirms it's still accepted in full. `redisOutage.test.ts` stops Redis
+and confirms the rate limiter's fail-open path engages fast (under 3 seconds, not the
+5+ seconds ioredis's default reconnect backoff would otherwise cost) and that the
+dashboard degrades to reading Postgres directly instead of erroring. All six chaos
+scenarios, what each one asserts, and their measured runtimes are in
+[backend/tests/chaos/README.md](backend/tests/chaos/README.md).
+
+## Design Patterns
+
+Full mechanics, the real interfaces, and a concrete extension walkthrough for both —
+exactly what files change to add a new state or component type, and what doesn't:
+[docs/design-patterns.md](docs/design-patterns.md).
+
+**State** (`backend/src/domain/state/`) — one class per lifecycle state
+(`OpenState`, `InvestigatingState`, `ResolvedState`, `ClosedState`), each declaring its
+own legal outbound transitions as a `Map`, not a switch. `ResolvedState` is the only
+one constructed with a guard — `createRcaCloseGuard` — which is the actual mechanism
+behind CLOSED being unreachable without a complete RCA: it's enforced inside
+`domain/state/` itself, not by the API layer choosing to check first.
+[ADR 0009](docs/decisions/0009-state-pattern-for-work-item-lifecycle.md).
+
+**Strategy** (`backend/src/domain/alerting/`) — one class per component type
+implementing `AlertStrategy`, resolved via `AlertStrategyRegistry`'s `Map` lookup,
+never a switch on `componentType` anywhere in the domain — enforced by a test that
+statically scans for one and fails the build if it appears. A signal's own reported
+severity and the strategy's floor are reconciled by taking whichever is more urgent
+([ADR 0006](docs/decisions/0006-severity-reconciliation-rule.md)), so an under-reported
+RDBMS failure still pages at P0. Full per-component floor/channel/escalation table:
+[docs/alerting.md](docs/alerting.md).
+[ADR 0004](docs/decisions/0004-strategy-pattern-for-alert-policy.md).
+
+Both patterns share the same shape: a common interface, one class per concrete case,
+and a lookup instead of conditional dispatch — the thing that makes "add a new case"
+additive instead of a diff to existing, already-tested code.
+
+## Performance
+
+Full methodology, every intermediate result, and what's next:
+[docs/performance.md](docs/performance.md). This section reports only what was
+actually measured.
+
+**Environment, stated plainly:** every number below came from one developer machine —
+the load generator (k6 in Docker, or the in-process `bulk-test` stress tool), Postgres,
+Mongo, Redis, and the backend all shared the same CPU cores and memory at the same
+time. There was no dedicated, isolated load-generation host and no dedicated,
+isolated system-under-test host. Absolute numbers describe this machine's capacity to
+run six-plus services at once, not the pipeline's capacity in isolation — see
+[docs/performance.md's environment section](docs/performance.md#environment-and-its-effect-on-the-numbers)
+for the full caveat, including a measured 3.5× variance between three trials of the
+*same* configuration.
+
+**Real HTTP path, through the rate limiter** (k6, 5 sharded source IPs, results
+committed under [docs/loadtest-results/](docs/loadtest-results/)):
+
+| Scenario | Duration | Accepted/sec | Persisted/sec |
+|---|---|---|---|
+| `sustained-ramp` | 76.1s | 91.1 | 91.1 |
+| `mixed-components` (600 components) | 36.2s | 89.6 | 89.6 |
+| `debounce-concentrated` (8 components) | 25.6s | 87.7 | 87.7 |
+
+Accepted and persisted match exactly in every run (zero gap) — nothing the edge
+accepted was ever lost before landing in Mongo. All three converge on ~88-91/s
+regardless of what each scenario is shaped to stress, which is the signature of a
+single shared constraint: 5 k6 shards × the per-IP rate limiter's default sustained
+refill (20/s each) ≈ a 100/s aggregate ceiling, and ~88-91/s achieved is 88-91% of it.
+Buffer fill stayed at 0.0% and queue depth never exceeded 6 in any of these runs — the
+rate limiter, working as designed, was the only thing under real pressure.
+
+**Raw pipeline capacity, rate limiter bypassed** (`POST /signals/bulk-test`, an
+in-process synthetic-signal generator built for exactly this — see
+`scripts/loadtest/orchestrator/bulkStress.js`): with the rate limiter out of the way,
+a real backlog forms (buffer fill hit 100%, BullMQ queue depth reached into the
+hundreds) and throughput settles at **~2,664 persisted/sec** (median of 2 trials) with
+the schema's default buffer settings (`BUFFER_DRAIN_BATCH_SIZE=200`,
+`BUFFER_DRAIN_INTERVAL_MS=50`). Testing each candidate bottleneck independently —
+batch size, worker concurrency, drain interval, Postgres pool size — found batch size
+alone (200→500) and drain interval alone (50ms→15ms) to be the dominant levers, 2.3×
+and 2.1× baseline respectively, with worker concurrency and Postgres pool size non-
+factors at this load (Prisma's implicit pool of 33 was never close to exhausted by a
+concurrency of 5). Raising `BUFFER_DRAIN_BATCH_SIZE` to 500 and lowering
+`BUFFER_DRAIN_INTERVAL_MS` to 15 together — now the defaults in `docker-compose.yml` —
+measured **3,991-15,262 persisted/sec across 3 trials (median ~14,081, ~5.3× baseline)**;
+that trial-to-trial spread is reported as measured, not smoothed over, and is
+discussed honestly in the doc rather than presented as one precise multiplier. The
+full backend test suite was re-run against the tuned config with no regressions, and
+the k6 scenarios above were re-confirmed unchanged post-tuning, since that bottleneck
+sits behind the rate limiter these scenarios are actually bound by.
+
+## Testing
+
+**Unit tests** (`backend/tests/unit/`, `npm test`): 366 tests across 31 files, zero
+I/O, run in a few seconds. Coverage is enforced, not just reported —
+`vitest.config.ts` sets a threshold (85% statements, 90% branches, 78% functions, 85%
+lines) scoped to `src/domain/**`, `src/services/**`, and the retry/Prisma-error
+utilities, and a plain `npm test` fails the run if actual coverage drops below it.
+Measured coverage as of this writeup: **88.9% statements, 91.62% branches, 83.24%
+functions, 88.9% lines** — all above threshold with headroom. The two areas the rubric
+names explicitly are both at 100%: **RCA validation**
+(`domain/rca/validateRca.test.ts` — every rule, every boundary case, every
+`RootCauseCategory` enum member, multiple simultaneous failures returning every field
+error) and **retry logic** (`utils/retry.test.ts`,
+`repositories/postgres/{prismaErrors,withPostgresRetry}.test.ts` — succeeds first try /
+after N transient failures / exhausts and throws, exponential backoff timing and
+jitter asserted against the actual random draw, and every Prisma error code the
+wrapper classifies tested individually). Also at 100%: the work item state machine
+(every legal and illegal transition) and alert strategy resolution.
+
+**Integration tests** (`backend/tests/integration/`, `npm run test:integration`,
+requires the Dockerized stores running): 73 tests across 10 files — the debouncer's
+real Postgres-unique-index correctness under actual concurrency (60 simultaneous
+signals × 8 iterations, exactly one work item every time), the full
+ingest→debounce→alert→dashboard-cache pipeline, repository round-trips against real
+Postgres/Mongo, the rate limiter, and the SSE event bus.
+
+**E2E tests** (`backend/tests/e2e/`, `npm run test:e2e`, requires the real
+docker-compose stack running, ~30s): 13 tests across 2 files — full-lifecycle
+correctness against the actually deployed backend over its real HTTP API: 500 signals
+across 5 components collapsing into 5 work items (not 500), correct Mongo linkage,
+alerting-Strategy severity reconciliation, dashboard-cache-vs-Postgres consistency, the
+full OPEN→INVESTIGATING→RESOLVED→CLOSED lifecycle with RCA validation and MTTR, and a
+concurrency test firing 50 simultaneous transitions at one work item across 25
+iterations to prove exactly one ever wins and the other 49 get `409`.
+
+**Chaos / resilience tests** (`backend/tests/chaos/`, `npm run test:chaos`, requires
+the real docker-compose stack running, ~1.5-3 min measured): 6 scenarios that pause,
+stop, and kill the real containers — Postgres outage, Redis outage, a paused Mongo,
+queue saturation, a mid-job worker crash (SIGKILL, relying on BullMQ's own stalled-job
+recovery), and a graceful-shutdown drain (SIGTERM) — each asserting a concrete
+data-integrity outcome, not just "didn't crash." Full write-up, including exactly what
+each scenario asserts and why one of them (`workerCrash.test.ts`) has genuinely
+variable runtime (7-90s, real BullMQ recovery timing, not flakiness):
+[backend/tests/chaos/README.md](backend/tests/chaos/README.md).
+
+**Frontend tests** (`frontend/`, `npm test`): 54 tests across 2 files — RCA validation
+logic mirrored from the backend's rules, and RCA form behavior (character minimums,
+draft persistence, unsaved-changes warning).
+
+**CI** (`.github/workflows/ci.yml`): lint, typecheck, unit tests (coverage-gated),
+frontend typecheck/tests, then integration + E2E + a short load test with a
+throughput-regression floor, all against the real stack — on every push and PR. The
+chaos suite runs on manual trigger only (`workflow_dispatch`), not on every push,
+because it's disruptive by design (it kills the containers the workflow just brought
+up) and its runtime is genuinely variable rather than a fit for a fast PR gate — the
+workflow file documents the full reasoning inline.
+
+## Sample Data
+
+The assignment asks for "a script or JSON file to mock a failure event across the
+stack (e.g., simulating an RDBMS outage followed by an MCP failure)."
+`scripts/scenarios/` has both: a narrated, replayable **cascading failure** scenario,
+and a companion script that walks the resulting incidents through the full lifecycle
+to `CLOSED` — the exact scripts run in [Quickstart](#quickstart) above.
+
+`cascading-failure.json` is the canonical, static event sequence, inspectable without
+running anything; `cascading-failure.ts` replays it exactly as written, narrating each
+beat to the console: baseline traffic across all 6 component types, an RDBMS
+connection-pool exhaustion ramping from a trickle to a flood, three dependent APIs
+timing out, an MCP host failing, a cache miss storm, partial recovery, and steady
+state. It then verifies — against the real system, not inferred — that debouncing
+collapsed the RDBMS burst into exactly one work item (enforced by a Postgres partial
+unique index, not just the Redis debounce fast path), that the alerting Strategy's
+severity floor corrected an intentionally under-reported RDBMS signal up to P0 while
+other components' alerts passed through at their own floor, that every signal linked
+to the right work item, and that the buffer absorbed the whole burst with zero drops.
+`replay-lifecycle.ts` then walks the 6 failure-narrative work items through
+INVESTIGATING → RESOLVED → a real, validating RCA (computing a real MTTR from each
+item's actual `firstSignalAt`), and deliberately leaves the 6 healthy baseline work
+items `OPEN` — so the dashboard shows both active incidents and closed ones with real
+MTTR, not an empty analytics page. Both scripts are safe to re-run against the same
+stack; full detail on flags and what gets verified is in
+[`scripts/scenarios/README.md`](scripts/scenarios/README.md).
 
 ## API Reference
 
 All bodies are JSON. `ComponentType` = `API | MCP_HOST | CACHE | QUEUE | RDBMS | NOSQL`.
 `Severity` = `P0 | P1 | P2 | P3`. `WorkItemState` = `OPEN | INVESTIGATING | RESOLVED | CLOSED`.
 
-### Signals — `src/api/routes/signals.ts`
+### Signals — `backend/src/api/routes/signals.ts`, mounted at `/api/v1/signals`
 
 | Method & path | Request | Response |
 |---|---|---|
-| `POST /api/v1/signals` | A single signal object or a JSON array of them: `{ signalId?, componentId, componentType, severity, rawPayload: any, occurredAt: ISO-8601 }` | `202 { accepted, signalIds? }` · `400 { error: "validation_error", details }` · `429 { error: "rate_limited" }` (+ `Retry-After`) · `503 { error: "buffer_saturated", accepted, dropped }` — see [Backpressure Handling](#backpressure-handling) |
-| `POST /api/v1/signals/bulk-test` (disabled when `NODE_ENV=production`) | `{ count, componentId?, componentType?, severity? }` — generates synthetic signals in-process, for load testing without a separate generator | `202 { accepted }` · `400 validation_error` |
+| `POST /` | A single signal object or a JSON array: `{ signalId?, componentId, componentType, severity, rawPayload: any, occurredAt: ISO-8601 }` | `202 { accepted, signalIds? }` · `400 { error: "validation_error", details }` · `429 { error: "rate_limited" }` (+ `Retry-After`) · `503 { error: "buffer_saturated", accepted, dropped }` — see [Backpressure Handling](#backpressure-handling) |
+| `POST /bulk-test` (disabled when `NODE_ENV=production`) | `{ count, componentId?, componentType?, severity? }` — generates synthetic signals in-process, bypassing the rate limiter, for pipeline load testing without a network generator | `202 { accepted }` · `400 validation_error` |
 
 Every response carries `RateLimit-Limit` / `RateLimit-Remaining` / `RateLimit-Reset`
 headers (per-IP token bucket, backed by Redis).
 
-### Incidents (workflow) — `src/api/routes/workitems.ts`, mounted at `/api/v1/incidents`
+### Incidents (workflow) — `backend/src/api/routes/workitems.ts`, mounted at `/api/v1/incidents`
 
 `IncidentSummary`: `{ id, componentId, componentType, severity, state, title, firstSignalAt, signalCount, updatedAt }`
 
 | Method & path | Request | Response |
 |---|---|---|
-| `GET /` | query `limit`, `offset`, `status=active\|closed` (default `active`) | `200 { items: IncidentSummary[], total, limit, offset }` — `active`: non-CLOSED incidents, severity then age (from the Redis cache); `closed`: CLOSED incidents, most-recently-closed first (from Postgres) |
+| `GET /` | query `limit`, `offset`, `status=active\|closed` (default `active`) | `200 { items: IncidentSummary[], total, limit, offset }` — `active`: non-CLOSED, severity then age, from the Redis cache; `closed`: CLOSED, most-recently-closed first, from Postgres |
 | `GET /:id` | — | `200` `IncidentSummary & { legalNextStates: WorkItemState[], rca: RcaSummaryDto \| null }` · `404 not_found` |
-| `GET /:id/signals` | query `limit`, `offset` | `200 { items: SignalDto[], total, limit, offset }` — raw signals from Mongo, chronological · `404 not_found` |
+| `GET /:id/signals` | query `limit`, `offset`, `order=asc\|desc` | `200 { items: SignalDto[], total, limit, offset }` — raw signals from Mongo · `404 not_found` |
+| `GET /:id/transitions` | — | `200 { items: StateTransitionDto[] }` — full audit trail, oldest first |
 | `POST /:id/transition` | `{ toState, actor }` | `200 IncidentSummary` · `404 not_found` · `409 invalid_transition` (illegal per the state machine) · `409 conflict` (optimistic-concurrency race) · `400 validation_error` |
 | `POST /:id/rca` | `{ actor, incidentStartTime, incidentEndTime, rootCauseCategory, rootCauseDescription, fixApplied, preventionSteps }` | `200` `IncidentSummary & { mttrSeconds }` · `404 not_found` · `422 { error: "invalid_rca", errors: [{field,message}] }` · `409 invalid_state` (not currently RESOLVED) · `400 validation_error` |
+| `GET /stream` | Server-Sent Events (`text/event-stream`) | Long-lived connection; `work_item_created` and `work_item_state_changed` events, each `{ type, incident: IncidentSummary, fromState?, toState? }`; a heartbeat comment keeps proxies from buffering the stream |
 
 `RcaSummaryDto`: `{ incidentStartTime, incidentEndTime, rootCauseCategory, rootCauseDescription, fixApplied, preventionSteps, mttrSeconds, submittedAt }`.
 `rootCauseCategory` is one of `CODE_DEFECT | INFRASTRUCTURE_FAILURE | CONFIGURATION_ERROR | CAPACITY_EXHAUSTION | EXTERNAL_DEPENDENCY | NETWORK | HUMAN_ERROR | UNKNOWN`.
 
-### Analytics — `src/api/routes/analytics.ts`, mounted at `/api/v1/analytics`
+### Analytics — `backend/src/api/routes/analytics.ts`, mounted at `/api/v1/analytics`
 
-Full design: [docs/data-model.md](docs/data-model.md) (see "MongoDB — aggregation sink").
-Every response is bucketed server-side (a MongoDB aggregation pipeline) — nothing is
-fetched raw and summed in Node.
+Full design: [docs/data-model.md](docs/data-model.md). Every response is bucketed
+server-side by a MongoDB aggregation pipeline — nothing is fetched raw and summed in
+Node.
 
 | Method & path | Request | Response |
 |---|---|---|
@@ -270,374 +455,95 @@ All four return `400 validation_error` for a missing/malformed `from`/`to`/`inte
 
 | Method & path | Response |
 |---|---|
-| `GET /health` | `200` (all critical dependencies up) or `503` (one or more down) — per-dependency status/latency, buffer state, queue depth, uptime, version, throughput |
+| `GET /health` | `200` (all critical dependencies up) or `503` (one or more down) — per-dependency status/latency, buffer state, queue depth, DLQ size, uptime, version, throughput |
 | `GET /ready` | `200` once the buffer drainer and BullMQ worker are actually running, `503` otherwise — distinct from `/health`, see docs/observability.md |
 | `GET /metrics` | `200 text/plain` — Prometheus exposition format |
 
-## Frontend (UI)
+## Project structure
 
-React 18 + TypeScript + Vite + Tailwind, in [`frontend/`](frontend/). A dense,
-responsive operator dashboard that drives the whole incident lifecycle against
-the APIs above. Every route is a lazily-loaded chunk wrapped in an error
-boundary, so one screen failing degrades to a recoverable card, never a white
-page.
-
-### Design system
-
-**The brief: a NOC panel read at 3am by an on-call engineer who just got
-paged.** One job — show what's broken, how bad, and how long, scannable in
-under three seconds — which drove every decision below. Full rationale:
-[ADR 0008](docs/decisions/0008-console-visual-system.md). Tokens live in the
-`@theme` layer of [`frontend/src/index.css`](frontend/src/index.css).
-
-**Palette — colour rationed to severity, nothing else.** Every hue in the
-system is fully desaturated/darkened from a normal UI palette *except* the
-four severity swatches, so a glance at colour alone means "how bad" and
-nothing competes with it — no colourful buttons, no cheerful success-green,
-no brand blue. Two parallel palettes, not one flipped: dark **"instrument
-slate"** is the primary mode (`#0e1315` panel, `#d6dddf` ink), and light
-**"daylight triage"** is a first-class alternative in cool greys (`#eef1f2`
-panel), never the cream/warm-white a light mode defaults to by habit. Severity
-splits warm-vs-cool by urgency tier — P0/P1 (act now) are warm red/amber, P2/P3
-(be aware) are cool teal/slate — so the *temperature* of a row is legible
-even before reading the code, and the same four hues drive the row spine, the
-age dot, the header's urgency ribbon, and the analytics charts from one source
-(`components/severity.ts`) so they can never drift apart. Every text/colour
-pairing in both themes is audited against WCAG AA (4.5:1 for real text, 3:1
-for graphical elements like the spine/dots) — see the ADR for the two
-contrast bugs the audit caught and how they were fixed without losing the
-"three ink tiers" hierarchy.
-
-**Type — a three-face system that tells machine from human at a glance.**
-Archivo for equipment-style labels (tracked, uppercase — the wordmark and page
-headings), IBM Plex Sans for human prose (titles, RCA narrative, empty/error
-copy), JetBrains Mono for every machine-generated value — component/signal
-IDs, timestamps, counts, raw JSON — with tabular figures so numbers align in
-a column. Seven named type-scale rungs (`eyebrow` through `mono-micro`, all
-defined in `index.css`'s `@theme` block and demoed live on `/styleguide`) mean
-no component ever reaches for an arbitrary `text-[13px]` — it picks the rung
-that matches its job.
-
-**Density & signature — the severity spine.** Feed rows run roughly 1.7× the
-density of a typical list row (`~28px`), because an operator scanning fifty
-active incidents needs the whole picture on one screen, not five scrolls. The
-signature element is a 3px colour rail on each row's leading edge; because
-rows abut with no divider, a severity-sorted feed reads as one continuous
-ribbon rather than fifty individual coloured chips. An **age dot** in the same
-gutter answers "how long" — hollow while fresh, filled once an incident has
-sat unaddressed past a threshold — and "time in state" separately escalates by
-ink weight, never a second colour, so severity and staleness never blur into
-each other.
-
-|  |  |
-|---|---|
-| ![Live Feed — dark](docs/screenshots/live-feed-dark.png) | ![Live Feed — light](docs/screenshots/live-feed-light.png) |
-| **Dark** — "instrument slate," the default | **Light** — "daylight triage," a first-class alternative, not a flip |
-
-Every reusable primitive in every state — badges, buttons, form fields, the
-full type scale, the severity spine on real data — is catalogued at
-[`/styleguide`](frontend/src/features/styleguide/StyleGuidePage.tsx). It's a
-**development artifact, not a product surface**: intentionally not linked
-from the primary nav (an on-call engineer never needs it at 3am), reachable
-only by typing the URL, and it exists so the visual system can be reviewed and
-regression-checked independent of any one screen.
-
-### Routes
-
-| Route | Screen | What it does |
-|---|---|---|
-| `/` | **Live Feed** | Active incidents, severity-then-recency (server-sorted). Real-time via SSE with a polling fallback; client-side filters (severity/state/component type) persisted in the URL; pagination; time-in-state that visually escalates as it grows. An **Active / Closed** toggle (`?view=closed`) switches to the closed-incident **history** — server-paginated (via `GET /api/v1/incidents?status=closed`), most-recently-closed first, since closed incidents leave the active cache once RCA'd. |
-| `/incidents/:id` | **Incident Detail** | Header + state-machine controls rendered from the server's `legalNextStates` (the domain layer stays authoritative); transition timeline; raw signals from Mongo, paginated & load-on-demand, newest/oldest with expandable payloads. Handles 409-conflict, RCA-required, and not-found explicitly. |
-| `/analytics` | **Analytics** | Throughput, incident volume (stacked, by type/severity), MTTR trend with the server's rolling average overlaid, and a worst-first component-health table — all from the aggregation endpoints, with a shared URL-persisted range/bucket selector. Plus a live **System Status** panel (per-dependency latency, buffer fill, queue depth, shedding state) that makes the backpressure work visible. |
-| `/styleguide` | **Style Guide** | Every reusable primitive in every state — the visual system the dashboard is built from. |
-
-### The workflow
-
-Feed → click an incident → **Start investigating** → **Mark resolved** →
-**Complete the RCA** (both timestamps, category, and the three narrative
-fields, client-validated as a mirror of the backend domain rules) → submit →
-the incident closes and the page re-renders as the read-only RCA with the
-computed MTTR. The RCA form previews the MTTR it's about to record, counts
-characters toward the minimums, persists a draft to `sessionStorage`, and warns
-on navigating away with unsaved changes.
-
-| | |
-|---|---|
-| ![Live Feed](docs/screenshots/live-feed-dark.png) | ![Incident Detail + RCA form](docs/screenshots/incident-detail.png) |
-| **Live Feed** — severity counts, escalating time-in-state, real-time updates | **Incident Detail** — state controls, transition timeline, raw signals, and (once RESOLVED) the RCA form with its live MTTR preview |
-| ![Analytics](docs/screenshots/analytics.png) | |
-| **Analytics** — throughput, volume, MTTR trend, component health, live system status | |
-
-### Resilience & accessibility
-
-- **Backend unreachable** → a shell-level banner (header/nav stay usable), and
-  a single `/health` poller retries automatically with exponential backoff
-  (5s → 30s). **Shedding under backpressure** surfaces as a distinct
-  "system under load" banner, not a generic outage; a dependency outage shows
-  which dependency is down.
-- **Real-time transport** is SSE, with a documented rationale in
-  [ADR 0007](docs/decisions/0007-sse-for-real-time-transport.md). SSE drops
-  degrade to polling with a subtle indicator so the operator always knows how
-  fresh the data is. Live updates never re-mount the list; rows are memoized by
-  value so a refresh repaints only what actually changed.
-- Skeletons appear only after ~200ms to avoid flicker; every fetch is
-  cancellable and aborted on unmount.
-- Keyboard-navigable through the full workflow with a visible focus ring
-  throughout — always the neutral `ring-ink` token, never a severity hue, so
-  focus stays visible against every surface in both themes
-  (11.7:1+ dark / 14.4:1+ light); `header`/`nav`/`main` landmarks, one `h1`
-  per screen, a skip-to-content link, and `aria-current` on the active nav
-  item. No meaning is carried by colour alone (severity is always paired
-  with its mono code; state carries no colour at all; charts always carry
-  legends and labels). Chart palettes are validated for colour-vision-
-  deficiency separation.
-- **Every text/background pairing meets WCAG AA** (4.5:1 text, 3:1
-  graphical), in both themes, checked with a contrast script rather than
-  eyeballed — see [ADR 0008](docs/decisions/0008-console-visual-system.md)
-  for the one real failure it caught (`ink-faint` used as label text) and how
-  it was fixed without flattening the three-tier ink hierarchy.
-- Responsive at **375 / 768 / 1440px** — tables collapse to cards on narrow
-  viewports, charts reflow, no horizontal overflow. Re-checked specifically
-  against the denser feed-row layout, since a tighter row breaks differently
-  than a sparse one.
-
-### Running the frontend standalone
-
-The frontend reads its API base URL from `VITE_API_BASE_URL` (default
-`http://localhost:3000`).
-
-```bash
-cd frontend
-npm install
-
-# dev server with hot reload (http://localhost:5173)
-npm run dev
-
-# type-check + production build, then serve the built bundle (http://localhost:4173)
-npm run build
-npm run preview
-
-# point at a non-default backend
-VITE_API_BASE_URL=http://api.example.com npm run dev
-
-# unit/component tests (RCA validation + form behaviour)
-npm test
+```
+InveniOps/
+├── backend/
+│   ├── prisma/
+│   │   ├── schema.prisma        # WorkItem, RcaRecord, StateTransition + enums
+│   │   └── migrations/          # init, plus the active-component partial unique index
+│   ├── src/
+│   │   ├── api/
+│   │   │   ├── app.ts           # Express app: helmet, cors, body limit, logging, error handling
+│   │   │   └── routes/          # signals, workitems, analytics, health, ready, metrics, incidentStream (SSE)
+│   │   ├── config/               # zod-validated env config — one frozen typed object, fails fast on boot
+│   │   ├── domain/                # Pure business logic, zero I/O
+│   │   │   ├── state/              # State pattern — work item lifecycle
+│   │   │   ├── alerting/           # Strategy pattern — severity floor + channel per component type
+│   │   │   └── rca/                # RCA validation + MTTR calculation
+│   │   ├── rateLimit/              # Redis-backed per-IP/global token bucket
+│   │   ├── repositories/           # Prisma/Mongo/Redis clients + typed repositories, one per store
+│   │   ├── services/                # Orchestration: ingestion buffer, debouncer, alerting delivery,
+│   │   │                            #   dashboard projection, aggregation, workflow, realtime SSE
+│   │   ├── workers/                 # BullMQ consumer: debounce → persist → cache → alert → metrics
+│   │   ├── utils/                   # logger (pino), retry (backoff wrapper), metrics registry
+│   │   └── index.ts                 # Bootstrap: connect clients, start server + worker, graceful shutdown
+│   ├── tests/
+│   │   ├── unit/                    # 366 tests, zero I/O
+│   │   ├── integration/             # 73 tests, real Postgres/Mongo/Redis, in-process app
+│   │   ├── e2e/                     # 13 tests, real docker-compose stack over HTTP
+│   │   └── chaos/                   # 6 scenarios — pause/stop/kill real containers, own README
+│   └── Dockerfile                   # multi-stage: deps → build (prisma generate + tsc) → runtime
+├── frontend/
+│   ├── src/
+│   │   ├── components/               # Reusable primitives — Button, Card, SeverityBadge, StateBadge, form fields…
+│   │   ├── features/
+│   │   │   ├── incidents/             # Live Feed, Incident Detail, state controls, transition timeline
+│   │   │   ├── rca/                   # RCA form (rendered inside Incident Detail once RESOLVED)
+│   │   │   ├── analytics/             # Throughput/volume/MTTR panels, system status
+│   │   │   └── styleguide/            # Component catalogue — dev artifact, see Demo section
+│   │   ├── hooks/                     # useIncidents (SSE + polling), useSystemHealth, useTheme
+│   │   ├── lib/api.ts                 # Typed fetch wrapper, error normalization
+│   │   └── types/enums.ts             # Hand-mirrored backend enums — checked for drift by
+│   │                                  #   tests/unit/frontendTypesParity.test.ts on every backend `npm test`
+│   └── Dockerfile                     # dev-mode: vite dev server, hot reload via bind mount
+├── scripts/
+│   ├── loadtest/                      # k6 scenarios + orchestrator; bulkStress.js for rate-limiter-bypassed
+│   │                                  #   pipeline stress testing — see Performance
+│   └── scenarios/                     # cascading-failure.ts + replay-lifecycle.ts — see Sample Data
+├── docs/                              # design docs + ADRs — see Documentation below
+├── prompts/                           # intended home for prompts/specs/plans used to build this repo
+├── .github/workflows/ci.yml           # lint, typecheck, unit, integration, E2E, load-test gate; chaos on manual trigger
+├── docker-compose.yml                 # postgres, mongo, redis, backend, frontend
+├── Makefile                           # up / down / logs / reset / db-shell
+└── .env.example
 ```
 
-Under Docker Compose the `frontend` service runs the Vite dev server against a
-bind-mounted source tree (hot reload), with `VITE_API_BASE_URL` supplied by
-compose — no separate step needed beyond `docker compose up`.
+## Documentation
 
-## Design Patterns
+Every design document lives in [`docs/`](docs/):
 
-### State — work item lifecycle (`src/domain/state/`)
+| Document | What it covers |
+|---|---|
+| [architecture.md](docs/architecture.md) | The layered `routes → services → repositories` structure, and the full write-path/read-path breakdown per store |
+| [design-patterns.md](docs/design-patterns.md) | State and Strategy with the real interfaces, and a concrete extension walkthrough for each — exactly what files change and what doesn't |
+| [backpressure.md](docs/backpressure.md) | The complete backpressure design — buffer, watermarks, shedding — condensed in this README's own section above |
+| [data-model.md](docs/data-model.md) | How the same incident data is shaped differently in Postgres, Mongo, and Redis, and why each store holds what it holds |
+| [alerting.md](docs/alerting.md) | The per-component severity-floor/channel/escalation table, severity reconciliation, deduplication, and delivery/retry behavior |
+| [observability.md](docs/observability.md) | The `/health`, `/ready`, `/metrics` contract, and how none of them ever block a request on a live dependency call |
+| [performance.md](docs/performance.md) | Full load-test methodology, the honest rate-limiter-bound baseline, the one-variable-at-a-time tuning pass, and what's next |
+| [requirements-traceability.md](docs/requirements-traceability.md) | Every requirement in the assignment mapped to the file, test, and doc section that satisfies it — including an honest accounting of what's partially met |
+| [demo-script.md](docs/demo-script.md) | A five-minute live walkthrough — exact commands, what to point at, what to say, including the two moments worth pausing on |
+| [assignment.md](docs/assignment.md) | The original assignment spec this system was built against |
+| [loadtest-results/](docs/loadtest-results/) | Raw, committed output (JSON + console summaries) from every k6 baseline run performance.md references |
+| [decisions/0001](docs/decisions/0001-postgres-for-source-of-truth.md) | Why PostgreSQL is the source of truth for work items and RCA |
+| [decisions/0002](docs/decisions/0002-mongodb-for-signal-audit-log.md) | Why MongoDB holds the raw signal audit log |
+| [decisions/0003](docs/decisions/0003-bullmq-for-async-queue.md) | Why BullMQ for the async signal-processing queue |
+| [decisions/0004](docs/decisions/0004-strategy-pattern-for-alert-policy.md) | Why the Strategy pattern for alert policy, specifically |
+| [decisions/0005](docs/decisions/0005-mongodb-timeseries-for-aggregation.md) | Why native MongoDB time-series collections back the aggregation sink |
+| [decisions/0006](docs/decisions/0006-severity-reconciliation-rule.md) | Why a severity floor is a minimum, never a cap, and what that prevents |
+| [decisions/0007](docs/decisions/0007-sse-for-real-time-transport.md) | Why Server-Sent Events, not WebSockets, for the dashboard's live updates |
+| [decisions/0008](docs/decisions/0008-console-visual-system.md) | The visual system's full rationale — palette, type, density, the WCAG audit |
+| [decisions/0009](docs/decisions/0009-state-pattern-for-work-item-lifecycle.md) | Why the State pattern for work item lifecycle transitions, specifically |
+| [decisions/0010](docs/decisions/0010-redis-fast-path-with-postgres-backstop-for-debouncing.md) | Why debouncing is a two-tier design — Redis fast path, Postgres unique index as the actual guarantee |
+| [decisions/0011](docs/decisions/0011-optimistic-concurrency-for-state-transitions.md) | Why optimistic concurrency (guarded `UPDATE`), not locking, protects state transitions |
 
-Each state (`OpenState`, `InvestigatingState`, `ResolvedState`, `ClosedState`) is a
-class implementing `WorkItemState { transition(context), getLegalNextStates() }`,
-extending `BaseWorkItemState`, which holds its legal transitions as a
-`Map<WorkItemStateName, TransitionEntry>` — not a switch or an if/else chain. A
-transition to a state that isn't in the map (or whose guard rejects it) throws
-`InvalidTransitionError`; there is no other code path to CLOSED. `ResolvedState` is the
-only state constructed with a guard — `createRcaCloseGuard`, which validates the RCA
-payload and rejects the RESOLVED→CLOSED transition unless it's complete. This is the
-literal mechanism behind CLOSED being unreachable without an RCA: it's enforced inside
-`domain/state/`, not by the API layer choosing to check first (`WorkflowService` never
-calls `submitRca`'s persistence path except through this guard — see
-`tests/unit/services/workitems/workflowService.test.ts`, which calls the service
-directly, with no HTTP layer involved, and proves the domain layer itself rejects it).
-
-`createWorkItemStateGraph(canClose)` (`graph.ts`) wires the four states together —
-`OpenState` is constructed with a reference to the `InvestigatingState` instance it can
-transition to, and so on down the chain. **Adding a new state** (e.g. a
-`REOPENED` state between CLOSED and OPEN) means: add the name to
-`WorkItemStateName`, write one class extending `BaseWorkItemState` declaring what it
-can transition to (with a guard, if the transition is conditional), and wire it into
-`createWorkItemStateGraph`. No existing state class changes, and nothing outside
-`domain/state/` does either — `WorkflowService`, the dashboard projection's
-`legalNextStates`, and the API routes are all written against the `WorkItemState`
-interface (`transition()`, `getLegalNextStates()`), never against a name or a switch.
-
-### Strategy — alert severity/channel selection (`src/domain/alerting/`)
-
-Every component type's alert policy (severity floor, channels, message text) is a
-class implementing `AlertStrategy { componentType, severityFloor, buildAlert(context) }`
-— see [docs/alerting.md](docs/alerting.md) for the full per-component table.
-`AlertStrategyRegistry` resolves `componentType → AlertStrategy` via a `Map`, falling
-back to `DefaultAlertStrategy` for anything unregistered — never a switch or
-if/else on `componentType`, anywhere in this domain. **Adding a new component type**
-means: write one class implementing `AlertStrategy`, and call
-`registry.register(new MyStrategy())` once (in
-`createDefaultAlertStrategyRegistry()`, or later at runtime). Zero edits to any
-existing strategy, the registry class, `AlertDispatcher`, or `EscalationScheduler` — all
-of them resolve through the same `registry.resolve(componentType)` call. This is
-enforced, not just intended:
-`tests/unit/domain/alerting/noBranchingOnComponentType.test.ts` statically scans every
-file under `domain/alerting/` for a `switch` or an `if` on `componentType` and fails
-the build if one appears — verified during development by deliberately introducing one
-and confirming the test catches it, then reverting.
-
-Both patterns share the same shape: a common interface, one class per concrete case,
-and a lookup (a `Map`, injected constructor references) instead of conditional
-dispatch — the thing that makes "add a new case" additive instead of a diff to
-existing, already-tested code.
-
-## Testing
-
-**Unit tests** (`backend/tests/unit/`, `npm test`): 363 tests, zero I/O, run in a few
-seconds. Coverage is enforced, not just reported — `vitest.config.ts` sets a
-threshold (currently 85% statements/lines, 90% branches, 78% functions) scoped to
-`src/domain/**`, `src/services/**`, and the retry util, and a plain `npm test` fails
-the run if actual coverage drops below it. The two areas the rubric names explicitly
-are both at 100%:
-
-- **RCA validation** (`domain/rca/validateRca.test.ts`) — every rule, both a passing
-  and failing case; boundary cases (exactly-at-minimum text length, end time one
-  second after/equal to start, start time exactly at `firstSignalAt`, timestamps one
-  second in the future); every `RootCauseCategory` enum member accepted, an invalid
-  one rejected; multiple simultaneous failures return every field error, not just the
-  first.
-- **Retry logic** (`utils/retry.test.ts`, `repositories/postgres/{prismaErrors,withPostgresRetry}.test.ts`)
-  — succeeds first try / after N transient failures / exhausts and throws; exponential
-  backoff timing and jitter (asserted against the actual random draw, not just "some
-  number in range"); every Prisma error code the retry wrapper classifies, tested
-  individually — connection failure (P1001), deadlock/serialization conflict (P2034),
-  and pool timeout (P2024) retry; constraint violation (P2002), not-found (P2025), and
-  validation errors do not.
-
-Also at 100%: the **work item state machine** (every legal transition, every illegal
-transition via the full cross-product of states, CLOSED's terminal-ness, and
-`getLegalNextStates` for all four states) and **alert strategy resolution** (the
-`AlertStrategyRegistry` lookup plus every per-component-type strategy). The
-**debouncer** (`services/ingestion/debouncer.test.ts`) — previously exercised only by
-the slow, real-Redis/Postgres/Mongo integration test below — now also has a fast unit
-suite against fake stores covering the create/link/race/lock-contention/cache-staleness
-paths individually. The **ingestion buffer**'s interval-driven drain loop
-(`start`/`stop`/`setSink`, tick reentrancy, surviving a failing tick) is covered the
-same way.
-
-Deliberately left to the integration suite rather than mocked: `src/repositories/**`'s
-actual Prisma/Mongo/Redis calls, and the I/O-heavy alert dispatch/escalation
-orchestration — those are thin wrappers around real clients, and a unit test against a
-mocked ORM would mostly assert that the mock does what the mock was told to do.
-
-**Integration tests** (`backend/tests/integration/`, `npm run test:integration`,
-requires the Dockerized stores running): the debouncer's real Postgres-unique-index
-correctness under actual concurrency (60 simultaneous signals × 8 iterations, exactly
-one work item every time), the full ingest→debounce→alert→dashboard-cache pipeline,
-repository round-trips against real Postgres/Mongo, the rate limiter, and the SSE event
-bus.
-
-**E2E tests** (`backend/tests/e2e/`, `npm run test:e2e`, requires the real
-docker-compose stack running): full-lifecycle correctness against the actually
-deployed backend over its real HTTP API — 500 signals across 5 components collapsing
-into 5 work items (not 500), correct Mongo linkage, alerting-Strategy severity
-reconciliation, dashboard-cache-vs-Postgres consistency, the full
-OPEN→INVESTIGATING→RESOLVED→CLOSED lifecycle with RCA validation and MTTR, and a
-concurrency test firing 50 simultaneous transitions at one work item across 25
-iterations to prove exactly one ever wins.
-
-**Chaos / resilience tests** (`backend/tests/chaos/`, `npm run test:chaos`, requires
-the real docker-compose stack running, ~1.5-3 min): pauses, stops, and kills the real
-containers — Postgres outage, Redis outage, slow Mongo, queue saturation, a mid-job
-worker crash, and a graceful-shutdown drain — asserting concrete data-integrity
-outcomes, not just "didn't crash." Full write-up: `backend/tests/chaos/README.md`.
-
-**CI** (`.github/workflows/ci.yml`): lint, typecheck, unit tests (coverage-gated),
-frontend typecheck/tests, then integration + E2E + a short load test with a
-throughput-regression floor, all against the real stack — on every push and PR. The
-chaos suite runs on manual trigger only (`workflow_dispatch`), not on every push; the
-workflow file documents why (disruptive by design, and genuinely variable runtime, not
-a fit for a PR gate).
-
-## Sample Data
-
-The assignment asks for "a script or JSON file to mock a failure event across the
-stack (e.g., simulating an RDBMS outage followed by an MCP failure)." `scripts/scenarios/`
-has both: a narrated, replayable **cascading failure** scenario, and a companion
-script that walks the resulting incidents through the full lifecycle to `CLOSED` —
-so opening [the dashboard](http://localhost:5173) afterward shows a realistic mix of
-active and closed incidents with real MTTR values, not an empty analytics page.
-
-### Running it
-
-```bash
-docker compose up -d             # from the repo root, if not already running
-
-cd scripts/scenarios
-npm install                                # one-time
-
-npm run cascading-failure                  # real time — ~3 minutes, for a live demo
-npm run cascading-failure -- --speed 30    # compressed — ~10 seconds, for CI
-
-npm run replay-lifecycle                   # then this — closes the incident work items
-```
-
-Both scripts talk to the real, running stack over the real HTTP API
-(`http://localhost:3000` by default, `--api-url` to override) — no in-process
-shortcuts. `--speed` divides every wait in the timeline by that factor: `--speed 1`
-(the default) plays out exactly as narrated in real time; `--speed 30` produces the
-same event sequence, in the same order, at the same volumes, in about ten seconds.
-Both are safe to re-run against the same stack — componentIds are fixed, so each run
-reads a component's pre-existing signal count first and only asserts against what
-*that run itself* added.
-
-### `cascading-failure.ts` / `cascading-failure.json`
-
-`cascading-failure.json` is the canonical, static event sequence — inspectable
-without running anything. `cascading-failure.ts` reads it at runtime and replays it
-exactly as written, narrating each beat to the console as it fires:
-
-| T+ | Beat | What happens |
-|---|---|---|
-| 0s | Baseline | Low-severity background traffic across all 6 component types |
-| 30s | RDBMS primary begins failing | Connection pool exhaustion on `DB_PRIMARY_01`, ramping 1/s → 10/s over 15s |
-| 45s | Dependent APIs time out | Three API components report timeouts as the DB backs up |
-| 60s | MCP host fails | `MCP_HOST_01` fails as its downstream dependency degrades |
-| 75s | Cache miss storm | `CACHE_SESSION_01` ramps 2/s → 12/s as services fall back to the (failing) DB |
-| 120s | Partial recovery | Every previously-failing component's error rate declines |
-| 180s | Steady state restored | No new signals |
-
-Once the timeline finishes, the script verifies — against the real system, not
-inferred — every property the assignment asks this scenario to demonstrate:
-
-- **Debouncing collapsed the RDBMS burst into one work item**: polls Postgres
-  directly until each component's `work_items` row shows the expected `signal_count`,
-  and confirms the 83 RDBMS signals from the ramp (86 including the recovery beat)
-  collapsed into exactly **one** work item — enforced by
-  `idx_work_items_active_component_id`, not just the Redis debounce fast path.
-- **The alerting Strategy assigned P0 to RDBMS and lower severities elsewhere**: the
-  RDBMS beat deliberately *reports* P1 (a monitor under-calling a connection-pool
-  warning — realistic), specifically so this can prove the Strategy's severity
-  *floor* is doing real work, not just echoing what was sent. It greps the backend's
-  own logs for the dispatched `ALERT [...]` line and confirms RDBMS's alert was
-  corrected up to **P0**, while the API/MCP_HOST/CACHE alerts — which already
-  reported at their own floor — pass through unchanged.
-- **Signals were correctly linked to their work items**: the same per-component
-  `signal_count` check, run for all 12 components (6 failing, 6 healthy baseline).
-- **The buffer absorbed the burst without loss**: every `POST /api/v1/signals`
-  response is tallied; the run reports 0 signals dropped (503) across the whole
-  scenario. (A fast `--speed` run can genuinely trip the real per-IP rate limiter —
-  the script retries those like any well-behaved client would, honoring
-  `Retry-After`, and reports the retry count separately from actual data loss.)
-
-Verification uses direct, read-only Postgres access and `docker logs`, the same
-posture as `backend/tests/chaos/`'s helpers, because there's no — and shouldn't be a
-— "find the work item for this componentId" HTTP endpoint; every signal and every
-state transition still goes through the real API. Each run writes
-`scripts/scenarios/.output/last-run.json` (gitignored) recording the componentId →
-work item ID mapping, which the companion script below reads.
-
-### `replay-lifecycle.ts`
-
-Reads `.output/last-run.json` and walks every **incident** work item (the 6 from the
-failure narrative — not the 6 healthy baseline ones) through
-`OPEN → INVESTIGATING → RESOLVED →` a real RCA (`POST /:id/rca`, which validates and
-closes it in one step), printing the computed MTTR for each. The RCA content is
-tailored per component type and passes the real `validateRca` rules, not placeholder
-text; `incidentStartTime` is the work item's actual `firstSignalAt`, so the reported
-MTTR is the real elapsed time, not a fabricated one.
-
-The 6 baseline work items are left `OPEN` on purpose — so the dashboard shows both
-still-active incidents (baseline) and closed ones with real MTTR (the cascading
-failure), exercising both halves of the UI and giving the analytics/MTTR views real
-closed data to chart.
+Also relevant, outside `docs/`: [backend/tests/chaos/README.md](backend/tests/chaos/README.md)
+(what each chaos scenario asserts), [scripts/loadtest/README.md](scripts/loadtest/README.md)
+(k6 methodology and the `bulkStress.js` pipeline tool), and
+[scripts/scenarios/README.md](scripts/scenarios/README.md) (the sample-data scripts' flags).

@@ -4,7 +4,11 @@ Everything needed to answer "is this healthy," "is this ready for traffic,"
 "what's it doing right now," and "what happened to this one signal" —
 without ever blocking a request on a live dependency call. Implementation:
 `src/utils/healthProbe.ts`, `src/services/observability/`,
-`src/api/routes/{health,ready,metrics}.ts`, `src/utils/metrics.ts`.
+`src/api/routes/{health,ready,metrics}.ts`, `src/utils/metrics.ts`. See
+[backpressure.md](backpressure.md#observability--nothing-dropped-silently)
+for how the buffer's own drop counters feed into the metrics catalog below,
+and [performance.md](performance.md) for these metrics used as the actual
+measurement instruments during load testing.
 
 ## Endpoints
 
