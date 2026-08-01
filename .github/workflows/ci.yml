@@ -88,10 +88,6 @@ jobs:
     name: Integration, E2E & load-test regression gate
     needs: [lint-and-typecheck, unit-tests]
     runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: postgresql://ims_user:ims_password@localhost:5432/ims
-      MONGODB_URI: mongodb://localhost:27017/ims
-      REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -131,12 +127,34 @@ jobs:
       # `migrate deploy` (not `migrate dev`, which is interactive and
       # dev-only) is the CI/production-safe way to apply committed
       # migrations non-interactively.
+      #
+      # DATABASE_URL is set here, step-scoped, deliberately — NOT as a
+      # job-level `env:`. This job's own Postgres/Mongo/Redis are reached
+      # by two different callers at two different addresses: this runner's
+      # shell (via the ports Compose publishes to the host, so
+      # `localhost`) and the dockerized `backend` container (over the
+      # `ims-network` bridge, so the service names `postgres`/`mongo`/
+      # `redis` — see docker-compose.yml's `${DATABASE_URL:-...}`
+      # defaults). A job-level env var of the same name would also be
+      # visible to the earlier `docker compose up` step, and Compose's
+      # substitution prefers an already-set shell variable over its own
+      # default — silently overwriting the container's correct in-network
+      # URL with this runner's `localhost` one, which resolves to nothing
+      # inside the container's own network namespace. (This is exactly
+      # what broke here before: the backend container could never reach
+      # any dependency, so /health never turned "healthy" and the wait
+      # step above timed out at its full 2 minutes, every run.)
       - name: Apply Postgres migrations
         working-directory: backend
+        env:
+          DATABASE_URL: postgresql://ims_user:ims_password@localhost:5432/ims
         run: npx prisma migrate deploy
 
       # In-process app instance against the real Postgres/Mongo/Redis —
-      # does not touch the docker `backend` container at all.
+      # does not touch the docker `backend` container at all. No env
+      # block needed: DATABASE_URL/MONGODB_URI/REDIS_URL here (unset)
+      # falls through to backend/tests/integration/testEnv.ts's own
+      # localhost defaults, same address these steps need.
       - name: Integration tests
         working-directory: backend
         run: npm run test:integration
@@ -214,10 +232,6 @@ jobs:
     if: github.event_name == 'workflow_dispatch'
     needs: [lint-and-typecheck, unit-tests]
     runs-on: ubuntu-latest
-    env:
-      DATABASE_URL: postgresql://ims_user:ims_password@localhost:5432/ims
-      MONGODB_URI: mongodb://localhost:27017/ims
-      REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -246,8 +260,16 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      # Step-scoped DATABASE_URL, not job-level — see the same step's
+      # comment in the integration-e2e-loadtest job above for why: a
+      # job-level var of this name would also reach the `docker compose
+      # up` step above and override the backend container's own in-network
+      # URL with this runner's localhost one, which is unreachable from
+      # inside the container.
       - name: Apply Postgres migrations
         working-directory: backend
+        env:
+          DATABASE_URL: postgresql://ims_user:ims_password@localhost:5432/ims
         run: npx prisma migrate deploy
 
       - name: Chaos / resilience tests
