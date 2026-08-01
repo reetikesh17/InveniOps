@@ -17,13 +17,23 @@ import type { TimeRange } from "./useTimeRange";
 
 type PivotRow = Record<string, number | string> & { bucket: string };
 
-function GroupByToggle({ value, onChange }: { value: AnalyticsGroupBy; onChange: (v: AnalyticsGroupBy) => void }): JSX.Element {
+function GroupByToggle({
+  value,
+  onChange,
+}: {
+  value: AnalyticsGroupBy;
+  onChange: (v: AnalyticsGroupBy) => void;
+}): JSX.Element {
   const options: { key: AnalyticsGroupBy; label: string }[] = [
     { key: "componentType", label: "Component type" },
     { key: "severity", label: "Severity" },
   ];
   return (
-    <div className="inline-flex overflow-hidden rounded-md border border-border-strong" role="group" aria-label="Group by">
+    <div
+      className="inline-flex overflow-hidden rounded-md border border-border-strong"
+      role="group"
+      aria-label="Group by"
+    >
       {options.map((option, index) => {
         const isSelected = option.key === value;
         return (
@@ -33,7 +43,9 @@ function GroupByToggle({ value, onChange }: { value: AnalyticsGroupBy; onChange:
             aria-pressed={isSelected}
             onClick={() => onChange(option.key)}
             className={`px-2.5 py-1 text-xs font-medium ${index > 0 ? "border-l border-border-strong" : ""} ${
-              isSelected ? "bg-ink text-surface-muted" : "bg-surface text-ink-muted hover:bg-surface-raised"
+              isSelected
+                ? "bg-ink text-surface-muted"
+                : "bg-surface text-ink-muted hover:bg-surface-raised"
             } ${FOCUS_RING}`}
           >
             {option.label}
@@ -44,12 +56,22 @@ function GroupByToggle({ value, onChange }: { value: AnalyticsGroupBy; onChange:
   );
 }
 
-function SeriesLegend({ series, colorFor }: { series: readonly string[]; colorFor: (v: string) => string }): JSX.Element {
+function SeriesLegend({
+  series,
+  colorFor,
+}: {
+  series: readonly string[];
+  colorFor: (v: string) => string;
+}): JSX.Element {
   return (
     <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
       {series.map((value) => (
         <li key={value} className="flex items-center gap-1.5 text-xs text-ink-muted">
-          <span className="h-2.5 w-2.5 rounded-[2px]" style={{ backgroundColor: colorFor(value) }} aria-hidden="true" />
+          <span
+            className="h-2.5 w-2.5 rounded-[2px]"
+            style={{ backgroundColor: colorFor(value) }}
+            aria-hidden="true"
+          />
           {value}
         </li>
       ))}
@@ -70,7 +92,12 @@ export function IncidentVolumePanel({ range }: IncidentVolumePanelProps): JSX.El
       api.getIncidentCounts({ from: fromIso, to: toIso, interval: intervalSeconds, groupBy }, opts),
     [fromIso, toIso, intervalSeconds, groupBy],
   );
-  const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [fromIso, toIso, intervalSeconds, groupBy]);
+  const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [
+    fromIso,
+    toIso,
+    intervalSeconds,
+    groupBy,
+  ]);
 
   const c = useChartColors();
   const order = groupBy === "severity" ? SEVERITY_ORDER : COMPONENT_TYPE_ORDER;
@@ -87,7 +114,7 @@ export function IncidentVolumePanel({ range }: IncidentVolumePanelProps): JSX.El
     const present = new Set<string>();
     for (const point of data.points) {
       present.add(point.value);
-      const row = byBucket.get(point.bucket) ?? ({ bucket: point.bucket } as PivotRow);
+      const row = byBucket.get(point.bucket) ?? { bucket: point.bucket };
       row[point.value] = point.count;
       byBucket.set(point.bucket, row);
     }
@@ -119,11 +146,20 @@ export function IncidentVolumePanel({ range }: IncidentVolumePanelProps): JSX.El
               tick={{ fill: c.inkMuted, fontSize: 11 }}
               minTickGap={28}
             />
-            <YAxis stroke={c.axis} tick={{ fill: c.inkMuted, fontSize: 11 }} width={36} allowDecimals={false} />
+            <YAxis
+              stroke={c.axis}
+              tick={{ fill: c.inkMuted, fontSize: 11 }}
+              width={36}
+              allowDecimals={false}
+            />
             <Tooltip
               cursor={{ fill: "rgba(127,127,127,0.12)" }}
               content={
-                <ChartTooltipContent labelFormatter={(label) => formatBucketFull(String(label))} valueFormatter={(v) => `${v}`} hideZero />
+                <ChartTooltipContent
+                  labelFormatter={(label) => formatBucketFull(String(label))}
+                  valueFormatter={(v) => `${v}`}
+                  hideZero
+                />
               }
             />
             {activeSeries.map((value, index) => (

@@ -11,9 +11,14 @@ vi.mock("../../lib/api", async (importOriginal) => {
   return { ...actual, api: { ...actual.api, submitRca: vi.fn() } };
 });
 
-// eslint-disable-next-line import/first -- must come after vi.mock so the mocked module is what's imported
+// Must come after vi.mock so the mocked module is what's imported.
 import { api, ApiRequestError } from "../../lib/api";
 
+// vitest 1.x types `vi.mocked()` as `Mock<any, any>` regardless of the
+// wrapped function's real signature (fixed in vitest 2+) — the unbound
+// method and unsafe-assignment findings below are that typing gap, not a
+// real risk: `api.submitRca` is a mock function, it never reads `this`.
+// eslint-disable-next-line @typescript-eslint/unbound-method
 const submitRca = vi.mocked(api.submitRca);
 
 function renderForm(overrides: Partial<RcaFormProps> = {}): {
@@ -32,14 +37,21 @@ function renderForm(overrides: Partial<RcaFormProps> = {}): {
     onConflict,
     ...overrides,
   };
-  const router = createMemoryRouter([{ path: "/", element: <RcaForm {...props} /> }], { initialEntries: ["/"] });
+  const router = createMemoryRouter([{ path: "/", element: <RcaForm {...props} /> }], {
+    initialEntries: ["/"],
+  });
   render(<RouterProvider router={router} />);
+  // Same vitest 1.x `vi.fn()` typing gap as `submitRca` above.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
   return { onSubmitted, onConflict, incidentId: props.incidentId };
 }
 
 async function fillNarrativeFields(user: ReturnType<typeof userEvent.setup>): Promise<void> {
   await user.selectOptions(screen.getByLabelText("Root cause category"), "INFRASTRUCTURE_FAILURE");
-  await user.type(screen.getByLabelText("Root cause description"), "Detailed root cause explanation here.");
+  await user.type(
+    screen.getByLabelText("Root cause description"),
+    "Detailed root cause explanation here.",
+  );
   await user.type(screen.getByLabelText("Fix applied"), "Applied the corrective fix.");
   await user.type(screen.getByLabelText("Prevention steps"), "Added preventative monitoring.");
 }
@@ -66,8 +78,8 @@ describe("RcaForm", () => {
 
   it("prefills start and end times", () => {
     renderForm();
-    expect((screen.getByLabelText("Incident start time") as HTMLInputElement).value).not.toBe("");
-    expect((screen.getByLabelText("Incident end time") as HTMLInputElement).value).not.toBe("");
+    expect(screen.getByLabelText<HTMLInputElement>("Incident start time").value).not.toBe("");
+    expect(screen.getByLabelText<HTMLInputElement>("Incident end time").value).not.toBe("");
   });
 
   it("shows a live character counter that reflects progress toward the minimum", async () => {
@@ -120,7 +132,12 @@ describe("RcaForm", () => {
   it("routes a 409 conflict to onConflict rather than an inline error", async () => {
     const user = userEvent.setup();
     submitRca.mockRejectedValueOnce(
-      new ApiRequestError({ kind: "conflict", status: 409, message: "conflict", reason: "invalid_state" }),
+      new ApiRequestError({
+        kind: "conflict",
+        status: 409,
+        message: "conflict",
+        reason: "invalid_state",
+      }),
     );
     const { onConflict, onSubmitted } = renderForm();
 
@@ -146,7 +163,7 @@ describe("RcaForm", () => {
     expect(sessionStorage.getItem(`ims:rca-draft:${incidentId}`)).toBeNull();
   });
 
-  it("restores a previously saved draft on mount", async () => {
+  it("restores a previously saved draft on mount", () => {
     sessionStorage.setItem(
       "ims:rca-draft:wi-1",
       JSON.stringify({
@@ -160,16 +177,18 @@ describe("RcaForm", () => {
     );
     renderForm();
 
-    expect((screen.getByLabelText("Root cause description") as HTMLTextAreaElement).value).toBe(
+    expect(screen.getByLabelText<HTMLTextAreaElement>("Root cause description").value).toBe(
       "Recovered from a saved draft body.",
     );
-    expect((screen.getByLabelText("Root cause category") as HTMLSelectElement).value).toBe("NETWORK");
+    expect(screen.getByLabelText<HTMLSelectElement>("Root cause category").value).toBe("NETWORK");
   });
 
   it("disables the button while in flight and does not submit twice", async () => {
     const user = userEvent.setup();
     let resolveSubmit: (value: unknown) => void = () => {};
-    submitRca.mockImplementation(() => new Promise((resolve) => (resolveSubmit = resolve)) as never);
+    submitRca.mockImplementation(
+      () => new Promise((resolve) => (resolveSubmit = resolve)) as never,
+    );
     renderForm();
 
     await fillNarrativeFields(user);

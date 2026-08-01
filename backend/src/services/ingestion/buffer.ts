@@ -26,19 +26,23 @@ export interface IngestionSignal {
 }
 
 /**
- * Where drained batches go. The only implementation today is
- * noopSignalSink — see its comment for why a real one isn't wired up yet.
+ * Where drained batches go. The real implementation is BullMqSignalSink
+ * (src/workers/bullMqSink.ts), a BullMQ producer that enqueues each batch
+ * for async processing (Mongo persistence + the debouncer). The buffer is
+ * written against this interface so the sink is swappable — see
+ * noopSignalSink below for why construction and wiring happen separately.
  */
 export interface SignalSink {
   drain(batch: readonly IngestionSignal[]): Promise<void>;
 }
 
-// TODO(next prompt): replace with a real sink — a BullMQ producer that
-// enqueues each batch for async processing (Mongo persistence + the
-// debouncer). Not implemented here: BullMQ isn't a project dependency yet,
-// and standing up a queue is its own scoped piece of work, not something to
-// fold into the buffer itself. The buffer is written against this
-// interface so swapping the sink later touches nothing else.
+// A safe placeholder, not a stub awaiting implementation: the buffer's
+// singleton (signalBufferInstance.ts) is constructed eagerly at module
+// load, before a live Redis connection exists to build the real
+// BullMqSignalSink against. This sink is used only in that narrow window —
+// index.ts swaps in the real one via SignalBuffer.setSink() during
+// bootstrap, before start() — so a signal can never actually reach it in a
+// running process.
 export const noopSignalSink: SignalSink = {
   drain(batch: readonly IngestionSignal[]): Promise<void> {
     void batch;
@@ -63,7 +67,9 @@ export interface BufferStats {
   readonly droppedBySeverity: Readonly<Record<Severity, number>>;
   readonly droppedByReason: Readonly<Record<DropReason, number>>;
   /** Cross-tabulated (severity, reason) — never reset, same cumulative posture as droppedBySeverity/droppedByReason. Feeds GET /metrics's per-severity shed-vs-dropped breakdown. */
-  readonly droppedBySeverityAndReason: Readonly<Record<Severity, Readonly<Record<DropReason, number>>>>;
+  readonly droppedBySeverityAndReason: Readonly<
+    Record<Severity, Readonly<Record<DropReason, number>>>
+  >;
 }
 
 export interface DrainAllResult {
@@ -251,7 +257,9 @@ export class SignalBuffer {
    * unreachable (see docs/backpressure.md).
    */
   private evictToMakeRoomForP0(): void {
-    const victimSeverity = [...PRIORITY_ORDER].reverse().find((severity) => this.queues[severity].size > 0);
+    const victimSeverity = [...PRIORITY_ORDER]
+      .reverse()
+      .find((severity) => this.queues[severity].size > 0);
     if (victimSeverity === undefined) {
       return;
     }
@@ -302,7 +310,9 @@ export class SignalBuffer {
    * re-queuing it — see docs/backpressure.md for why re-queuing is
    * deliberately out of scope here.
    */
-  async drainToSink(maxItems: number = this.options.drainBatchSize): Promise<{ drained: number; failed: number }> {
+  async drainToSink(
+    maxItems: number = this.options.drainBatchSize,
+  ): Promise<{ drained: number; failed: number }> {
     const batch = this.popPriorityBatch(maxItems);
     if (batch.length === 0) {
       return { drained: 0, failed: 0 };

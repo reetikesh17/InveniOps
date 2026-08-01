@@ -1,6 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button, Card, EmptyState, ErrorState, IncidentDetailSkeleton, Input, useToast } from "../../components";
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  IncidentDetailSkeleton,
+  Input,
+  useToast,
+} from "../../components";
 import { XCircleIcon } from "../../components/icons";
 import { friendlyErrorMessage } from "../../lib/errorMessages";
 import { useDelayedFlag } from "../../hooks/useDelayedFlag";
@@ -62,7 +70,7 @@ export function IncidentDetailPage(): JSX.Element | null {
         headline="Incident not found"
         body="It may have been removed, or the link might be wrong."
         action={
-          <Button variant="secondary" onClick={() => navigate("/")}>
+          <Button variant="secondary" onClick={() => void navigate("/")}>
             Back to Live Feed
           </Button>
         }
@@ -75,7 +83,12 @@ export function IncidentDetailPage(): JSX.Element | null {
   }
 
   if (error && !detail) {
-    return <ErrorState message={friendlyErrorMessage(error, "this incident")} onRetry={() => void handleRefresh()} />;
+    return (
+      <ErrorState
+        message={friendlyErrorMessage(error, "this incident")}
+        onRetry={() => void handleRefresh()}
+      />
+    );
   }
 
   if (!detail) {

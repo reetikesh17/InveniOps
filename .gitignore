@@ -5,3 +5,14 @@ dist/
 !.env.example
 coverage/
 scripts/scenarios/.output/
+*.tsbuildinfo
+
+# Local AI-tooling state — not project content
+.claude/
+.agents/
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

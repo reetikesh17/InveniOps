@@ -20,7 +20,7 @@ export function loadDraft(incidentId: string): Partial<RcaFormValues> | null {
     if (typeof parsed !== "object" || parsed === null) {
       return null;
     }
-    return parsed as Partial<RcaFormValues>;
+    return parsed;
   } catch {
     // Corrupt JSON or storage unavailable (private mode/quota) — treat as no draft.
     return null;

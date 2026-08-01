@@ -7,8 +7,15 @@
 // but accept any string" — a bare `string` in the union would collapse the
 // literals and lose the autocomplete entirely. Not the "empty object"
 // footgun the ban-types rule normally warns about.
-// eslint-disable-next-line @typescript-eslint/ban-types
-export type ComponentType = "API" | "MCP_HOST" | "CACHE" | "QUEUE" | "RDBMS" | "NOSQL" | (string & {});
+export type ComponentType =
+  | "API"
+  | "MCP_HOST"
+  | "CACHE"
+  | "QUEUE"
+  | "RDBMS"
+  | "NOSQL"
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  | (string & {});
 
 export type Severity = "P0" | "P1" | "P2" | "P3";
 

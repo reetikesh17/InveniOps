@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { API_BASE_URL, api, ApiRequestError, type ApiErrorInfo } from "../lib/api";
 import type { WorkItem } from "../types";
 
@@ -45,7 +54,11 @@ function toErrorInfo(error: unknown): ApiErrorInfo {
   if (error instanceof ApiRequestError) {
     return error.info;
   }
-  return { kind: "unknown", status: 0, message: error instanceof Error ? error.message : "unexpected error" };
+  return {
+    kind: "unknown",
+    status: 0,
+    message: error instanceof Error ? error.message : "unexpected error",
+  };
 }
 
 /**
@@ -92,7 +105,11 @@ export function IncidentsProvider({ children }: { children: ReactNode }): JSX.El
       setData(page.items);
       setError(null);
     } catch (err) {
-      if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError") || !mountedRef.current) {
+      if (
+        controller.signal.aborted ||
+        (err instanceof DOMException && err.name === "AbortError") ||
+        !mountedRef.current
+      ) {
         return;
       }
       setError(toErrorInfo(err));
@@ -160,7 +177,8 @@ export function IncidentsProvider({ children }: { children: ReactNode }): JSX.El
       setConnectionStatus("connecting");
       reconnectTimerRef.current = setTimeout(connectSse, backoffDelayMs(retryCountRef.current));
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- connectSse intentionally references itself for reconnect scheduling
+    // connectSse intentionally references itself (by name, for the
+    // reconnect's setTimeout) rather than through the dependency array.
   }, [scheduleRefetch, startPolling, stopPolling]);
 
   useEffect(() => {
