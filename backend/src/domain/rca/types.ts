@@ -41,8 +41,7 @@ export interface RcaFieldError {
 }
 
 export type RcaValidationResult =
-  | { readonly valid: true }
-  | { readonly valid: false; readonly errors: readonly RcaFieldError[] };
+  { readonly valid: true } | { readonly valid: false; readonly errors: readonly RcaFieldError[] };
 
 export interface RcaValidationContext {
   readonly firstSignalAt: Date;

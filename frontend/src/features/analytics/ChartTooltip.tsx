@@ -36,7 +36,9 @@ export function ChartTooltipContent({
     return null;
   }
 
-  const rows = payload.filter((entry) => !hideZero || (entry.value !== undefined && entry.value !== 0));
+  const rows = payload.filter(
+    (entry) => !hideZero || (entry.value !== undefined && entry.value !== 0),
+  );
   if (rows.length === 0) {
     return null;
   }
@@ -53,7 +55,11 @@ export function ChartTooltipContent({
           const rawName = String(entry.name ?? entry.dataKey ?? "");
           return (
             <li key={`${rawName}-${index}`} className="flex items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-[2px]" style={{ backgroundColor: entry.color }} aria-hidden="true" />
+              <span
+                className="h-2 w-2 shrink-0 rounded-[2px]"
+                style={{ backgroundColor: entry.color }}
+                aria-hidden="true"
+              />
               <span className="text-ink-muted">{nameFor ? nameFor(rawName) : rawName}</span>
               <span className="ml-auto font-mono text-mono-num font-medium tabular-nums text-ink">
                 {entry.value === undefined ? "—" : valueFormatter(entry.value)}

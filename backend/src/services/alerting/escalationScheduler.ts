@@ -1,6 +1,10 @@
 import type { Logger } from "pino";
 import type { WorkItem } from "@prisma/client";
-import { getEscalationPolicy, reconcileSeverity, type AlertStrategyRegistry } from "../../domain/alerting/index.js";
+import {
+  getEscalationPolicy,
+  reconcileSeverity,
+  type AlertStrategyRegistry,
+} from "../../domain/alerting/index.js";
 import type { AlertDispatcher } from "./dispatcher.js";
 
 export interface EscalationWorkItemStore {
@@ -56,7 +60,9 @@ export class EscalationScheduler {
 
   async tick(): Promise<void> {
     const now = new Date();
-    const candidates = await this.workItemStore.findOpenWorkItemsOlderThan(this.widestPossibleCutoff(now));
+    const candidates = await this.workItemStore.findOpenWorkItemsOlderThan(
+      this.widestPossibleCutoff(now),
+    );
     await Promise.all(candidates.map((workItem) => this.maybeEscalate(workItem, now)));
   }
 

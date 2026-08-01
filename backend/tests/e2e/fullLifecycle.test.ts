@@ -9,7 +9,10 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import type { Db } from "mongodb";
 import type { Redis } from "ioredis";
-import { createDefaultAlertStrategyRegistry, reconcileSeverity } from "../../src/domain/alerting/index.js";
+import {
+  createDefaultAlertStrategyRegistry,
+  reconcileSeverity,
+} from "../../src/domain/alerting/index.js";
 import {
   postSignals,
   getHealth,
@@ -49,7 +52,12 @@ interface ComponentSpec {
 const COMPONENTS: readonly ComponentSpec[] = [
   { key: "rdbms", componentId: `${RUN_TAG}-RDBMS`, componentType: "RDBMS", reportedSeverity: "P0" },
   { key: "api", componentId: `${RUN_TAG}-API`, componentType: "API", reportedSeverity: "P2" },
-  { key: "mcpHost", componentId: `${RUN_TAG}-MCP_HOST`, componentType: "MCP_HOST", reportedSeverity: "P0" },
+  {
+    key: "mcpHost",
+    componentId: `${RUN_TAG}-MCP_HOST`,
+    componentType: "MCP_HOST",
+    reportedSeverity: "P0",
+  },
   { key: "cache", componentId: `${RUN_TAG}-CACHE`, componentType: "CACHE", reportedSeverity: "P2" },
   { key: "nosql", componentId: `${RUN_TAG}-NOSQL`, componentType: "NOSQL", reportedSeverity: "P1" },
 ];
@@ -97,7 +105,9 @@ describe("E2E: full incident lifecycle", () => {
 
     const preflight = await getHealth();
     if (preflight.body.status !== "healthy") {
-      throw new Error(`backend not healthy before the test even started: ${JSON.stringify(preflight.body)}`);
+      throw new Error(
+        `backend not healthy before the test even started: ${JSON.stringify(preflight.body)}`,
+      );
     }
     dlqSizeBefore = preflight.body.queue.dlqSize;
     ingestStartedAtIso = new Date().toISOString();
@@ -119,7 +129,9 @@ describe("E2E: full incident lifecycle", () => {
         totals.accepted += result.accepted;
         totals.dropped += result.dropped;
         totals.rateLimitRetries += result.rateLimitRetries;
-        expect(result.status, `unexpected status posting a batch for ${spec.componentId}`).toBe(202);
+        expect(result.status, `unexpected status posting a batch for ${spec.componentId}`).toBe(
+          202,
+        );
       }
     }
 
@@ -129,7 +141,11 @@ describe("E2E: full incident lifecycle", () => {
       const workItem = await waitForValue(
         () => prisma.workItem.findFirst({ where: { componentId: spec.componentId } }),
         (item) => item !== null && item.signalCount >= SIGNALS_PER_COMPONENT,
-        { timeoutMs: 60_000, intervalMs: 1_000, description: `${spec.componentId}'s work item to reach signalCount ${SIGNALS_PER_COMPONENT}` },
+        {
+          timeoutMs: 60_000,
+          intervalMs: 1_000,
+          description: `${spec.componentId}'s work item to reach signalCount ${SIGNALS_PER_COMPONENT}`,
+        },
       );
       workItemIdByKey.set(spec.key, workItem!.id);
     }
@@ -140,7 +156,9 @@ describe("E2E: full incident lifecycle", () => {
     await prisma.stateTransition.deleteMany({ where: { workItemId: { in: workItemIds } } });
     await prisma.rcaRecord.deleteMany({ where: { workItemId: { in: workItemIds } } });
     await prisma.workItem.deleteMany({ where: { id: { in: workItemIds } } });
-    await mongoDb.collection("signals").deleteMany({ componentId: { $in: COMPONENTS.map((c) => c.componentId) } });
+    await mongoDb
+      .collection("signals")
+      .deleteMany({ componentId: { $in: COMPONENTS.map((c) => c.componentId) } });
     for (const id of workItemIds) {
       await redis.del(`dashboard:incident:${id}`);
       await redis.zrem("dashboard:active_incidents", id);
@@ -169,12 +187,16 @@ describe("E2E: full incident lifecycle", () => {
   it("persists every signal to Mongo, linked to the correct work item", async () => {
     for (const spec of COMPONENTS) {
       const workItemId = workItemIdByKey.get(spec.key)!;
-      const docs = await mongoDb.collection<SignalDocument>("signals").find({ componentId: spec.componentId }).toArray();
+      const docs = await mongoDb
+        .collection<SignalDocument>("signals")
+        .find({ componentId: spec.componentId })
+        .toArray();
       expect(docs, `${spec.componentId} signal count in Mongo`).toHaveLength(SIGNALS_PER_COMPONENT);
       const distinctWorkItemIds = new Set(docs.map((d) => d.workItemId));
-      expect(distinctWorkItemIds, `${spec.componentId}'s signals must all link to its one work item`).toEqual(
-        new Set([workItemId]),
-      );
+      expect(
+        distinctWorkItemIds,
+        `${spec.componentId}'s signals must all link to its one work item`,
+      ).toEqual(new Set([workItemId]));
     }
   });
 
@@ -193,9 +215,15 @@ describe("E2E: full incident lifecycle", () => {
       const alerts = await waitForValue(
         () => findAlertLogsSince(BACKEND_CONTAINER_NAME, ingestStartedAtIso, spec.componentId),
         (lines) => lines.length > 0,
-        { timeoutMs: 20_000, intervalMs: 1_000, description: `an ALERT log line for ${spec.componentId}` },
+        {
+          timeoutMs: 20_000,
+          intervalMs: 1_000,
+          description: `an ALERT log line for ${spec.componentId}`,
+        },
       );
-      expect(alerts[0]!.severity, `${spec.componentId} dispatched alert severity`).toBe(expectedAlert);
+      expect(alerts[0]!.severity, `${spec.componentId} dispatched alert severity`).toBe(
+        expectedAlert,
+      );
 
       // The persisted WorkItem row is a different, deliberately separate
       // fact: it stores whatever the triggering signal itself reported,
@@ -206,16 +234,25 @@ describe("E2E: full incident lifecycle", () => {
       // documents that distinction instead of silently assuming they're
       // the same thing.
       const workItem = await prisma.workItem.findUniqueOrThrow({ where: { id: workItemId } });
-      expect(workItem.severity, `${spec.componentId} persisted work item severity`).toBe(spec.reportedSeverity);
+      expect(workItem.severity, `${spec.componentId} persisted work item severity`).toBe(
+        spec.reportedSeverity,
+      );
     }
   });
 
   // --- 5: alerts dispatched once per work item, not once per signal ---
   it("dispatches exactly one alert per work item, not once per signal", async () => {
     for (const spec of COMPONENTS) {
-      const alerts = await findAlertLogsSince(BACKEND_CONTAINER_NAME, ingestStartedAtIso, spec.componentId);
+      const alerts = await findAlertLogsSince(
+        BACKEND_CONTAINER_NAME,
+        ingestStartedAtIso,
+        spec.componentId,
+      );
       const createdAlerts = alerts.filter((a) => a.msg.includes("New incident opened:"));
-      expect(createdAlerts, `${spec.componentId} received ${SIGNALS_PER_COMPONENT} signals but must fire exactly one "created" alert`).toHaveLength(1);
+      expect(
+        createdAlerts,
+        `${spec.componentId} received ${SIGNALS_PER_COMPONENT} signals but must fire exactly one "created" alert`,
+      ).toHaveLength(1);
     }
   });
 
@@ -225,11 +262,19 @@ describe("E2E: full incident lifecycle", () => {
       const workItemId = workItemIdByKey.get(spec.key)!;
 
       const score = await redis.zscore("dashboard:active_incidents", workItemId);
-      expect(score, `${spec.componentId}'s work item should be in the active-incidents cache`).not.toBeNull();
+      expect(
+        score,
+        `${spec.componentId}'s work item should be in the active-incidents cache`,
+      ).not.toBeNull();
 
       const cachedRaw = await redis.get(`dashboard:incident:${workItemId}`);
       expect(cachedRaw, `${spec.componentId}'s cached incident summary`).not.toBeNull();
-      const cached = JSON.parse(cachedRaw!) as { severity: string; state: string; componentId: string; signalCount: number };
+      const cached = JSON.parse(cachedRaw!) as {
+        severity: string;
+        state: string;
+        componentId: string;
+        signalCount: number;
+      };
 
       const truth = await prisma.workItem.findUniqueOrThrow({ where: { id: workItemId } });
       expect(cached.componentId).toBe(truth.componentId);
@@ -255,7 +300,9 @@ describe("E2E: full incident lifecycle", () => {
     expect(toResolved.status).toBe(200);
     expect(toResolved.body["state"]).toBe("RESOLVED");
 
-    incidentStartTime = new Date(new Date(toResolved.body["firstSignalAt"] as string).getTime() + 10).toISOString();
+    incidentStartTime = new Date(
+      new Date(toResolved.body["firstSignalAt"] as string).getTime() + 10,
+    ).toISOString();
   });
 
   it("rejects CLOSED without an RCA and leaves state unchanged", async () => {
@@ -359,6 +406,8 @@ describe("E2E: full incident lifecycle", () => {
     // Diff, not a bare === 0: a shared dev stack can carry residue from
     // unrelated earlier activity, but THIS run must never add to it —
     // that's the actual property "the DLQ is empty" is standing in for.
-    expect(after.body.queue.dlqSize, "DLQ size must not have grown during this run").toBe(dlqSizeBefore);
+    expect(after.body.queue.dlqSize, "DLQ size must not have grown during this run").toBe(
+      dlqSizeBefore,
+    );
   });
 });

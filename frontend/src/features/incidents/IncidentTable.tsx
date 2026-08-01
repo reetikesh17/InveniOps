@@ -41,7 +41,9 @@ export function IncidentTable({ incidents }: IncidentTableProps): JSX.Element {
     }
 
     const previouslySeen = seenIdsRef.current;
-    const arrived = incidents.map((incident) => incident.id).filter((id) => !previouslySeen.has(id));
+    const arrived = incidents
+      .map((incident) => incident.id)
+      .filter((id) => !previouslySeen.has(id));
     seenIdsRef.current = currentIds;
 
     if (arrived.length === 0) {
@@ -63,10 +65,17 @@ export function IncidentTable({ incidents }: IncidentTableProps): JSX.Element {
   }, [incidents]);
 
   return (
-    <div role="table" aria-label="Active incidents" className="overflow-hidden rounded-md border border-border bg-surface">
+    <div
+      role="table"
+      aria-label="Active incidents"
+      className="overflow-hidden rounded-md border border-border bg-surface"
+    >
       {/* Column header aligns to the row grid; the leading 3px + 14px gutter
           matches the row's rail + SEV cell. */}
-      <div role="row" className="hidden items-center gap-3 border-b border-border bg-surface-raised pl-[15px] pr-2.5 py-1.5 sm:flex">
+      <div
+        role="row"
+        className="hidden items-center gap-3 border-b border-border bg-surface-raised pl-[15px] pr-2.5 py-1.5 sm:flex"
+      >
         <HeaderCell className="w-14">Sev</HeaderCell>
         <HeaderCell className="w-48 shrink-0">Component</HeaderCell>
         <HeaderCell className="flex-1">Title</HeaderCell>

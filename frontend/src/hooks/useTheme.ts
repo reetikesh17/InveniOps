@@ -14,7 +14,9 @@ function initialTheme(): Theme {
     // ignore
   }
   // Dark is the on-call default; fall to light only if the OS asks for it.
-  return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  return typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: light)").matches
+    ? "light"
+    : "dark";
 }
 
 /**

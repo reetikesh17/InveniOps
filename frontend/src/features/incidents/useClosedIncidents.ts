@@ -14,7 +14,11 @@ function toErrorInfo(error: unknown): ApiErrorInfo {
   if (error instanceof ApiRequestError) {
     return error.info;
   }
-  return { kind: "unknown", status: 0, message: error instanceof Error ? error.message : "unexpected error" };
+  return {
+    kind: "unknown",
+    status: 0,
+    message: error instanceof Error ? error.message : "unexpected error",
+  };
 }
 
 /**
@@ -37,7 +41,10 @@ export function useClosedIncidents(page: number, pageSize: number): UseClosedInc
     setLoading(true);
     setError(null);
     api
-      .listClosedIncidents({ limit: pageSize, offset: (page - 1) * pageSize }, { signal: controller.signal })
+      .listClosedIncidents(
+        { limit: pageSize, offset: (page - 1) * pageSize },
+        { signal: controller.signal },
+      )
       .then((result) => {
         if (controller.signal.aborted) {
           return;
@@ -47,7 +54,10 @@ export function useClosedIncidents(page: number, pageSize: number): UseClosedInc
         setLoading(false);
       })
       .catch((err: unknown) => {
-        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+        if (
+          controller.signal.aborted ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
           return;
         }
         setError(toErrorInfo(err));

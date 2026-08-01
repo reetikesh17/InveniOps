@@ -1,5 +1,11 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { PrismaClient, WorkItemStatus, Severity, ComponentType, RootCauseCategory } from "@prisma/client";
+import {
+  PrismaClient,
+  WorkItemStatus,
+  Severity,
+  ComponentType,
+  RootCauseCategory,
+} from "@prisma/client";
 import {
   PostgresWorkItemRepository,
   OptimisticConcurrencyError,
@@ -139,13 +145,25 @@ describe("PostgresWorkItemRepository", () => {
   describe("listActive", () => {
     it("sorts by severity then firstSignalAt, and paginates", async () => {
       const p0Old = await repo.createWorkItem(
-        baseWorkItemInput({ componentId: "A", severity: Severity.P0, firstSignalAt: new Date("2026-01-01T00:00:00.000Z") }),
+        baseWorkItemInput({
+          componentId: "A",
+          severity: Severity.P0,
+          firstSignalAt: new Date("2026-01-01T00:00:00.000Z"),
+        }),
       );
       const p0New = await repo.createWorkItem(
-        baseWorkItemInput({ componentId: "B", severity: Severity.P0, firstSignalAt: new Date("2026-01-02T00:00:00.000Z") }),
+        baseWorkItemInput({
+          componentId: "B",
+          severity: Severity.P0,
+          firstSignalAt: new Date("2026-01-02T00:00:00.000Z"),
+        }),
       );
       const p2 = await repo.createWorkItem(
-        baseWorkItemInput({ componentId: "C", severity: Severity.P2, firstSignalAt: new Date("2026-01-01T00:00:00.000Z") }),
+        baseWorkItemInput({
+          componentId: "C",
+          severity: Severity.P2,
+          firstSignalAt: new Date("2026-01-01T00:00:00.000Z"),
+        }),
       );
 
       const page1 = await repo.listActive({ limit: 2, offset: 0 });
@@ -169,7 +187,9 @@ describe("PostgresWorkItemRepository", () => {
 
       expect(updated.state).toBe(WorkItemStatus.INVESTIGATING);
 
-      const transitions = await prisma.stateTransition.findMany({ where: { workItemId: workItem.id } });
+      const transitions = await prisma.stateTransition.findMany({
+        where: { workItemId: workItem.id },
+      });
       expect(transitions).toHaveLength(1);
       expect(transitions[0]).toMatchObject({
         fromState: WorkItemStatus.OPEN,
@@ -193,7 +213,9 @@ describe("PostgresWorkItemRepository", () => {
       const reloaded = await prisma.workItem.findUniqueOrThrow({ where: { id: workItem.id } });
       expect(reloaded.state).toBe(WorkItemStatus.OPEN);
 
-      const transitions = await prisma.stateTransition.findMany({ where: { workItemId: workItem.id } });
+      const transitions = await prisma.stateTransition.findMany({
+        where: { workItemId: workItem.id },
+      });
       expect(transitions).toHaveLength(0);
     });
 
@@ -222,7 +244,9 @@ describe("PostgresWorkItemRepository", () => {
 
       expect(fulfilled).toHaveLength(1);
       expect(rejected).toHaveLength(1);
-      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(OptimisticConcurrencyError);
+      expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+        OptimisticConcurrencyError,
+      );
 
       const reloaded = await prisma.workItem.findUniqueOrThrow({ where: { id: workItem.id } });
       expect(reloaded.state).toBe(WorkItemStatus.CLOSED);
@@ -263,7 +287,12 @@ describe("PostgresWorkItemRepository", () => {
       const workItem = await repo.createWorkItem(baseWorkItemInput()); // still OPEN
 
       await expect(
-        repo.submitRca({ workItemId: workItem.id, actor: "alice", rca: validRcaInput(), mttrSeconds: 100 }),
+        repo.submitRca({
+          workItemId: workItem.id,
+          actor: "alice",
+          rca: validRcaInput(),
+          mttrSeconds: 100,
+        }),
       ).rejects.toThrow(OptimisticConcurrencyError);
     });
 
@@ -286,7 +315,12 @@ describe("PostgresWorkItemRepository", () => {
       });
 
       await expect(
-        repo.submitRca({ workItemId: workItem.id, actor: "alice", rca: validRcaInput(), mttrSeconds: 999 }),
+        repo.submitRca({
+          workItemId: workItem.id,
+          actor: "alice",
+          rca: validRcaInput(),
+          mttrSeconds: 999,
+        }),
       ).rejects.toThrow();
 
       const reloaded = await prisma.workItem.findUniqueOrThrow({ where: { id: workItem.id } });

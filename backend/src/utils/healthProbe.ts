@@ -75,9 +75,15 @@ export class CachedProbe<T> {
 
   private async tick(): Promise<void> {
     try {
-      this.snapshot = await Promise.race([this.fetch(), timeoutRejection(this.options.label, this.options.timeoutMs)]);
+      this.snapshot = await Promise.race([
+        this.fetch(),
+        timeoutRejection(this.options.label, this.options.timeoutMs),
+      ]);
     } catch (error) {
-      this.options.logger?.error({ error, probe: this.options.label }, "cached probe tick failed — serving last known snapshot");
+      this.options.logger?.error(
+        { error, probe: this.options.label },
+        "cached probe tick failed — serving last known snapshot",
+      );
     }
   }
 }

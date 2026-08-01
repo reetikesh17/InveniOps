@@ -18,13 +18,17 @@ function fakeMetricsStore(overrides: Partial<MetricsQueryStore> = {}): MetricsQu
     queryThroughput: (): Promise<ThroughputBucket[]> => Promise.resolve([]),
     queryIncidentCounts: (): Promise<GroupedCountBucket[]> => Promise.resolve([]),
     queryMttrTrend: (): Promise<MttrTrendBucket[]> => Promise.resolve([]),
-    queryComponentHealth: (): Promise<ComponentHealthAggregate> => Promise.resolve({ recentSignalCount: 0, avgMttrMs: null }),
+    queryComponentHealth: (): Promise<ComponentHealthAggregate> =>
+      Promise.resolve({ recentSignalCount: 0, avgMttrMs: null }),
     ...overrides,
   };
 }
 
 function fakeWorkItemStore(counts: Readonly<Record<string, number>> = {}): ComponentWorkItemStore {
-  return { countByComponentIdGroupedByState: (): Promise<Readonly<Record<string, number>>> => Promise.resolve(counts) };
+  return {
+    countByComponentIdGroupedByState: (): Promise<Readonly<Record<string, number>>> =>
+      Promise.resolve(counts),
+  };
 }
 
 const FROM = new Date("2026-01-01T00:00:00.000Z");
@@ -36,7 +40,14 @@ describe("AnalyticsQueryService", () => {
     const store = fakeMetricsStore({
       queryThroughput: (from, to, interval): Promise<ThroughputBucket[]> => {
         receivedInterval = interval;
-        return Promise.resolve([{ bucket: new Date("2026-01-01T00:05:00.000Z"), componentId: "c1", severity: "P1", count: 4 }]);
+        return Promise.resolve([
+          {
+            bucket: new Date("2026-01-01T00:05:00.000Z"),
+            componentId: "c1",
+            severity: "P1",
+            count: 4,
+          },
+        ]);
       },
     });
     const service = new AnalyticsQueryService(store, fakeWorkItemStore());
@@ -72,13 +83,23 @@ describe("AnalyticsQueryService", () => {
   it("getMttrTrend: shapes rolling-average points into the DTO", async () => {
     const store = fakeMetricsStore({
       queryMttrTrend: (): Promise<MttrTrendBucket[]> =>
-        Promise.resolve([{ bucket: FROM, value: "P0", avgMttrMs: 5_000, rollingAvgMttrMs: 4_500, sampleCount: 3 }]),
+        Promise.resolve([
+          { bucket: FROM, value: "P0", avgMttrMs: 5_000, rollingAvgMttrMs: 4_500, sampleCount: 3 },
+        ]),
     });
     const service = new AnalyticsQueryService(store, fakeWorkItemStore());
 
     const result = await service.getMttrTrend(FROM, TO, 3_600, "severity");
 
-    expect(result.points).toEqual([{ bucket: FROM.toISOString(), value: "P0", avgMttrMs: 5_000, rollingAvgMttrMs: 4_500, sampleCount: 3 }]);
+    expect(result.points).toEqual([
+      {
+        bucket: FROM.toISOString(),
+        value: "P0",
+        avgMttrMs: 5_000,
+        rollingAvgMttrMs: 4_500,
+        sampleCount: 3,
+      },
+    ]);
   });
 
   it("getComponentHealth: composes the Mongo aggregate with the Postgres state breakdown", async () => {

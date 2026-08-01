@@ -7,7 +7,10 @@ import { createApp } from "./api/app.js";
 import { signalBuffer } from "./services/ingestion/signalBufferInstance.js";
 import { escalationScheduler } from "./services/alerting/alertingInstance.js";
 import { setWorkerRuntimeRefs } from "./services/observability/runtimeRefs.js";
-import { startHealthProbes, stopHealthProbes } from "./services/observability/healthProbeInstance.js";
+import {
+  startHealthProbes,
+  stopHealthProbes,
+} from "./services/observability/healthProbeInstance.js";
 import { incidentEventSubscriber } from "./services/realtime/realtimeInstance.js";
 import { startWorkerSystem, stopWorkerSystem } from "./workers/index.js";
 

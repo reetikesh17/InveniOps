@@ -4,10 +4,18 @@ import { prisma } from "../../repositories/clients.js";
 import { PostgresWorkItemRepository } from "../../repositories/postgres/index.js";
 import type { DropReason } from "../../services/ingestion/buffer.js";
 import { signalBuffer } from "../../services/ingestion/signalBufferInstance.js";
-import { signalCounters, E2E_LATENCY_BUCKETS_MS, type HistogramSnapshot, type SeverityCountersSnapshot } from "../../utils/metrics.js";
+import {
+  signalCounters,
+  E2E_LATENCY_BUCKETS_MS,
+  type HistogramSnapshot,
+  type SeverityCountersSnapshot,
+} from "../../utils/metrics.js";
 import { alertMetrics } from "../../services/alerting/alertingInstance.js";
 import { getWorkerRuntimeRefs } from "../../services/observability/runtimeRefs.js";
-import { queueDepthProbe, type QueueDepthSnapshot } from "../../services/observability/healthProbeInstance.js";
+import {
+  queueDepthProbe,
+  type QueueDepthSnapshot,
+} from "../../services/observability/healthProbeInstance.js";
 
 const SEVERITIES: readonly Severity[] = [Severity.P0, Severity.P1, Severity.P2, Severity.P3];
 const DROP_REASONS: readonly DropReason[] = ["shed_ceiling", "hard_capacity", "sink_failure"];
@@ -34,7 +42,12 @@ function sample(name: string, labels: Readonly<Record<string, string>>, value: n
   return `${name}${formatLabels(labels)} ${value}`;
 }
 
-function metricBlock(name: string, help: string, type: "counter" | "gauge", lines: readonly string[]): string {
+function metricBlock(
+  name: string,
+  help: string,
+  type: "counter" | "gauge",
+  lines: readonly string[],
+): string {
   return [`# HELP ${name} ${help}`, `# TYPE ${name} ${type}`, ...lines].join("\n");
 }
 
@@ -54,13 +67,20 @@ function renderHistogram(name: string, help: string, histogram: HistogramSnapsho
 
 export interface MetricsSnapshotInput {
   readonly signalCounters: SeverityCountersSnapshot;
-  readonly droppedBySeverityAndReason: Readonly<Record<Severity, Readonly<Record<DropReason, number>>>>;
+  readonly droppedBySeverityAndReason: Readonly<
+    Record<Severity, Readonly<Record<DropReason, number>>>
+  >;
   readonly bufferDepthBySeverity: Readonly<Record<Severity, number>>;
   readonly bufferFillFraction: number;
   readonly queueDepth: QueueDepthSnapshot;
-  readonly queueJobsCumulative: { readonly jobsProcessedTotal: number; readonly jobsFailedTotal: number };
+  readonly queueJobsCumulative: {
+    readonly jobsProcessedTotal: number;
+    readonly jobsFailedTotal: number;
+  };
   readonly workItemsByState: Readonly<Record<string, number>>;
-  readonly alertsByChannel: Readonly<Record<string, { readonly delivered: number; readonly failed: number }>>;
+  readonly alertsByChannel: Readonly<
+    Record<string, { readonly delivered: number; readonly failed: number }>
+  >;
   readonly escalationsTriggered: number;
   readonly latencyHistogram: HistogramSnapshot;
 }
@@ -72,27 +92,39 @@ export function renderPrometheusMetrics(input: MetricsSnapshotInput): string {
       "ims_signals_received_total",
       "Signals received at the ingestion endpoint, by severity",
       "counter",
-      SEVERITIES.map((s) => sample("ims_signals_received_total", { severity: s }, input.signalCounters.received[s])),
+      SEVERITIES.map((s) =>
+        sample("ims_signals_received_total", { severity: s }, input.signalCounters.received[s]),
+      ),
     ),
     metricBlock(
       "ims_signals_accepted_total",
       "Signals accepted into the ingestion buffer, by severity",
       "counter",
-      SEVERITIES.map((s) => sample("ims_signals_accepted_total", { severity: s }, input.signalCounters.accepted[s])),
+      SEVERITIES.map((s) =>
+        sample("ims_signals_accepted_total", { severity: s }, input.signalCounters.accepted[s]),
+      ),
     ),
     metricBlock(
       "ims_signals_dropped_total",
       'Signals dropped by the ingestion buffer, by severity and reason (reason="shed_ceiling" is graceful shedding; hard_capacity/sink_failure are hard drops)',
       "counter",
       SEVERITIES.flatMap((s) =>
-        DROP_REASONS.map((r) => sample("ims_signals_dropped_total", { severity: s, reason: r }, input.droppedBySeverityAndReason[s][r])),
+        DROP_REASONS.map((r) =>
+          sample(
+            "ims_signals_dropped_total",
+            { severity: s, reason: r },
+            input.droppedBySeverityAndReason[s][r],
+          ),
+        ),
       ),
     ),
     metricBlock(
       "ims_buffer_depth",
       "Current ingestion buffer depth, by severity",
       "gauge",
-      SEVERITIES.map((s) => sample("ims_buffer_depth", { severity: s }, input.bufferDepthBySeverity[s])),
+      SEVERITIES.map((s) =>
+        sample("ims_buffer_depth", { severity: s }, input.bufferDepthBySeverity[s]),
+      ),
     ),
     metricBlock("ims_buffer_fill_ratio", "Current ingestion buffer fill fraction (0-1)", "gauge", [
       sample("ims_buffer_fill_ratio", {}, input.bufferFillFraction),
@@ -105,14 +137,24 @@ export function renderPrometheusMetrics(input: MetricsSnapshotInput): string {
       sample("ims_queue_dlq_size", {}, input.queueDepth.dlqSize),
     ]),
     metricBlock("ims_queue_jobs_total", "Cumulative BullMQ batch jobs, by outcome", "counter", [
-      sample("ims_queue_jobs_total", { outcome: "processed" }, input.queueJobsCumulative.jobsProcessedTotal),
-      sample("ims_queue_jobs_total", { outcome: "failed" }, input.queueJobsCumulative.jobsFailedTotal),
+      sample(
+        "ims_queue_jobs_total",
+        { outcome: "processed" },
+        input.queueJobsCumulative.jobsProcessedTotal,
+      ),
+      sample(
+        "ims_queue_jobs_total",
+        { outcome: "failed" },
+        input.queueJobsCumulative.jobsFailedTotal,
+      ),
     ]),
     metricBlock(
       "ims_work_items",
       "Current work item count, by state",
       "gauge",
-      WORK_ITEM_STATES.map((s) => sample("ims_work_items", { state: s }, input.workItemsByState[s] ?? 0)),
+      WORK_ITEM_STATES.map((s) =>
+        sample("ims_work_items", { state: s }, input.workItemsByState[s] ?? 0),
+      ),
     ),
     metricBlock(
       "ims_alerts_total",
@@ -165,7 +207,10 @@ async function gatherMetricsSnapshot(): Promise<MetricsSnapshotInput> {
   // live a second time — keeps the two endpoints' numbers consistent and
   // avoids adding another live-I/O path from a route handler.
   const queueDepth = queueDepthProbe.get();
-  const queueJobsCumulative = refs?.metrics.cumulative() ?? { jobsProcessedTotal: 0, jobsFailedTotal: 0 };
+  const queueJobsCumulative = refs?.metrics.cumulative() ?? {
+    jobsProcessedTotal: 0,
+    jobsFailedTotal: 0,
+  };
   const latencyHistogram = refs?.metrics.latencyHistogram() ?? EMPTY_HISTOGRAM;
   // A live, indexed GROUP BY — cheap enough to run per scrape (typically
   // every 15-30s), unlike the dependency/queue checks this deliberately

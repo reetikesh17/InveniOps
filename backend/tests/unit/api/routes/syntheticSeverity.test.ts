@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ComponentType, Severity } from "@prisma/client";
-import { pickSeverityForComponentType, severityMixFor } from "../../../../src/api/routes/syntheticSeverity.js";
+import {
+  pickSeverityForComponentType,
+  severityMixFor,
+} from "../../../../src/api/routes/syntheticSeverity.js";
 import { createDefaultAlertStrategyRegistry } from "../../../../src/domain/alerting/registry.js";
 
 const ALL_TYPES = Object.values(ComponentType);

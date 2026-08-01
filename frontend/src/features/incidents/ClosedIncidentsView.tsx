@@ -45,7 +45,9 @@ export function ClosedIncidentsView(): JSX.Element {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <h1 className="font-display text-lg font-bold uppercase tracking-[0.1em] text-ink">Closed incidents</h1>
+          <h1 className="font-display text-lg font-bold uppercase tracking-[0.1em] text-ink">
+            Closed incidents
+          </h1>
           <FeedViewToggle view="closed" />
         </div>
         {total > 0 && <span className="text-sm text-ink-muted">{total} total</span>}
@@ -66,7 +68,13 @@ export function ClosedIncidentsView(): JSX.Element {
       ) : (
         <>
           <IncidentTable incidents={items} />
-          <Pagination page={page} pageCount={pageCount} totalCount={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            totalCount={total}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </>
       )}
     </div>

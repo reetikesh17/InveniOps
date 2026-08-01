@@ -16,7 +16,11 @@ function Segmented<T extends string>({
   return (
     <div className="flex items-center gap-2">
       <span className={EYEBROW_CLASSES}>{legend}</span>
-      <div className="inline-flex overflow-hidden rounded-md border border-border-strong" role="group" aria-label={legend}>
+      <div
+        className="inline-flex overflow-hidden rounded-md border border-border-strong"
+        role="group"
+        aria-label={legend}
+      >
         {options.map((option, index) => {
           const isSelected = option.key === selected;
           return (
@@ -26,7 +30,9 @@ function Segmented<T extends string>({
               aria-pressed={isSelected}
               onClick={() => onSelect(option.key)}
               className={`px-2.5 py-1 text-xs font-medium ${index > 0 ? "border-l border-border-strong" : ""} ${
-                isSelected ? "bg-ink text-surface-muted" : "bg-surface text-ink-muted hover:bg-surface-raised"
+                isSelected
+                  ? "bg-ink text-surface-muted"
+                  : "bg-surface text-ink-muted hover:bg-surface-raised"
               } ${FOCUS_RING}`}
             >
               {option.label}

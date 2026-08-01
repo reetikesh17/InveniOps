@@ -48,9 +48,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <ExclamationTriangleIcon className="h-8 w-8 text-severity-p0" />
           <div>
             <p className="text-sm font-semibold text-ink">
-              {this.props.label ? `Something went wrong loading ${this.props.label}.` : "Something went wrong on this screen."}
+              {this.props.label
+                ? `Something went wrong loading ${this.props.label}.`
+                : "Something went wrong on this screen."}
             </p>
-            <p className="mt-1 text-sm text-ink-muted">The rest of the app is still working — you can retry this screen.</p>
+            <p className="mt-1 text-sm text-ink-muted">
+              The rest of the app is still working — you can retry this screen.
+            </p>
           </div>
           <Button variant="secondary" onClick={this.handleReset}>
             Try again

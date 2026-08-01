@@ -1,7 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { MongoClient, type Db } from "mongodb";
 import { randomUUID } from "node:crypto";
-import { MongoSignalRepository, type SignalDocument } from "../../../src/repositories/mongo/index.js";
+import {
+  MongoSignalRepository,
+  type SignalDocument,
+} from "../../../src/repositories/mongo/index.js";
 import { TEST_MONGODB_URI } from "../testEnv.js";
 
 let client: MongoClient;
@@ -104,9 +107,17 @@ describe("MongoSignalRepository", () => {
       );
       await repo.insertMany(signals);
 
-      const results = await repo.findByWorkItemId(workItemId, { limit: 10, offset: 0, order: "desc" });
+      const results = await repo.findByWorkItemId(workItemId, {
+        limit: 10,
+        offset: 0,
+        order: "desc",
+      });
 
-      expect(results.map((s) => s.signalId)).toEqual([signals[2]?.signalId, signals[1]?.signalId, signals[0]?.signalId]);
+      expect(results.map((s) => s.signalId)).toEqual([
+        signals[2]?.signalId,
+        signals[1]?.signalId,
+        signals[0]?.signalId,
+      ]);
     });
 
     it("does not return signals belonging to a different work item", async () => {
@@ -143,7 +154,11 @@ describe("MongoSignalRepository", () => {
   describe("countByWorkItemId", () => {
     it("counts signals linked to a work item", async () => {
       const workItemId = randomUUID();
-      await repo.insertMany([makeSignal({ workItemId }), makeSignal({ workItemId }), makeSignal({ workItemId: null })]);
+      await repo.insertMany([
+        makeSignal({ workItemId }),
+        makeSignal({ workItemId }),
+        makeSignal({ workItemId: null }),
+      ]);
 
       expect(await repo.countByWorkItemId(workItemId)).toBe(2);
     });

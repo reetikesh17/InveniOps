@@ -3,7 +3,12 @@ import type { BufferStats } from "../../services/ingestion/buffer.js";
 import { signalBuffer } from "../../services/ingestion/signalBufferInstance.js";
 import { getLastSignalsPerSecond } from "../../utils/metrics.js";
 import { appVersion } from "../../utils/version.js";
-import { dependencyHealthProbe, queueDepthProbe, type HealthSnapshot, type QueueDepthSnapshot } from "../../services/observability/healthProbeInstance.js";
+import {
+  dependencyHealthProbe,
+  queueDepthProbe,
+  type HealthSnapshot,
+  type QueueDepthSnapshot,
+} from "../../services/observability/healthProbeInstance.js";
 
 type DependencyStatus = "up" | "down";
 
@@ -16,7 +21,9 @@ export interface HealthResponseBody {
   readonly status: "healthy" | "degraded" | "unhealthy";
   readonly uptimeSeconds: number;
   readonly version: string;
-  readonly dependencies: Readonly<Record<"postgres" | "mongo" | "redis" | "queue", DependencyHealthDto>>;
+  readonly dependencies: Readonly<
+    Record<"postgres" | "mongo" | "redis" | "queue", DependencyHealthDto>
+  >;
   readonly buffer: {
     readonly depth: number;
     readonly capacity: number;
@@ -52,7 +59,10 @@ export interface BuildHealthResponseInput {
  * watching to notice. 503 is reserved for "a critical dependency is
  * actually unreachable."
  */
-export function buildHealthResponse(input: BuildHealthResponseInput): { httpStatus: number; body: HealthResponseBody } {
+export function buildHealthResponse(input: BuildHealthResponseInput): {
+  httpStatus: number;
+  body: HealthResponseBody;
+} {
   const { dependencies } = input;
   const allUp =
     dependencies.postgres.status === "up" &&
@@ -60,7 +70,11 @@ export function buildHealthResponse(input: BuildHealthResponseInput): { httpStat
     dependencies.redis.status === "up" &&
     dependencies.queue.status === "up";
 
-  const status = !allUp ? "unhealthy" : input.bufferStats.state === "shedding" ? "degraded" : "healthy";
+  const status = !allUp
+    ? "unhealthy"
+    : input.bufferStats.state === "shedding"
+      ? "degraded"
+      : "healthy";
 
   return {
     httpStatus: allUp ? 200 : 503,

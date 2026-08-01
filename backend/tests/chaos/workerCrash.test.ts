@@ -83,117 +83,125 @@ describe("chaos: worker crash", () => {
     await backend?.stop();
   });
 
-  it(
-    "does not lose an in-flight job's signals across a hard crash, and never duplicates them on reprocessing",
-    async () => {
-      const signals: SignalInput[] = Array.from({ length: BATCH_SIZE }, (_, i) => ({
-        signalId: `${RUN_TAG}-${i}`,
-        componentId: `${RUN_TAG}-component-${i % 20}`, // spread across 20 components so the job does real debounce/dedup work, not one trivial insert
-        componentType: "NOSQL",
-        severity: i % 7 === 0 ? "P0" : "P3",
-        rawPayload: { chaosTest: "worker-crash", index: i },
-        occurredAt: new Date().toISOString(),
-      }));
+  it("does not lose an in-flight job's signals across a hard crash, and never duplicates them on reprocessing", async () => {
+    const signals: SignalInput[] = Array.from({ length: BATCH_SIZE }, (_, i) => ({
+      signalId: `${RUN_TAG}-${i}`,
+      componentId: `${RUN_TAG}-component-${i % 20}`, // spread across 20 components so the job does real debounce/dedup work, not one trivial insert
+      componentType: "NOSQL",
+      severity: i % 7 === 0 ? "P0" : "P3",
+      rawPayload: { chaosTest: "worker-crash", index: i },
+      occurredAt: new Date().toISOString(),
+    }));
 
-      const res = await fetch(`${backend.baseUrl}/api/v1/signals`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(signals),
-      });
-      const ingestBody = (await res.json()) as { accepted?: number };
-      expect(res.status).toBe(202);
-      expect(ingestBody.accepted).toBe(BATCH_SIZE);
+    const res = await fetch(`${backend.baseUrl}/api/v1/signals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(signals),
+    });
+    const ingestBody = (await res.json()) as { accepted?: number };
+    expect(res.status).toBe(202);
+    expect(ingestBody.accepted).toBe(BATCH_SIZE);
 
-      // First, wait for the buffer to fully empty — every signal is now a
-      // durable BullMQ job in Redis, not sitting in volatile process
-      // memory. Only once that's true is it safe (and meaningful) to look
-      // for a job to kill mid-processing: killing before this point risks
-      // permanently losing whatever's still un-drained, which would be
-      // testing something this system was never designed to survive.
-      await waitFor(
-        async () => {
-          const { body } = await health(backend.baseUrl);
-          return body.buffer.depth === 0;
-        },
-        { timeoutMs: 15_000, intervalMs: 100, description: "the ingestion buffer to fully drain into durable BullMQ jobs" },
-      );
+    // First, wait for the buffer to fully empty — every signal is now a
+    // durable BullMQ job in Redis, not sitting in volatile process
+    // memory. Only once that's true is it safe (and meaningful) to look
+    // for a job to kill mid-processing: killing before this point risks
+    // permanently losing whatever's still un-drained, which would be
+    // testing something this system was never designed to survive.
+    await waitFor(
+      async () => {
+        const { body } = await health(backend.baseUrl);
+        return body.buffer.depth === 0;
+      },
+      {
+        timeoutMs: 15_000,
+        intervalMs: 100,
+        description: "the ingestion buffer to fully drain into durable BullMQ jobs",
+      },
+    );
 
-      // Concurrency 1 above serializes the resulting ~20 jobs, so the
-      // queue stays busy for a while after the buffer's already empty.
-      // Queried directly against BullMQ/Redis, not through /health's
-      // queue.activeCount — that's a CACHED probe (background-refreshed
-      // on its own interval, see healthProbeInstance.ts), and polling it
-      // faster doesn't help if the real queue drains between refreshes;
-      // it produced real, observed flakes here. A live BullMQ read has no
-      // such lag. Asserted below, not just informational, since a false
-      // negative here would mean this test isn't actually exercising
-      // "mid-job."
-      const probeQueue = new Queue(SIGNAL_BATCH_QUEUE_NAME, { connection: makeRedisClient() });
-      let caughtActive = false;
-      try {
-        for (let attempt = 0; attempt < 100; attempt += 1) {
-          const activeCount = await probeQueue.getActiveCount();
-          if (activeCount > 0) {
-            caughtActive = true;
-            break;
-          }
-          await sleep(25);
+    // Concurrency 1 above serializes the resulting ~20 jobs, so the
+    // queue stays busy for a while after the buffer's already empty.
+    // Queried directly against BullMQ/Redis, not through /health's
+    // queue.activeCount — that's a CACHED probe (background-refreshed
+    // on its own interval, see healthProbeInstance.ts), and polling it
+    // faster doesn't help if the real queue drains between refreshes;
+    // it produced real, observed flakes here. A live BullMQ read has no
+    // such lag. Asserted below, not just informational, since a false
+    // negative here would mean this test isn't actually exercising
+    // "mid-job."
+    const probeQueue = new Queue(SIGNAL_BATCH_QUEUE_NAME, { connection: makeRedisClient() });
+    let caughtActive = false;
+    try {
+      for (let attempt = 0; attempt < 100; attempt += 1) {
+        const activeCount = await probeQueue.getActiveCount();
+        if (activeCount > 0) {
+          caughtActive = true;
+          break;
         }
-      } finally {
-        await probeQueue.close();
+        await sleep(25);
       }
-      expect(caughtActive).toBe(true); // genuinely killed mid-job, not just "killed near an already-finished job"
+    } finally {
+      await probeQueue.close();
+    }
+    expect(caughtActive).toBe(true); // genuinely killed mid-job, not just "killed near an already-finished job"
 
-      await kill(backend.containerName, "SIGKILL");
-      expect(await isRunning(backend.containerName)).toBe(false);
+    await kill(backend.containerName, "SIGKILL");
+    expect(await isRunning(backend.containerName)).toBe(false);
 
-      await start(backend.containerName);
+    await start(backend.containerName);
+    await waitFor(
+      async () => {
+        try {
+          const { httpStatus } = await health(backend.baseUrl);
+          return httpStatus === 200 || httpStatus === 503;
+        } catch {
+          return false;
+        }
+      },
+      { timeoutMs: 30_000, description: "backend to come back up after the crash" },
+    );
+
+    // BullMQ's stalled-job recovery: the crashed worker's lock on this
+    // job expires (default lockDuration ~30s), and the periodic stalled
+    // check (default interval ~30s) reassigns it to the new worker
+    // instance once this container is healthy again — generous timeout
+    // to cover both.
+    const { db, close } = await makeMongoDb();
+    try {
       await waitFor(
         async () => {
-          try {
-            const { httpStatus } = await health(backend.baseUrl);
-            return httpStatus === 200 || httpStatus === 503;
-          } catch {
-            return false;
-          }
+          const count = await db
+            .collection("signals")
+            .countDocuments({ signalId: { $regex: `^${RUN_TAG}-` } });
+          return count === BATCH_SIZE;
         },
-        { timeoutMs: 30_000, description: "backend to come back up after the crash" },
+        {
+          timeoutMs: 120_000,
+          intervalMs: 2_000,
+          description: "all signals from the crashed job to eventually persist",
+        },
       );
 
-      // BullMQ's stalled-job recovery: the crashed worker's lock on this
-      // job expires (default lockDuration ~30s), and the periodic stalled
-      // check (default interval ~30s) reassigns it to the new worker
-      // instance once this container is healthy again — generous timeout
-      // to cover both.
-      const { db, close } = await makeMongoDb();
-      try {
-        await waitFor(
-          async () => {
-            const count = await db.collection("signals").countDocuments({ signalId: { $regex: `^${RUN_TAG}-` } });
-            return count === BATCH_SIZE;
-          },
-          { timeoutMs: 120_000, intervalMs: 2_000, description: "all signals from the crashed job to eventually persist" },
-        );
+      // Idempotency: exactly one document per signalId, never more —
+      // proves reprocessing (whether the crash happened before or after
+      // the original attempt's partial Mongo insert) never double-wrote.
+      const counts = await db
+        .collection("signals")
+        .aggregate([
+          { $match: { signalId: { $regex: `^${RUN_TAG}-` } } },
+          { $group: { _id: "$signalId", count: { $sum: 1 } } },
+          { $match: { count: { $gt: 1 } } },
+        ])
+        .toArray();
+      expect(counts).toEqual([]);
 
-        // Idempotency: exactly one document per signalId, never more —
-        // proves reprocessing (whether the crash happened before or after
-        // the original attempt's partial Mongo insert) never double-wrote.
-        const counts = await db
-          .collection("signals")
-          .aggregate([
-            { $match: { signalId: { $regex: `^${RUN_TAG}-` } } },
-            { $group: { _id: "$signalId", count: { $sum: 1 } } },
-            { $match: { count: { $gt: 1 } } },
-          ])
-          .toArray();
-        expect(counts).toEqual([]);
-
-        const totalDocs = await db.collection("signals").countDocuments({ signalId: { $regex: `^${RUN_TAG}-` } });
-        expect(totalDocs).toBe(BATCH_SIZE); // not one more, not one fewer
-      } finally {
-        await close();
-      }
-    },
-    180_000,
-  );
+      const totalDocs = await db
+        .collection("signals")
+        .countDocuments({ signalId: { $regex: `^${RUN_TAG}-` } });
+      expect(totalDocs).toBe(BATCH_SIZE); // not one more, not one fewer
+    } finally {
+      await close();
+    }
+  }, 180_000);
 });

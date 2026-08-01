@@ -45,65 +45,92 @@ describe("validateRcaForm", () => {
 
   describe("incidentStartTime", () => {
     it("is required when empty", () => {
-      expect(validateRcaForm(validValues({ incidentStartTime: "" }), CONTEXT).incidentStartTime).toBeDefined();
+      expect(
+        validateRcaForm(validValues({ incidentStartTime: "" }), CONTEXT).incidentStartTime,
+      ).toBeDefined();
     });
 
     it("is invalid when unparseable", () => {
-      expect(validateRcaForm(validValues({ incidentStartTime: "not-a-date" }), CONTEXT).incidentStartTime).toBeDefined();
+      expect(
+        validateRcaForm(validValues({ incidentStartTime: "not-a-date" }), CONTEXT)
+          .incidentStartTime,
+      ).toBeDefined();
     });
   });
 
   describe("incidentEndTime", () => {
     it("is required when empty", () => {
-      expect(validateRcaForm(validValues({ incidentEndTime: "" }), CONTEXT).incidentEndTime).toBeDefined();
+      expect(
+        validateRcaForm(validValues({ incidentEndTime: "" }), CONTEXT).incidentEndTime,
+      ).toBeDefined();
     });
   });
 
   describe("rootCauseCategory", () => {
     it("is required when empty", () => {
-      expect(validateRcaForm(validValues({ rootCauseCategory: "" }), CONTEXT).rootCauseCategory).toBeDefined();
+      expect(
+        validateRcaForm(validValues({ rootCauseCategory: "" }), CONTEXT).rootCauseCategory,
+      ).toBeDefined();
     });
 
     it("is required when whitespace only", () => {
-      expect(validateRcaForm(validValues({ rootCauseCategory: "   " }), CONTEXT).rootCauseCategory).toBeDefined();
+      expect(
+        validateRcaForm(validValues({ rootCauseCategory: "   " }), CONTEXT).rootCauseCategory,
+      ).toBeDefined();
     });
 
     it("fails when not a member of the enum", () => {
-      const message = validateRcaForm(validValues({ rootCauseCategory: "ALIEN_INVASION" }), CONTEXT).rootCauseCategory;
+      const message = validateRcaForm(
+        validValues({ rootCauseCategory: "ALIEN_INVASION" }),
+        CONTEXT,
+      ).rootCauseCategory;
       expect(message).toContain("must be one of");
     });
 
     it.each(ROOT_CAUSE_CATEGORIES)("passes for the %s category", (category) => {
-      expect(validateRcaForm(validValues({ rootCauseCategory: category }), CONTEXT).rootCauseCategory).toBeUndefined();
+      expect(
+        validateRcaForm(validValues({ rootCauseCategory: category }), CONTEXT).rootCauseCategory,
+      ).toBeUndefined();
     });
   });
 
-  describe.each(["rootCauseDescription", "fixApplied", "preventionSteps"] as const)("%s", (field) => {
-    it("is required when empty", () => {
-      expect(validateRcaForm(validValues({ [field]: "" }), CONTEXT)[field]).toBeDefined();
-    });
+  describe.each(["rootCauseDescription", "fixApplied", "preventionSteps"] as const)(
+    "%s",
+    (field) => {
+      it("is required when empty", () => {
+        expect(validateRcaForm(validValues({ [field]: "" }), CONTEXT)[field]).toBeDefined();
+      });
 
-    it("is required when whitespace only", () => {
-      expect(validateRcaForm(validValues({ [field]: "        " }), CONTEXT)[field]).toBeDefined();
-    });
+      it("is required when whitespace only", () => {
+        expect(validateRcaForm(validValues({ [field]: "        " }), CONTEXT)[field]).toBeDefined();
+      });
 
-    it("fails at a single character", () => {
-      expect(validateRcaForm(validValues({ [field]: "x" }), CONTEXT)[field]).toBeDefined();
-    });
+      it("fails at a single character", () => {
+        expect(validateRcaForm(validValues({ [field]: "x" }), CONTEXT)[field]).toBeDefined();
+      });
 
-    it(`fails at ${MIN_TEXT_FIELD_LENGTH - 1} characters (one under the minimum)`, () => {
-      expect(validateRcaForm(validValues({ [field]: "a".repeat(MIN_TEXT_FIELD_LENGTH - 1) }), CONTEXT)[field]).toBeDefined();
-    });
+      it(`fails at ${MIN_TEXT_FIELD_LENGTH - 1} characters (one under the minimum)`, () => {
+        expect(
+          validateRcaForm(validValues({ [field]: "a".repeat(MIN_TEXT_FIELD_LENGTH - 1) }), CONTEXT)[
+            field
+          ],
+        ).toBeDefined();
+      });
 
-    it(`passes at exactly ${MIN_TEXT_FIELD_LENGTH} characters`, () => {
-      expect(validateRcaForm(validValues({ [field]: "a".repeat(MIN_TEXT_FIELD_LENGTH) }), CONTEXT)[field]).toBeUndefined();
-    });
+      it(`passes at exactly ${MIN_TEXT_FIELD_LENGTH} characters`, () => {
+        expect(
+          validateRcaForm(validValues({ [field]: "a".repeat(MIN_TEXT_FIELD_LENGTH) }), CONTEXT)[
+            field
+          ],
+        ).toBeUndefined();
+      });
 
-    it("trims surrounding whitespace before checking length", () => {
-      const padded = `   ${"a".repeat(MIN_TEXT_FIELD_LENGTH)}   `;
-      expect(validateRcaForm(validValues({ [field]: padded }), CONTEXT)[field]).toBeUndefined();
-    });
-  });
+      it("trims surrounding whitespace before checking length", () => {
+        const padded = `   ${"a".repeat(MIN_TEXT_FIELD_LENGTH)}   `;
+        expect(validateRcaForm(validValues({ [field]: padded }), CONTEXT)[field]).toBeUndefined();
+      });
+    },
+  );
 
   describe("end strictly after start", () => {
     it("fails when end equals start", () => {
@@ -186,7 +213,14 @@ describe("validateRcaForm", () => {
     );
 
     expect(Object.keys(result).sort()).toEqual(
-      ["fixApplied", "incidentEndTime", "incidentStartTime", "preventionSteps", "rootCauseCategory", "rootCauseDescription"].sort(),
+      [
+        "fixApplied",
+        "incidentEndTime",
+        "incidentStartTime",
+        "preventionSteps",
+        "rootCauseCategory",
+        "rootCauseDescription",
+      ].sort(),
     );
   });
 });
@@ -198,6 +232,8 @@ describe("firstInvalidField", () => {
 
   it("returns the first field in form order, not insertion order", () => {
     // preventionSteps set first, but incidentEndTime comes earlier in the form.
-    expect(firstInvalidField({ preventionSteps: "x", incidentEndTime: "y" })).toBe("incidentEndTime");
+    expect(firstInvalidField({ preventionSteps: "x", incidentEndTime: "y" })).toBe(
+      "incidentEndTime",
+    );
   });
 });

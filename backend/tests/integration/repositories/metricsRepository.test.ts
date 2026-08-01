@@ -29,7 +29,10 @@ beforeAll(async () => {
 // is the reliable way to isolate tests from each other.
 afterEach(async () => {
   for (const name of COLLECTION_NAMES) {
-    await db.collection(name).drop().catch(() => undefined);
+    await db
+      .collection(name)
+      .drop()
+      .catch(() => undefined);
   }
   await repo.ensureCollections();
 });
@@ -65,11 +68,10 @@ describe("MongoMetricsRepository", () => {
         { ts: new Date(base.getTime() + 5_000), componentId: "C2", severity: "P1", count: 4 }, // different component
       ]);
 
-      const result = await repo.queryThroughput(
-        base,
-        new Date(base.getTime() + 120_000),
-        { unit: "minute", binSize: 1 },
-      );
+      const result = await repo.queryThroughput(base, new Date(base.getTime() + 120_000), {
+        unit: "minute",
+        binSize: 1,
+      });
 
       expect(result).toEqual([
         { bucket: base, componentId: "C1", severity: "P1", count: 5 },
@@ -96,7 +98,12 @@ describe("MongoMetricsRepository", () => {
       expect(result).toEqual(
         expect.arrayContaining([
           { bucket: from, componentId: "C1", severity: "P1", count: 1 },
-          { bucket: new Date("2026-01-01T00:01:00.000Z"), componentId: "C1", severity: "P1", count: 1 },
+          {
+            bucket: new Date("2026-01-01T00:01:00.000Z"),
+            componentId: "C1",
+            severity: "P1",
+            count: 1,
+          },
         ]),
       );
     });
@@ -104,15 +111,22 @@ describe("MongoMetricsRepository", () => {
     it("a point exactly on a minute boundary buckets forward, not into the preceding minute", async () => {
       const from = new Date("2026-01-01T00:00:00.000Z");
       const boundary = new Date("2026-01-01T00:01:00.000Z");
-      await repo.recordSignalVolume([{ ts: boundary, componentId: "C1", severity: "P1", count: 9 }]);
+      await repo.recordSignalVolume([
+        { ts: boundary, componentId: "C1", severity: "P1", count: 9 },
+      ]);
 
-      const result = await repo.queryThroughput(from, new Date(from.getTime() + 120_000), { unit: "minute", binSize: 1 });
+      const result = await repo.queryThroughput(from, new Date(from.getTime() + 120_000), {
+        unit: "minute",
+        binSize: 1,
+      });
 
       expect(result).toEqual([{ bucket: boundary, componentId: "C1", severity: "P1", count: 9 }]);
     });
 
     it("empty-range behaviour: a range with no matching data returns an empty array, not an error", async () => {
-      await repo.recordSignalVolume([{ ts: new Date("2026-01-01T00:00:00.000Z"), componentId: "C1", severity: "P1", count: 1 }]);
+      await repo.recordSignalVolume([
+        { ts: new Date("2026-01-01T00:00:00.000Z"), componentId: "C1", severity: "P1", count: 1 },
+      ]);
 
       const result = await repo.queryThroughput(
         new Date("2099-01-01T00:00:00.000Z"),
@@ -142,7 +156,10 @@ describe("MongoMetricsRepository", () => {
         { ts: new Date(base.getTime() + 120_000), componentId: "C1", severity: "P1", count: 3 }, // minute 2
       ]);
 
-      const result = await repo.queryThroughput(base, new Date(base.getTime() + 300_000), { unit: "minute", binSize: 1 });
+      const result = await repo.queryThroughput(base, new Date(base.getTime() + 300_000), {
+        unit: "minute",
+        binSize: 1,
+      });
 
       // The spike bucket totals its own burst (6+4=10); the second bucket
       // totals ONLY its own burst (3), not 10+3=13 — proving the pipeline sums
@@ -206,7 +223,12 @@ describe("MongoMetricsRepository", () => {
         { ts: day(4), componentType: "RDBMS", severity: "P0", componentId: "R1", mttrMs: 5_000 },
       ]);
 
-      const trend = await repo.queryMttrTrend(day(0), new Date(day(4).getTime() + 1), { unit: "day", binSize: 1 }, "componentType");
+      const trend = await repo.queryMttrTrend(
+        day(0),
+        new Date(day(4).getTime() + 1),
+        { unit: "day", binSize: 1 },
+        "componentType",
+      );
 
       expect(trend).toHaveLength(5);
       expect(trend.map((b) => b.avgMttrMs)).toEqual([1_000, 2_000, 3_000, 4_000, 5_000]);
@@ -265,7 +287,10 @@ describe("MongoMetricsRepository", () => {
         { unit: "minute", binSize: 1 },
         "severity",
       );
-      const health = await repo.queryComponentHealth("BUSY_OPEN", new Date(now.getTime() - 3_600_000));
+      const health = await repo.queryComponentHealth(
+        "BUSY_OPEN",
+        new Date(now.getTime() - 3_600_000),
+      );
 
       expect(trend).toEqual([]); // the trend has nothing to plot — not a rising "age" line
       expect(health.recentSignalCount).toBe(750); // it IS active…
@@ -275,8 +300,20 @@ describe("MongoMetricsRepository", () => {
     it("when a closure exists, the trend average and the component-health average read the same underlying value", async () => {
       const now = new Date();
       await repo.recordMttr([
-        { ts: now, componentType: "CACHE", severity: "P2", componentId: "CLOSED_ONCE", mttrMs: 4_000 },
-        { ts: now, componentType: "CACHE", severity: "P2", componentId: "CLOSED_ONCE", mttrMs: 8_000 },
+        {
+          ts: now,
+          componentType: "CACHE",
+          severity: "P2",
+          componentId: "CLOSED_ONCE",
+          mttrMs: 4_000,
+        },
+        {
+          ts: now,
+          componentType: "CACHE",
+          severity: "P2",
+          componentId: "CLOSED_ONCE",
+          mttrMs: 8_000,
+        },
       ]);
 
       const trend = await repo.queryMttrTrend(
@@ -285,7 +322,10 @@ describe("MongoMetricsRepository", () => {
         { unit: "hour", binSize: 1 },
         "severity",
       );
-      const health = await repo.queryComponentHealth("CLOSED_ONCE", new Date(now.getTime() - 3_600_000));
+      const health = await repo.queryComponentHealth(
+        "CLOSED_ONCE",
+        new Date(now.getTime() - 3_600_000),
+      );
 
       // Same two closed samples → same mean (6000) from both code paths.
       expect(health.avgMttrMs).toBe(6_000);

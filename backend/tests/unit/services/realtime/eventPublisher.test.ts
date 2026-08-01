@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { ComponentType, Severity, WorkItemStatus, type WorkItem } from "@prisma/client";
-import { IncidentEventPublisher, type PublishableRedis } from "../../../../src/services/realtime/eventPublisher.js";
-import { INCIDENT_EVENTS_CHANNEL, type IncidentEvent } from "../../../../src/services/realtime/incidentEvents.js";
+import {
+  IncidentEventPublisher,
+  type PublishableRedis,
+} from "../../../../src/services/realtime/eventPublisher.js";
+import {
+  INCIDENT_EVENTS_CHANNEL,
+  type IncidentEvent,
+} from "../../../../src/services/realtime/incidentEvents.js";
 
 function makeWorkItem(overrides: Partial<WorkItem> = {}): WorkItem {
   const now = new Date("2026-01-01T00:00:00.000Z");
@@ -49,7 +55,11 @@ describe("IncidentEventPublisher", () => {
     const { redis, publish } = fakeRedis();
     const publisher = new IncidentEventPublisher(redis);
 
-    await publisher.publishWorkItemStateChanged(makeWorkItem({ state: WorkItemStatus.INVESTIGATING }), "OPEN", "INVESTIGATING");
+    await publisher.publishWorkItemStateChanged(
+      makeWorkItem({ state: WorkItemStatus.INVESTIGATING }),
+      "OPEN",
+      "INVESTIGATING",
+    );
 
     const [, message] = publish.mock.calls[0]!;
     const event = JSON.parse(message) as IncidentEvent;
@@ -66,7 +76,9 @@ describe("IncidentEventPublisher", () => {
     const publisher = new IncidentEventPublisher(redis, { error: errorLog });
 
     await expect(publisher.publishWorkItemCreated(makeWorkItem())).resolves.toBeUndefined();
-    await expect(publisher.publishWorkItemStateChanged(makeWorkItem(), "OPEN", "CLOSED")).resolves.toBeUndefined();
+    await expect(
+      publisher.publishWorkItemStateChanged(makeWorkItem(), "OPEN", "CLOSED"),
+    ).resolves.toBeUndefined();
 
     expect(errorLog).toHaveBeenCalledTimes(2);
   });

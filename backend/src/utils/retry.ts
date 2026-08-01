@@ -49,7 +49,12 @@ export async function retry<T>(fn: () => Promise<T>, options: RetryOptions): Pro
   throw lastError;
 }
 
-function computeDelay(attempt: number, baseDelayMs: number, maxDelayMs: number, jitter: boolean): number {
+function computeDelay(
+  attempt: number,
+  baseDelayMs: number,
+  maxDelayMs: number,
+  jitter: boolean,
+): number {
   const exponential = baseDelayMs * 2 ** (attempt - 1);
   const capped = Math.min(exponential, maxDelayMs);
   return jitter ? Math.random() * capped : capped;

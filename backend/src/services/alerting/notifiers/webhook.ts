@@ -26,7 +26,12 @@ function defaultPayload(alert: Alert, context: AlertContext): unknown {
  * called it indefinitely. Shared by WebhookNotifier and SlackNotifier,
  * which differ only in payload shape.
  */
-export async function postJson(notifierName: string, url: string, payload: unknown, timeoutMs: number): Promise<void> {
+export async function postJson(
+  notifierName: string,
+  url: string,
+  payload: unknown,
+  timeoutMs: number,
+): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -38,7 +43,10 @@ export async function postJson(notifierName: string, url: string, payload: unkno
       signal: controller.signal,
     });
     if (!response.ok) {
-      throw new NotifierDeliveryError(notifierName, `webhook responded with HTTP ${response.status}`);
+      throw new NotifierDeliveryError(
+        notifierName,
+        `webhook responded with HTTP ${response.status}`,
+      );
     }
   } catch (error) {
     if (error instanceof NotifierDeliveryError) {

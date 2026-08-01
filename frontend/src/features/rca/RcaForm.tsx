@@ -67,16 +67,27 @@ function CharacterCounter({ value }: { value: string }): JSX.Element {
   );
 }
 
-function UnsavedChangesDialog({ onStay, onLeave }: { onStay: () => void; onLeave: () => void }): JSX.Element {
+function UnsavedChangesDialog({
+  onStay,
+  onLeave,
+}: {
+  onStay: () => void;
+  onLeave: () => void;
+}): JSX.Element {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div role="alertdialog" aria-modal="true" aria-labelledby="rca-leave-title" className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 shadow-lg">
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="rca-leave-title"
+        className="w-full max-w-sm rounded-lg border border-border bg-surface p-4 shadow-lg"
+      >
         <h2 id="rca-leave-title" className="text-base font-semibold text-ink">
           Discard this RCA?
         </h2>
         <p className="mt-1 font-body text-prose text-ink-muted">
-          You have an unsaved root cause analysis. Leaving now will keep your draft in this session, but the incident
-          won’t be closed.
+          You have an unsaved root cause analysis. Leaving now will keep your draft in this session,
+          but the incident won’t be closed.
         </p>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={onStay}>
@@ -107,7 +118,13 @@ export interface RcaFormProps {
  * page for a RESOLVED incident (see IncidentDetailPage.tsx); on success the
  * parent refetches and the page re-renders as the read-only CLOSED view.
  */
-export function RcaForm({ incidentId, firstSignalAt, actor, onSubmitted, onConflict }: RcaFormProps): JSX.Element {
+export function RcaForm({
+  incidentId,
+  firstSignalAt,
+  actor,
+  onSubmitted,
+  onConflict,
+}: RcaFormProps): JSX.Element {
   const firstSignalDate = useMemo(() => new Date(firstSignalAt), [firstSignalAt]);
   const defaultsRef = useRef<RcaFormValues>(buildDefaults(firstSignalAt));
 
@@ -194,7 +211,10 @@ export function RcaForm({ incidentId, firstSignalAt, actor, onSubmitted, onConfl
 
     // Client validation is a convenience gate only — skip a request that's
     // certain to 422, and focus the operator on the first thing to fix.
-    const localErrors = validateRcaForm(values, { firstSignalAt: firstSignalDate, now: new Date() });
+    const localErrors = validateRcaForm(values, {
+      firstSignalAt: firstSignalDate,
+      now: new Date(),
+    });
     if (hasErrors(localErrors)) {
       focusFirstInvalid(localErrors);
       return;
@@ -227,7 +247,9 @@ export function RcaForm({ incidentId, firstSignalAt, actor, onSubmitted, onConfl
         setServerErrors(mapped);
         focusFirstInvalid(mapped);
       } else if (err instanceof ApiRequestError && err.info.kind === "conflict") {
-        onConflict("This incident’s state changed before the RCA could be submitted — showing the latest state.");
+        onConflict(
+          "This incident’s state changed before the RCA could be submitted — showing the latest state.",
+        );
       } else if (err instanceof ApiRequestError) {
         setGeneralError(err.info.message);
       } else {
@@ -245,7 +267,9 @@ export function RcaForm({ incidentId, firstSignalAt, actor, onSubmitted, onConfl
     !Number.isNaN(enteredStart.getTime()) &&
     !Number.isNaN(enteredEnd.getTime()) &&
     enteredEnd.getTime() > enteredStart.getTime();
-  const windowSeconds = windowValid ? Math.round((enteredEnd.getTime() - enteredStart.getTime()) / 1000) : null;
+  const windowSeconds = windowValid
+    ? Math.round((enteredEnd.getTime() - enteredStart.getTime()) / 1000)
+    : null;
 
   const nowLocal = formatDatetimeLocal(now);
 
@@ -282,7 +306,10 @@ export function RcaForm({ incidentId, firstSignalAt, actor, onSubmitted, onConfl
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1">
           <div className="flex items-baseline gap-2">
             <span className={EYEBROW_CLASSES}>MTTR to be recorded</span>
-            <span className="font-mono text-lg font-semibold tabular-nums text-ink" aria-live="polite">
+            <span
+              className="font-mono text-lg font-semibold tabular-nums text-ink"
+              aria-live="polite"
+            >
               {recordedSeconds < 0 ? "—" : formatDuration(recordedSeconds)}
             </span>
           </div>

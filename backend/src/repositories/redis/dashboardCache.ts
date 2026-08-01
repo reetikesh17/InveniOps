@@ -103,7 +103,10 @@ export class DashboardCacheRepository {
         this.redis.zadd(ACTIVE_INCIDENTS_KEY, activeScore(workItem), workItem.id),
       ]);
     } catch (error) {
-      logger.warn({ workItemId: workItem.id, error }, "dashboard cache write failed (Redis unreachable?) — continuing without it");
+      logger.warn(
+        { workItemId: workItem.id, error },
+        "dashboard cache write failed (Redis unreachable?) — continuing without it",
+      );
     }
 
     return summary;
@@ -117,7 +120,10 @@ export class DashboardCacheRepository {
         this.redis.zrem(ACTIVE_INCIDENTS_KEY, workItemId),
       ]);
     } catch (error) {
-      logger.warn({ workItemId, error }, "dashboard cache removal failed (Redis unreachable?) — continuing without it");
+      logger.warn(
+        { workItemId, error },
+        "dashboard cache removal failed (Redis unreachable?) — continuing without it",
+      );
     }
   }
 
@@ -137,11 +143,18 @@ export class DashboardCacheRepository {
   }
 
   /** Severity-then-recency order comes for free from the ZSET's score encoding — see docs/data-model.md. Throws CacheUnavailableError if Redis itself can't be reached. */
-  async getActiveIncidentIds(pagination: { limit: number; offset: number }): Promise<ActiveIncidentPage> {
+  async getActiveIncidentIds(pagination: {
+    limit: number;
+    offset: number;
+  }): Promise<ActiveIncidentPage> {
     try {
       const [total, ids] = await Promise.all([
         this.redis.zcard(ACTIVE_INCIDENTS_KEY),
-        this.redis.zrange(ACTIVE_INCIDENTS_KEY, pagination.offset, pagination.offset + pagination.limit - 1),
+        this.redis.zrange(
+          ACTIVE_INCIDENTS_KEY,
+          pagination.offset,
+          pagination.offset + pagination.limit - 1,
+        ),
       ]);
       return { ids, total };
     } catch (error) {

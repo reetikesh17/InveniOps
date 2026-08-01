@@ -12,10 +12,19 @@ import {
 } from "../../../src/workers/processBatch.js";
 import type { DebounceResult } from "../../../src/services/ingestion/debouncer.js";
 import type { IngestionSignal } from "../../../src/services/ingestion/buffer.js";
-import type { SignalDocument, InsertManyIdempotentResult } from "../../../src/repositories/mongo/signalRepository.js";
-import type { SignalVolumePoint, WorkItemCreatedPoint } from "../../../src/repositories/metrics/index.js";
+import type {
+  SignalDocument,
+  InsertManyIdempotentResult,
+} from "../../../src/repositories/mongo/signalRepository.js";
+import type {
+  SignalVolumePoint,
+  WorkItemCreatedPoint,
+} from "../../../src/repositories/metrics/index.js";
 
-function makeSignal(componentId: string, overrides: Partial<IngestionSignal> = {}): IngestionSignal {
+function makeSignal(
+  componentId: string,
+  overrides: Partial<IngestionSignal> = {},
+): IngestionSignal {
   const now = new Date("2026-01-01T00:00:00.000Z");
   return {
     signalId: randomUUID(),
@@ -65,7 +74,9 @@ function fakeDebouncer(componentToWorkItemId: ReadonlyMap<string, string>): Batc
 }
 
 /** In-memory idempotent store: signalIds in `alreadyPersisted` are treated as already durably written. */
-function fakeSignalStore(alreadyPersisted: ReadonlySet<string> = new Set()): BatchSignalStore & { readonly inserted: SignalDocument[] } {
+function fakeSignalStore(
+  alreadyPersisted: ReadonlySet<string> = new Set(),
+): BatchSignalStore & { readonly inserted: SignalDocument[] } {
   const inserted: SignalDocument[] = [];
   return {
     inserted,
@@ -77,7 +88,9 @@ function fakeSignalStore(alreadyPersisted: ReadonlySet<string> = new Set()): Bat
   };
 }
 
-function fakeWorkItemStore(): BatchWorkItemStore & { readonly incrementCalls: Array<{ workItemId: string; by: number }> } {
+function fakeWorkItemStore(): BatchWorkItemStore & {
+  readonly incrementCalls: Array<{ workItemId: string; by: number }>;
+} {
   const incrementCalls: Array<{ workItemId: string; by: number }> = [];
   return {
     incrementCalls,
@@ -177,7 +190,10 @@ describe("processBatch", () => {
     expect(workItemStore.incrementCalls).toContainEqual({ workItemId: "work-item-a", by: 2 });
     expect(workItemStore.incrementCalls).toContainEqual({ workItemId: "work-item-b", by: 1 });
 
-    expect(cache.upserted.map((workItem) => workItem.id).sort()).toEqual(["work-item-a", "work-item-b"]);
+    expect(cache.upserted.map((workItem) => workItem.id).sort()).toEqual([
+      "work-item-a",
+      "work-item-b",
+    ]);
   });
 
   it("excludes already-persisted signals from the increment count — idempotent under retry", async () => {
@@ -205,7 +221,9 @@ describe("processBatch", () => {
     const alreadyPersisted1 = makeSignal("COMPONENT_A");
     const alreadyPersisted2 = makeSignal("COMPONENT_A");
 
-    const signalStore = fakeSignalStore(new Set([alreadyPersisted1.signalId, alreadyPersisted2.signalId]));
+    const signalStore = fakeSignalStore(
+      new Set([alreadyPersisted1.signalId, alreadyPersisted2.signalId]),
+    );
     const workItemStore = fakeWorkItemStore();
     const cache = fakeCache();
 
@@ -264,7 +282,10 @@ describe("processBatch", () => {
 
     expect(metricsWriter.workItemCreatedCalls).toHaveLength(1);
     expect(metricsWriter.workItemCreatedCalls[0]).toHaveLength(1);
-    expect(metricsWriter.workItemCreatedCalls[0]?.[0]).toMatchObject({ componentType: ComponentType.CACHE, severity: Severity.P2 });
+    expect(metricsWriter.workItemCreatedCalls[0]?.[0]).toMatchObject({
+      componentType: ComponentType.CACHE,
+      severity: Severity.P2,
+    });
   });
 
   it("publishes a real-time event only for newly-created work items, not every work item touched", async () => {
@@ -287,7 +308,13 @@ describe("processBatch", () => {
       },
     };
 
-    await processBatch([signalA1, signalB1], { debouncer, signalStore, workItemStore, cache, eventPublisher });
+    await processBatch([signalA1, signalB1], {
+      debouncer,
+      signalStore,
+      workItemStore,
+      cache,
+      eventPublisher,
+    });
 
     expect(eventPublisher.createdCalls).toHaveLength(1);
     expect(eventPublisher.createdCalls[0]?.id).toBe("work-item-b");

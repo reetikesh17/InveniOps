@@ -50,13 +50,19 @@ export function createNotifierRegistry(
       new SlackNotifier({ url: config.slackWebhookUrl, timeoutMs: config.channelTimeoutMs }),
     );
   } else {
-    logger.warn({ channel: "slack" }, "ALERT_SLACK_WEBHOOK_URL not configured — slack alert channel disabled");
+    logger.warn(
+      { channel: "slack" },
+      "ALERT_SLACK_WEBHOOK_URL not configured — slack alert channel disabled",
+    );
   }
 
   if (config.pagerdutyWebhookUrl) {
     registry.register(
       "pagerduty",
-      new WebhookNotifier("pagerduty", { url: config.pagerdutyWebhookUrl, timeoutMs: config.channelTimeoutMs }),
+      new WebhookNotifier("pagerduty", {
+        url: config.pagerdutyWebhookUrl,
+        timeoutMs: config.channelTimeoutMs,
+      }),
     );
   } else {
     logger.warn(
@@ -68,10 +74,16 @@ export function createNotifierRegistry(
   if (config.emailWebhookUrl) {
     registry.register(
       "email",
-      new WebhookNotifier("email", { url: config.emailWebhookUrl, timeoutMs: config.channelTimeoutMs }),
+      new WebhookNotifier("email", {
+        url: config.emailWebhookUrl,
+        timeoutMs: config.channelTimeoutMs,
+      }),
     );
   } else {
-    logger.warn({ channel: "email" }, "ALERT_EMAIL_WEBHOOK_URL not configured — email alert channel disabled");
+    logger.warn(
+      { channel: "email" },
+      "ALERT_EMAIL_WEBHOOK_URL not configured — email alert channel disabled",
+    );
   }
 
   return registry;

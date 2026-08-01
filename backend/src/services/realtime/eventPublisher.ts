@@ -36,7 +36,11 @@ export class IncidentEventPublisher {
     await this.safePublish({ type: "work_item_created", incident: toIncidentSummary(workItem) });
   }
 
-  async publishWorkItemStateChanged(workItem: WorkItem, fromState: string, toState: string): Promise<void> {
+  async publishWorkItemStateChanged(
+    workItem: WorkItem,
+    fromState: string,
+    toState: string,
+  ): Promise<void> {
     await this.safePublish({
       type: "work_item_state_changed",
       incident: toIncidentSummary(workItem),

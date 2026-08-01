@@ -35,10 +35,25 @@ export interface FieldError {
 export type ApiErrorInfo =
   | { readonly kind: "network"; readonly message: string }
   | { readonly kind: "timeout"; readonly message: string; readonly timeoutMs: number }
-  | { readonly kind: "validation"; readonly status: 400; readonly message: string; readonly fieldErrors: readonly FieldError[] }
+  | {
+      readonly kind: "validation";
+      readonly status: 400;
+      readonly message: string;
+      readonly fieldErrors: readonly FieldError[];
+    }
   | { readonly kind: "not_found"; readonly status: 404; readonly message: string }
-  | { readonly kind: "conflict"; readonly status: 409; readonly message: string; readonly reason: string }
-  | { readonly kind: "invalid_rca"; readonly status: 422; readonly message: string; readonly fieldErrors: readonly FieldError[] }
+  | {
+      readonly kind: "conflict";
+      readonly status: 409;
+      readonly message: string;
+      readonly reason: string;
+    }
+  | {
+      readonly kind: "invalid_rca";
+      readonly status: 422;
+      readonly message: string;
+      readonly fieldErrors: readonly FieldError[];
+    }
   | { readonly kind: "unavailable"; readonly status: 503; readonly message: string }
   | { readonly kind: "unknown"; readonly status: number; readonly message: string };
 
@@ -57,20 +72,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isFieldError(value: unknown): value is FieldError {
-  return isRecord(value) && typeof value["field"] === "string" && typeof value["message"] === "string";
+  return (
+    isRecord(value) && typeof value["field"] === "string" && typeof value["message"] === "string"
+  );
 }
 
 // The backend isn't fully consistent about which key carries field-level
 // errors (workitems.ts uses "errors", signals.ts uses "details") — check
 // both rather than assuming one.
 function extractFieldErrors(body: Record<string, unknown>): FieldError[] {
-  const raw = Array.isArray(body["errors"]) ? body["errors"] : Array.isArray(body["details"]) ? body["details"] : [];
+  const raw = Array.isArray(body["errors"])
+    ? body["errors"]
+    : Array.isArray(body["details"])
+      ? body["details"]
+      : [];
   return raw.filter(isFieldError);
 }
 
 function toErrorInfo(status: number, data: unknown): ApiErrorInfo {
   const body = isRecord(data) ? data : {};
-  const message = typeof body["message"] === "string" ? body["message"] : `Request failed with status ${status}`;
+  const message =
+    typeof body["message"] === "string" ? body["message"] : `Request failed with status ${status}`;
 
   switch (status) {
     case 400:
@@ -78,7 +100,12 @@ function toErrorInfo(status: number, data: unknown): ApiErrorInfo {
     case 404:
       return { kind: "not_found", status, message };
     case 409:
-      return { kind: "conflict", status, message, reason: typeof body["error"] === "string" ? body["error"] : "conflict" };
+      return {
+        kind: "conflict",
+        status,
+        message,
+        reason: typeof body["error"] === "string" ? body["error"] : "conflict",
+      };
     case 422:
       return { kind: "invalid_rca", status, message, fieldErrors: extractFieldErrors(body) };
     case 503:
@@ -117,7 +144,10 @@ async function apiFetchRaw(path: string, options: RequestOptions = {}): Promise<
   const { body, method, signal: callerSignal, timeoutMs = DEFAULT_TIMEOUT_MS } = options;
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(new DOMException("timeout", "TimeoutError")), timeoutMs);
+  const timeoutId = setTimeout(
+    () => controller.abort(new DOMException("timeout", "TimeoutError")),
+    timeoutMs,
+  );
   const onCallerAbort = (): void => controller.abort(callerSignal?.reason);
   callerSignal?.addEventListener("abort", onCallerAbort);
 
@@ -134,16 +164,25 @@ async function apiFetchRaw(path: string, options: RequestOptions = {}): Promise<
       throw error;
     }
     if (controller.signal.aborted) {
-      throw new ApiRequestError({ kind: "timeout", message: `request timed out after ${timeoutMs}ms`, timeoutMs });
+      throw new ApiRequestError({
+        kind: "timeout",
+        message: `request timed out after ${timeoutMs}ms`,
+        timeoutMs,
+      });
     }
-    throw new ApiRequestError({ kind: "network", message: error instanceof Error ? error.message : "network error" });
+    throw new ApiRequestError({
+      kind: "network",
+      message: error instanceof Error ? error.message : "network error",
+    });
   } finally {
     clearTimeout(timeoutId);
     callerSignal?.removeEventListener("abort", onCallerAbort);
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  const data: unknown = contentType.includes("application/json") ? await response.json() : undefined;
+  const data: unknown = contentType.includes("application/json")
+    ? await response.json()
+    : undefined;
   return { status: response.status, data };
 }
 
@@ -163,9 +202,9 @@ export async function apiFetch<T>(path: string, options?: RequestOptions): Promi
 // index-signature check. Safe: every field on those interfaces is already
 // string | number | boolean | undefined.
 function toQueryString(params: object): string {
-  const entries = Object.entries(params as Record<string, string | number | boolean | undefined>).filter(
-    (entry): entry is [string, string | number | boolean] => entry[1] !== undefined,
-  );
+  const entries = Object.entries(
+    params as Record<string, string | number | boolean | undefined>,
+  ).filter((entry): entry is [string, string | number | boolean] => entry[1] !== undefined);
   if (entries.length === 0) {
     return "";
   }
@@ -186,15 +225,30 @@ export const api = {
     return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}`, opts);
   },
 
-  getIncidentSignals(id: string, params: SignalsQuery = {}, opts?: CallOptions): Promise<Page<Signal>> {
-    return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/signals${toQueryString(params)}`, opts);
+  getIncidentSignals(
+    id: string,
+    params: SignalsQuery = {},
+    opts?: CallOptions,
+  ): Promise<Page<Signal>> {
+    return apiFetch(
+      `/api/v1/incidents/${encodeURIComponent(id)}/signals${toQueryString(params)}`,
+      opts,
+    );
   },
 
-  getIncidentTransitions(id: string, opts?: CallOptions): Promise<{ readonly items: readonly StateTransition[] }> {
+  getIncidentTransitions(
+    id: string,
+    opts?: CallOptions,
+  ): Promise<{ readonly items: readonly StateTransition[] }> {
     return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/transitions`, opts);
   },
 
-  transitionIncident(id: string, toState: WorkItemState, actor: string, opts?: CallOptions): Promise<WorkItem> {
+  transitionIncident(
+    id: string,
+    toState: WorkItemState,
+    actor: string,
+    opts?: CallOptions,
+  ): Promise<WorkItem> {
     return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/transition`, {
       ...opts,
       method: "POST",
@@ -202,8 +256,16 @@ export const api = {
     });
   },
 
-  submitRca(id: string, input: RcaSubmissionInput, opts?: CallOptions): Promise<WorkItem & { mttrSeconds: number }> {
-    return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/rca`, { ...opts, method: "POST", body: input });
+  submitRca(
+    id: string,
+    input: RcaSubmissionInput,
+    opts?: CallOptions,
+  ): Promise<WorkItem & { mttrSeconds: number }> {
+    return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/rca`, {
+      ...opts,
+      method: "POST",
+      body: input,
+    });
   },
 
   getThroughput(query: ThroughputQuery, opts?: CallOptions): Promise<ThroughputResponse> {
@@ -214,12 +276,22 @@ export const api = {
     return apiFetch(`/api/v1/analytics/mttr${toQueryString(query)}`, opts);
   },
 
-  getIncidentCounts(query: GroupedAnalyticsQuery, opts?: CallOptions): Promise<IncidentCountsResponse> {
+  getIncidentCounts(
+    query: GroupedAnalyticsQuery,
+    opts?: CallOptions,
+  ): Promise<IncidentCountsResponse> {
     return apiFetch(`/api/v1/analytics/incidents${toQueryString(query)}`, opts);
   },
 
-  getComponentHealth(componentId: string, windowSeconds?: number, opts?: CallOptions): Promise<ComponentHealth> {
-    return apiFetch(`/api/v1/analytics/components/${encodeURIComponent(componentId)}${toQueryString({ windowSeconds })}`, opts);
+  getComponentHealth(
+    componentId: string,
+    windowSeconds?: number,
+    opts?: CallOptions,
+  ): Promise<ComponentHealth> {
+    return apiFetch(
+      `/api/v1/analytics/components/${encodeURIComponent(componentId)}${toQueryString({ windowSeconds })}`,
+      opts,
+    );
   },
 
   /**

@@ -14,7 +14,11 @@ function toErrorInfo(error: unknown): ApiErrorInfo {
   if (error instanceof ApiRequestError) {
     return error.info;
   }
-  return { kind: "unknown", status: 0, message: error instanceof Error ? error.message : "unexpected error" };
+  return {
+    kind: "unknown",
+    status: 0,
+    message: error instanceof Error ? error.message : "unexpected error",
+  };
 }
 
 /**

@@ -12,7 +12,11 @@ function toErrorInfo(error: unknown): ApiErrorInfo {
   if (error instanceof ApiRequestError) {
     return error.info;
   }
-  return { kind: "unknown", status: 0, message: error instanceof Error ? error.message : "unexpected error" };
+  return {
+    kind: "unknown",
+    status: 0,
+    message: error instanceof Error ? error.message : "unexpected error",
+  };
 }
 
 /**
@@ -41,7 +45,8 @@ export function useAnalyticsResource<T>(
     setLoading(true);
     setError(null);
 
-    fetcherRef.current({ signal: controller.signal })
+    fetcherRef
+      .current({ signal: controller.signal })
       .then((result) => {
         if (!controller.signal.aborted) {
           setData(result);
@@ -49,7 +54,10 @@ export function useAnalyticsResource<T>(
         }
       })
       .catch((err: unknown) => {
-        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+        if (
+          controller.signal.aborted ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
           return;
         }
         setError(toErrorInfo(err));

@@ -46,9 +46,22 @@ export async function findAlertLogsSince(
       continue;
     }
     try {
-      const parsed = JSON.parse(line) as { severity?: string; title?: string; componentId?: string; msg?: string };
-      if (parsed.componentId === componentId && typeof parsed.msg === "string" && parsed.msg.startsWith("ALERT [")) {
-        matches.push({ severity: parsed.severity ?? "unknown", title: parsed.title ?? "", componentId });
+      const parsed = JSON.parse(line) as {
+        severity?: string;
+        title?: string;
+        componentId?: string;
+        msg?: string;
+      };
+      if (
+        parsed.componentId === componentId &&
+        typeof parsed.msg === "string" &&
+        parsed.msg.startsWith("ALERT [")
+      ) {
+        matches.push({
+          severity: parsed.severity ?? "unknown",
+          title: parsed.title ?? "",
+          componentId,
+        });
       }
     } catch {
       // Not a JSON log line (e.g. a raw stack trace) — not what we're looking for, skip it.

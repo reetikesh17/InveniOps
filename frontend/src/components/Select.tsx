@@ -14,7 +14,15 @@ export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement
   readonly placeholder?: string;
 }
 
-export function Select({ label, error, options, placeholder, id, className = "", ...rest }: SelectProps): JSX.Element {
+export function Select({
+  label,
+  error,
+  options,
+  placeholder,
+  id,
+  className = "",
+  ...rest
+}: SelectProps): JSX.Element {
   const generatedId = useId();
   const selectId = id ?? generatedId;
   const errorId = error ? `${selectId}-error` : undefined;
@@ -32,7 +40,9 @@ export function Select({ label, error, options, placeholder, id, className = "",
           className={fieldClasses(Boolean(error), `appearance-none pr-8 text-sm ${className}`)}
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId}
-          defaultValue={rest.value === undefined && rest.defaultValue === undefined ? "" : undefined}
+          defaultValue={
+            rest.value === undefined && rest.defaultValue === undefined ? "" : undefined
+          }
           {...rest}
         >
           {placeholder && (

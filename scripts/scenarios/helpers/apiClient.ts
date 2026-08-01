@@ -56,7 +56,9 @@ export class ApiClient {
 
       if (res.status === 429) {
         if (attempt >= maxRetries) {
-          throw new Error(`rate limited ${maxRetries} times in a row posting to ${this.options.baseUrl} — giving up`);
+          throw new Error(
+            `rate limited ${maxRetries} times in a row posting to ${this.options.baseUrl} — giving up`,
+          );
         }
         const retryAfterHeader = res.headers.get("retry-after");
         const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : 1;
@@ -86,11 +88,14 @@ export class ApiClient {
     toState: "OPEN" | "INVESTIGATING" | "RESOLVED" | "CLOSED",
     actor: string,
   ): Promise<{ status: number; body: IncidentSummaryDto }> {
-    const res = await fetch(`${this.options.baseUrl}/api/v1/incidents/${encodeURIComponent(workItemId)}/transition`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toState, actor }),
-    });
+    const res = await fetch(
+      `${this.options.baseUrl}/api/v1/incidents/${encodeURIComponent(workItemId)}/transition`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toState, actor }),
+      },
+    );
     const body = (await res.json()) as IncidentSummaryDto;
     return { status: res.status, body };
   }
@@ -98,12 +103,19 @@ export class ApiClient {
   async submitRca(
     workItemId: string,
     rca: RcaSubmission,
-  ): Promise<{ status: number; body: IncidentSummaryDto & { mttrSeconds?: number }; raw: unknown }> {
-    const res = await fetch(`${this.options.baseUrl}/api/v1/incidents/${encodeURIComponent(workItemId)}/rca`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(rca),
-    });
+  ): Promise<{
+    status: number;
+    body: IncidentSummaryDto & { mttrSeconds?: number };
+    raw: unknown;
+  }> {
+    const res = await fetch(
+      `${this.options.baseUrl}/api/v1/incidents/${encodeURIComponent(workItemId)}/rca`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(rca),
+      },
+    );
     const raw = await res.json().catch(() => ({}));
     return { status: res.status, body: raw as IncidentSummaryDto & { mttrSeconds?: number }, raw };
   }
@@ -111,7 +123,10 @@ export class ApiClient {
 
 export interface HealthResponse {
   readonly status: "healthy" | "degraded" | "unhealthy";
-  readonly dependencies: Record<"postgres" | "mongo" | "redis" | "queue", { status: "up" | "down"; latencyMs: number }>;
+  readonly dependencies: Record<
+    "postgres" | "mongo" | "redis" | "queue",
+    { status: "up" | "down"; latencyMs: number }
+  >;
   readonly buffer: { depth: number; capacity: number; fillFraction: number; shedding: boolean };
   readonly queue: { waitingCount: number; activeCount: number; dlqSize: number };
 }

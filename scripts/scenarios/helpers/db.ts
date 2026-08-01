@@ -29,7 +29,12 @@ export class WorkItemLookup {
 
   /** Most-recently-created non-CLOSED work item for a componentId, or null if none exists yet. */
   async findActive(componentId: string): Promise<WorkItemRow | null> {
-    const result = await this.pool.query<{ id: string; severity: string; state: string; signal_count: number }>(
+    const result = await this.pool.query<{
+      id: string;
+      severity: string;
+      state: string;
+      signal_count: number;
+    }>(
       `SELECT id, severity, state, signal_count
        FROM work_items
        WHERE component_id = $1 AND state <> 'CLOSED'

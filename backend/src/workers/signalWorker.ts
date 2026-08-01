@@ -81,7 +81,10 @@ export function createSignalWorker(
     }
 
     void forwardToDeadLetterQueue(deps.deadLetterQueue, job, error).catch((dlqError: unknown) => {
-      deps.logger?.error({ dlqError, jobId: job.id }, "failed to forward exhausted job to the dead letter queue");
+      deps.logger?.error(
+        { dlqError, jobId: job.id },
+        "failed to forward exhausted job to the dead letter queue",
+      );
     });
   });
 

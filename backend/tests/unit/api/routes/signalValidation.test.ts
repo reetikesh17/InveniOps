@@ -29,7 +29,10 @@ describe("parseSignalBatch", () => {
   });
 
   it("accepts a batch array of valid signals", () => {
-    const result = parseSignalBatch([validSignal(), validSignal({ componentId: "API_GATEWAY" })], 10);
+    const result = parseSignalBatch(
+      [validSignal(), validSignal({ componentId: "API_GATEWAY" })],
+      10,
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.signals).toHaveLength(2);
@@ -110,7 +113,10 @@ describe("parseSignalBatch", () => {
   });
 
   it("accepts arbitrary JSON shapes for rawPayload", () => {
-    const result = parseSignalBatch(validSignal({ rawPayload: { nested: { arr: [1, 2, 3] }, n: null } }), 10);
+    const result = parseSignalBatch(
+      validSignal({ rawPayload: { nested: { arr: [1, 2, 3] }, n: null } }),
+      10,
+    );
     expect(result.ok).toBe(true);
   });
 });

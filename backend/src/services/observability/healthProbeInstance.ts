@@ -13,7 +13,12 @@ export interface HealthSnapshot {
 }
 
 const NEVER_PROBED: ProbeResult = { status: "down", latencyMs: 0 };
-const HEALTH_FALLBACK: HealthSnapshot = { postgres: NEVER_PROBED, mongo: NEVER_PROBED, redis: NEVER_PROBED, queue: NEVER_PROBED };
+const HEALTH_FALLBACK: HealthSnapshot = {
+  postgres: NEVER_PROBED,
+  mongo: NEVER_PROBED,
+  redis: NEVER_PROBED,
+  queue: NEVER_PROBED,
+};
 
 async function checkPostgres(): Promise<void> {
   await prisma.$queryRaw`SELECT 1`;
@@ -52,13 +57,16 @@ async function fetchHealthSnapshot(): Promise<HealthSnapshot> {
 }
 
 /** GET /health's dependency up/down + latency — cached, refreshed in the background, never queried live on the request path. */
-export const dependencyHealthProbe: CachedProbe<HealthSnapshot> = new CachedProbe(fetchHealthSnapshot, {
-  intervalMs: config.health.probeIntervalMs,
-  timeoutMs: config.health.probeTimeoutMs,
-  fallback: HEALTH_FALLBACK,
-  label: "dependency-health",
-  logger,
-});
+export const dependencyHealthProbe: CachedProbe<HealthSnapshot> = new CachedProbe(
+  fetchHealthSnapshot,
+  {
+    intervalMs: config.health.probeIntervalMs,
+    timeoutMs: config.health.probeTimeoutMs,
+    fallback: HEALTH_FALLBACK,
+    label: "dependency-health",
+    logger,
+  },
+);
 
 export interface QueueDepthSnapshot {
   readonly waitingCount: number;

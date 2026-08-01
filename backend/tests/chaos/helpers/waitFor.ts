@@ -7,7 +7,10 @@ export interface WaitForOptions {
   readonly description: string;
 }
 
-export async function waitFor(check: () => Promise<boolean>, options: WaitForOptions): Promise<void> {
+export async function waitFor(
+  check: () => Promise<boolean>,
+  options: WaitForOptions,
+): Promise<void> {
   const intervalMs = options.intervalMs ?? 500;
   const deadline = Date.now() + options.timeoutMs;
   let lastError: unknown;
@@ -24,7 +27,9 @@ export async function waitFor(check: () => Promise<boolean>, options: WaitForOpt
   }
 
   const suffix = lastError ? ` (last check threw: ${String(lastError)})` : "";
-  throw new Error(`waitFor timed out after ${options.timeoutMs}ms: ${options.description}${suffix}`);
+  throw new Error(
+    `waitFor timed out after ${options.timeoutMs}ms: ${options.description}${suffix}`,
+  );
 }
 
 export function sleep(ms: number): Promise<void> {

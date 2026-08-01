@@ -1,7 +1,14 @@
 import type { WorkItem, RcaRecord as PrismaRcaRecord, StateTransition } from "@prisma/client";
 import { getLegalNextStates, type WorkItemStateName } from "../../domain/state/index.js";
-import { CacheUnavailableError, type IncidentSummary, type ActiveIncidentPage } from "../../repositories/redis/dashboardCache.js";
-import type { SignalDocument, SignalPagination } from "../../repositories/mongo/signalRepository.js";
+import {
+  CacheUnavailableError,
+  type IncidentSummary,
+  type ActiveIncidentPage,
+} from "../../repositories/redis/dashboardCache.js";
+import type {
+  SignalDocument,
+  SignalPagination,
+} from "../../repositories/mongo/signalRepository.js";
 import type { WorkItemWithRca } from "../../repositories/postgres/index.js";
 
 // Narrow, structural interfaces — the real PostgresWorkItemRepository /
@@ -179,14 +186,18 @@ export class DashboardProjectionService {
       }
     }
 
-    const summaries = await Promise.all(page.ids.map((id) => this.getIncidentSummaryCacheAware(id)));
+    const summaries = await Promise.all(
+      page.ids.map((id) => this.getIncidentSummaryCacheAware(id)),
+    );
     const items = summaries.filter((summary): summary is IncidentSummary => summary !== null);
 
     return { items, total: page.total };
   }
 
   /** The degraded path getActiveIncidents falls back to when the cache is genuinely unreachable — same data, same severity-then-firstSignalAt order (listActive's own ORDER BY), just without the cache's ZSET in between. */
-  private async getActiveIncidentsFromPostgres(pagination: Pagination): Promise<Page<IncidentSummary>> {
+  private async getActiveIncidentsFromPostgres(
+    pagination: Pagination,
+  ): Promise<Page<IncidentSummary>> {
     const [workItems, total] = await Promise.all([
       this.workItemStore.listActive(pagination),
       this.workItemStore.countActive(),
@@ -243,7 +254,10 @@ export class DashboardProjectionService {
   }
 
   /** Null means the work item itself doesn't exist — distinct from "exists but has no signals yet." */
-  async getIncidentSignals(workItemId: string, pagination: SignalPagination): Promise<Page<SignalDto> | null> {
+  async getIncidentSignals(
+    workItemId: string,
+    pagination: SignalPagination,
+  ): Promise<Page<SignalDto> | null> {
     const exists = await this.incidentExists(workItemId);
     if (!exists) {
       return null;
@@ -303,7 +317,10 @@ export class DashboardProjectionService {
   }
 
   private async repopulateActiveCache(): Promise<void> {
-    const active = await this.workItemStore.listActive({ limit: this.options.repopulateCap, offset: 0 });
+    const active = await this.workItemStore.listActive({
+      limit: this.options.repopulateCap,
+      offset: 0,
+    });
     await Promise.all(active.map((workItem) => this.cache.upsertActiveIncident(workItem)));
   }
 }

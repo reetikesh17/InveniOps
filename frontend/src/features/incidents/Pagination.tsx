@@ -9,7 +9,13 @@ export interface PaginationProps {
 }
 
 /** Page-based, not virtualized scroll — simpler to keyboard-navigate, and the filtered result sets here are small enough (bounded by the Live Feed's own fetch cap) that a full virtualization library isn't warranted. */
-export function Pagination({ page, pageCount, totalCount, pageSize, onPageChange }: PaginationProps): JSX.Element {
+export function Pagination({
+  page,
+  pageCount,
+  totalCount,
+  pageSize,
+  onPageChange,
+}: PaginationProps): JSX.Element {
   const start = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const end = Math.min(page * pageSize, totalCount);
 
@@ -25,7 +31,11 @@ export function Pagination({ page, pageCount, totalCount, pageSize, onPageChange
         <span className="tabular-nums">
           Page {page} of {pageCount}
         </span>
-        <Button variant="secondary" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)}>
+        <Button
+          variant="secondary"
+          disabled={page >= pageCount}
+          onClick={() => onPageChange(page + 1)}
+        >
           Next
         </Button>
       </div>

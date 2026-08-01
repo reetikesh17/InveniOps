@@ -1,4 +1,8 @@
-export { MetricsWriter, type MetricsRepositoryWriter, type MetricsWriterOptions } from "./metricsWriter.js";
+export {
+  MetricsWriter,
+  type MetricsRepositoryWriter,
+  type MetricsWriterOptions,
+} from "./metricsWriter.js";
 export { getMetricsWriter } from "./aggregationInstance.js";
 export {
   AnalyticsQueryService,

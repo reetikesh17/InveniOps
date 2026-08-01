@@ -17,8 +17,8 @@ export function AnalyticsPage(): JSX.Element {
       <div>
         <h1 className={DISPLAY_HEADING_CLASSES}>Analytics</h1>
         <p className="mt-1 font-body text-prose text-ink-muted">
-          Timeseries from the aggregation sink and live system health. All bucketing is server-side; the shared range below
-          is saved to the URL.
+          Timeseries from the aggregation sink and live system health. All bucketing is server-side;
+          the shared range below is saved to the URL.
         </p>
       </div>
 

@@ -44,7 +44,10 @@ export class IncidentEventSubscriber {
         return;
       }
       if (!isIncidentEvent(parsed)) {
-        this.logger?.error({ parsed }, "incident event message had an unrecognized shape — dropped");
+        this.logger?.error(
+          { parsed },
+          "incident event message had an unrecognized shape — dropped",
+        );
         return;
       }
       this.emitter.emit(EVENT_NAME, parsed);

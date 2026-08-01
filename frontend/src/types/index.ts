@@ -25,5 +25,10 @@ export type {
   MttrTrendResponse,
   ComponentHealth,
 } from "./analytics";
-export type { IncidentEventType, IncidentEvent, WorkItemCreatedEvent, WorkItemStateChangedEvent } from "./events";
+export type {
+  IncidentEventType,
+  IncidentEvent,
+  WorkItemCreatedEvent,
+  WorkItemStateChangedEvent,
+} from "./events";
 export type { DependencyStatus, DependencyHealth, HealthResponse } from "./health";

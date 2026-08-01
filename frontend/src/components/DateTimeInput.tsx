@@ -7,7 +7,13 @@ export interface DateTimeInputProps extends Omit<InputHTMLAttributes<HTMLInputEl
 }
 
 /** Wraps a native datetime-local input — the RCA form's Incident Start/End pickers (docs/assignment.md). */
-export function DateTimeInput({ label, error, id, className = "", ...rest }: DateTimeInputProps): JSX.Element {
+export function DateTimeInput({
+  label,
+  error,
+  id,
+  className = "",
+  ...rest
+}: DateTimeInputProps): JSX.Element {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const errorId = error ? `${inputId}-error` : undefined;

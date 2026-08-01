@@ -39,9 +39,14 @@ function IncidentRowInner({ incident, isNew }: IncidentRowProps): JSX.Element {
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1.5 border-t border-border px-2.5 py-2 sm:min-h-row sm:flex-row sm:items-center sm:gap-3 sm:py-0">
         {/* SEV — the spine's visible anchor: age dot + mono code (greyscale-safe) */}
-        <div className="flex w-14 shrink-0 items-center gap-2" title={`Severity ${incident.severity}`}>
+        <div
+          className="flex w-14 shrink-0 items-center gap-2"
+          title={`Severity ${incident.severity}`}
+        >
           <AgeDot severity={incident.severity} since={incident.updatedAt} state={incident.state} />
-          <span className="font-mono text-mono-id font-medium tabular-nums text-ink">{incident.severity}</span>
+          <span className="font-mono text-mono-id font-medium tabular-nums text-ink">
+            {incident.severity}
+          </span>
         </div>
 
         {/* COMPONENT — machine id in mono. Middle-truncated (not CSS
@@ -55,8 +60,13 @@ function IncidentRowInner({ incident, isNew }: IncidentRowProps): JSX.Element {
         >
           <FieldLabel>Component</FieldLabel>
           <div className="flex min-w-0 items-baseline gap-1.5">
-            <MiddleTruncate text={incident.componentId} className="font-mono text-mono-id text-ink" />
-            <span className="shrink-0 font-mono text-mono-micro text-ink-muted">{incident.componentType}</span>
+            <MiddleTruncate
+              text={incident.componentId}
+              className="font-mono text-mono-id text-ink"
+            />
+            <span className="shrink-0 font-mono text-mono-micro text-ink-muted">
+              {incident.componentType}
+            </span>
           </div>
         </div>
 
@@ -72,7 +82,9 @@ function IncidentRowInner({ incident, isNew }: IncidentRowProps): JSX.Element {
             numeric column in this row. */}
         <div className="w-full shrink-0 sm:w-14 sm:text-right">
           <FieldLabel>Signals</FieldLabel>
-          <span className="font-mono text-mono-num tabular-nums text-ink-muted">{incident.signalCount}</span>
+          <span className="font-mono text-mono-num tabular-nums text-ink-muted">
+            {incident.signalCount}
+          </span>
         </div>
 
         {/* IN STATE — how long, brightness-escalating */}

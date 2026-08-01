@@ -1,9 +1,4 @@
-import express, {
-  type Express,
-  type NextFunction,
-  type Request,
-  type Response,
-} from "express";
+import express, { type Express, type NextFunction, type Request, type Response } from "express";
 import helmet from "helmet";
 import cors from "cors";
 import { httpLogger } from "../utils/logger.js";
@@ -50,7 +45,12 @@ interface ErrorResponseBody {
   message: string;
 }
 
-function errorHandler(err: unknown, req: Request, res: Response<ErrorResponseBody>, next: NextFunction): void {
+function errorHandler(
+  err: unknown,
+  req: Request,
+  res: Response<ErrorResponseBody>,
+  next: NextFunction,
+): void {
   if (res.headersSent) {
     next(err);
     return;

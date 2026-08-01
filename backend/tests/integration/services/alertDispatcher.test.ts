@@ -58,7 +58,11 @@ function buildChannels(shouldFail: (name: string) => boolean = () => false): Cha
   return { registry, slack, pagerduty, email };
 }
 
-const DEFAULT_OPTIONS: AlertDispatcherOptions = { maxAttempts: 2, backoffDelayMs: 5, suppressionWindowSeconds: 60 };
+const DEFAULT_OPTIONS: AlertDispatcherOptions = {
+  maxAttempts: 2,
+  backoffDelayMs: 5,
+  suppressionWindowSeconds: 60,
+};
 
 function buildDispatcher(
   channels: Channels,
@@ -81,11 +85,15 @@ interface RecordedDispatch {
   readonly outcome: "delivered" | "failed";
 }
 
-function fakeMetricsWriter(): AlertDispatchMetricsWriter & { readonly recorded: RecordedDispatch[] } {
+function fakeMetricsWriter(): AlertDispatchMetricsWriter & {
+  readonly recorded: RecordedDispatch[];
+} {
   const recorded: RecordedDispatch[] = [];
   return {
     recorded,
-    recordAlertDispatches(points: readonly { channel: string; outcome: "delivered" | "failed" }[]): Promise<void> {
+    recordAlertDispatches(
+      points: readonly { channel: string; outcome: "delivered" | "failed" }[],
+    ): Promise<void> {
       recorded.push(...points.map((p) => ({ channel: p.channel, outcome: p.outcome })));
       return Promise.resolve();
     },
@@ -107,13 +115,48 @@ describe("AlertDispatcher", () => {
   });
 
   it("routes to the correct channels per component type", async () => {
-    const cases: ReadonlyArray<{ componentType: ComponentType; expectSlack: boolean; expectPagerduty: boolean; expectEmail: boolean }> = [
-      { componentType: ComponentType.RDBMS, expectSlack: true, expectPagerduty: true, expectEmail: false },
-      { componentType: ComponentType.NOSQL, expectSlack: true, expectPagerduty: true, expectEmail: false },
-      { componentType: ComponentType.CACHE, expectSlack: true, expectPagerduty: false, expectEmail: false },
-      { componentType: ComponentType.API, expectSlack: true, expectPagerduty: true, expectEmail: false },
-      { componentType: ComponentType.MCP_HOST, expectSlack: true, expectPagerduty: false, expectEmail: true },
-      { componentType: ComponentType.QUEUE, expectSlack: true, expectPagerduty: false, expectEmail: false },
+    const cases: ReadonlyArray<{
+      componentType: ComponentType;
+      expectSlack: boolean;
+      expectPagerduty: boolean;
+      expectEmail: boolean;
+    }> = [
+      {
+        componentType: ComponentType.RDBMS,
+        expectSlack: true,
+        expectPagerduty: true,
+        expectEmail: false,
+      },
+      {
+        componentType: ComponentType.NOSQL,
+        expectSlack: true,
+        expectPagerduty: true,
+        expectEmail: false,
+      },
+      {
+        componentType: ComponentType.CACHE,
+        expectSlack: true,
+        expectPagerduty: false,
+        expectEmail: false,
+      },
+      {
+        componentType: ComponentType.API,
+        expectSlack: true,
+        expectPagerduty: true,
+        expectEmail: false,
+      },
+      {
+        componentType: ComponentType.MCP_HOST,
+        expectSlack: true,
+        expectPagerduty: false,
+        expectEmail: true,
+      },
+      {
+        componentType: ComponentType.QUEUE,
+        expectSlack: true,
+        expectPagerduty: false,
+        expectEmail: false,
+      },
     ];
 
     for (const testCase of cases) {

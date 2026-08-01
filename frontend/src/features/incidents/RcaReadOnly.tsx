@@ -30,7 +30,8 @@ export function RcaReadOnly({ rca }: RcaReadOnlyProps): JSX.Element {
       <Field label="Fix applied" value={rca.fixApplied} />
       <Field label="Prevention steps" value={rca.preventionSteps} />
       <p className="text-xs text-ink-muted">
-        Submitted <RelativeTime value={rca.submittedAt} className="font-mono text-mono-micro tabular-nums" />
+        Submitted{" "}
+        <RelativeTime value={rca.submittedAt} className="font-mono text-mono-micro tabular-nums" />
       </p>
     </div>
   );

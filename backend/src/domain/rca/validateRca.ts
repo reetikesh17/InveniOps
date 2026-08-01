@@ -103,7 +103,10 @@ export function validateRca(rca: RcaRecord, context: RcaValidationContext): RcaV
   }
 
   if (startValid && incidentStartTime.getTime() > context.now.getTime()) {
-    errors.push({ field: "incidentStartTime", message: "incidentStartTime cannot be in the future." });
+    errors.push({
+      field: "incidentStartTime",
+      message: "incidentStartTime cannot be in the future.",
+    });
   }
 
   if (endValid && incidentEndTime.getTime() > context.now.getTime()) {

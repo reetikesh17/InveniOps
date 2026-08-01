@@ -41,9 +41,15 @@ function newSubscriber(): IncidentEventSubscriber {
   return subscriber;
 }
 
-function waitForEvent(subscriber: IncidentEventSubscriber, timeoutMs = 2000): Promise<IncidentEvent> {
+function waitForEvent(
+  subscriber: IncidentEventSubscriber,
+  timeoutMs = 2000,
+): Promise<IncidentEvent> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timed out waiting for incident event")), timeoutMs);
+    const timer = setTimeout(
+      () => reject(new Error("timed out waiting for incident event")),
+      timeoutMs,
+    );
     const unsubscribe = subscriber.subscribe((event) => {
       clearTimeout(timer);
       unsubscribe();
@@ -99,8 +105,16 @@ describe("incident event bus (Redis pub/sub)", () => {
       publisher.publishWorkItemStateChanged(workItem, "OPEN", "INVESTIGATING"),
     ]);
 
-    expect(eventOnA).toMatchObject({ type: "work_item_state_changed", fromState: "OPEN", toState: "INVESTIGATING" });
-    expect(eventOnB).toMatchObject({ type: "work_item_state_changed", fromState: "OPEN", toState: "INVESTIGATING" });
+    expect(eventOnA).toMatchObject({
+      type: "work_item_state_changed",
+      fromState: "OPEN",
+      toState: "INVESTIGATING",
+    });
+    expect(eventOnB).toMatchObject({
+      type: "work_item_state_changed",
+      fromState: "OPEN",
+      toState: "INVESTIGATING",
+    });
   });
 
   it("unsubscribe() stops delivery to that listener without affecting others", async () => {

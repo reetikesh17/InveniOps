@@ -29,7 +29,10 @@ function makeChaosSignal(severity: SignalInput["severity"], index: number): Sign
   };
 }
 
-async function postTo(baseUrl: string, signals: readonly SignalInput[]): Promise<{ status: number; body: Record<string, unknown> }> {
+async function postTo(
+  baseUrl: string,
+  signals: readonly SignalInput[],
+): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await fetch(`${baseUrl}/api/v1/signals`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -85,7 +88,9 @@ describe("chaos: queue saturation", () => {
       floodBatches.push(signals);
     }
 
-    const floodResponses = await Promise.all(floodBatches.map((batch) => postTo(backend.baseUrl, batch)));
+    const floodResponses = await Promise.all(
+      floodBatches.map((batch) => postTo(backend.baseUrl, batch)),
+    );
 
     // Every response is a real HTTP outcome, never a hang/crash — 202
     // (fully accepted) or 503 (buffer_saturated, with accepted/dropped
@@ -125,10 +130,19 @@ describe("chaos: queue saturation", () => {
     // Drop counts are reported, not silent — cross-check the backend's own
     // authoritative counters, not just the HTTP response bodies above.
     const metricsText = await (await fetch(`${backend.baseUrl}/metrics`)).text();
-    const p3ShedCeiling = readMetricValue(metricsText, "ims_signals_dropped_total", { severity: "P3", reason: "shed_ceiling" });
+    const p3ShedCeiling = readMetricValue(metricsText, "ims_signals_dropped_total", {
+      severity: "P3",
+      reason: "shed_ceiling",
+    });
     const p0AnyDrop =
-      readMetricValue(metricsText, "ims_signals_dropped_total", { severity: "P0", reason: "shed_ceiling" }) +
-      readMetricValue(metricsText, "ims_signals_dropped_total", { severity: "P0", reason: "hard_capacity" });
+      readMetricValue(metricsText, "ims_signals_dropped_total", {
+        severity: "P0",
+        reason: "shed_ceiling",
+      }) +
+      readMetricValue(metricsText, "ims_signals_dropped_total", {
+        severity: "P0",
+        reason: "hard_capacity",
+      });
 
     expect(p3ShedCeiling).toBeGreaterThan(0); // low severity actually got shed
     expect(p0AnyDrop).toBe(0); // P0 was never shed, not even once

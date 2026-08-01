@@ -4,7 +4,12 @@ import {
   createDefaultAlertStrategyRegistry,
 } from "../../../../src/domain/alerting/registry.js";
 import { DefaultAlertStrategy } from "../../../../src/domain/alerting/strategies/defaultStrategy.js";
-import type { Alert, AlertContext, AlertStrategy, Severity } from "../../../../src/domain/alerting/types.js";
+import type {
+  Alert,
+  AlertContext,
+  AlertStrategy,
+  Severity,
+} from "../../../../src/domain/alerting/types.js";
 import { reconcileSeverity } from "../../../../src/domain/alerting/severity.js";
 import { getEscalationPolicy } from "../../../../src/domain/alerting/escalation.js";
 
@@ -74,7 +79,13 @@ describe("AlertStrategyRegistry runtime registration", () => {
       readonly severityFloor: Severity = "P3";
       buildAlert(context: AlertContext): Alert {
         const severity = reconcileSeverity(this.severityFloor, context.reportedSeverity);
-        return { severity, channels: ["email"], escalation: getEscalationPolicy(severity), title: "replaced", body: "replaced" };
+        return {
+          severity,
+          channels: ["email"],
+          escalation: getEscalationPolicy(severity),
+          title: "replaced",
+          body: "replaced",
+        };
       }
     }
 

@@ -66,33 +66,43 @@ interface RcaTemplate {
 const RCA_TEMPLATES: Readonly<Record<ComponentType, RcaTemplate>> = {
   RDBMS: {
     rootCauseCategory: "CAPACITY_EXHAUSTION",
-    rootCauseDescription: "Connection pool exhausted under sustained load, blocking new queries against the primary.",
+    rootCauseDescription:
+      "Connection pool exhausted under sustained load, blocking new queries against the primary.",
     fixApplied: "Increased max pool size and recycled idle connections until pressure subsided.",
-    preventionSteps: "Add pool-utilization alerting before exhaustion and enforce per-query timeouts.",
+    preventionSteps:
+      "Add pool-utilization alerting before exhaustion and enforce per-query timeouts.",
   },
   API: {
     rootCauseCategory: "EXTERNAL_DEPENDENCY",
-    rootCauseDescription: "Upstream RDBMS timeouts cascaded into request failures for this service.",
+    rootCauseDescription:
+      "Upstream RDBMS timeouts cascaded into request failures for this service.",
     fixApplied: "Recovered automatically once the database connection pool was restored.",
-    preventionSteps: "Add circuit breakers so this service fails fast instead of queuing against a degraded dependency.",
+    preventionSteps:
+      "Add circuit breakers so this service fails fast instead of queuing against a degraded dependency.",
   },
   MCP_HOST: {
     rootCauseCategory: "EXTERNAL_DEPENDENCY",
-    rootCauseDescription: "MCP host degraded as its downstream dependency chain became unavailable.",
+    rootCauseDescription:
+      "MCP host degraded as its downstream dependency chain became unavailable.",
     fixApplied: "Recovered automatically once the dependency chain stabilized.",
-    preventionSteps: "Add independent health checks so MCP host failures are diagnosed separately from downstream causes.",
+    preventionSteps:
+      "Add independent health checks so MCP host failures are diagnosed separately from downstream causes.",
   },
   CACHE: {
     rootCauseCategory: "EXTERNAL_DEPENDENCY",
-    rootCauseDescription: "Cache miss storm as requests fell back to the (then-failing) primary database.",
-    fixApplied: "Miss rate returned to baseline once the database recovered and the cache repopulated naturally.",
-    preventionSteps: "Add a stale-while-revalidate fallback so cache misses don't stampede a degraded backing store.",
+    rootCauseDescription:
+      "Cache miss storm as requests fell back to the (then-failing) primary database.",
+    fixApplied:
+      "Miss rate returned to baseline once the database recovered and the cache repopulated naturally.",
+    preventionSteps:
+      "Add a stale-while-revalidate fallback so cache misses don't stampede a degraded backing store.",
   },
   QUEUE: {
     rootCauseCategory: "CAPACITY_EXHAUSTION",
     rootCauseDescription: "Consumer lag built up faster than the queue could drain it.",
     fixApplied: "Scaled consumers until the backlog cleared.",
-    preventionSteps: "Alert on consumer lag crossing a threshold, not just on outright queue failure.",
+    preventionSteps:
+      "Alert on consumer lag crossing a threshold, not just on outright queue failure.",
   },
   NOSQL: {
     rootCauseCategory: "CAPACITY_EXHAUSTION",
@@ -120,7 +130,9 @@ async function main(): Promise<void> {
 
     const investigating = await api.transition(item.workItemId, "INVESTIGATING", args.actor);
     if (investigating.status !== 200) {
-      fail(`transition to INVESTIGATING failed: ${investigating.status} ${JSON.stringify(investigating.body)}`);
+      fail(
+        `transition to INVESTIGATING failed: ${investigating.status} ${JSON.stringify(investigating.body)}`,
+      );
       continue;
     }
     ok(`OPEN → INVESTIGATING`);
@@ -153,20 +165,30 @@ async function main(): Promise<void> {
       continue;
     }
     ok(`RESOLVED → CLOSED, RCA accepted, MTTR = ${fmtDuration(rcaResult.body.mttrSeconds)}`);
-    results.push({ componentId: item.componentId, workItemId: item.workItemId, mttrSeconds: rcaResult.body.mttrSeconds });
+    results.push({
+      componentId: item.componentId,
+      workItemId: item.workItemId,
+      mttrSeconds: rcaResult.body.mttrSeconds,
+    });
   }
 
   banner("Summary");
   console.log(`  Closed with a real MTTR:`);
   for (const r of results) {
-    console.log(`    ${r.componentId.padEnd(22)} ${r.workItemId}  MTTR ${fmtDuration(r.mttrSeconds)}`);
+    console.log(
+      `    ${r.componentId.padEnd(22)} ${r.workItemId}  MTTR ${fmtDuration(r.mttrSeconds)}`,
+    );
   }
-  console.log(`\n  Left OPEN (never part of the failure narrative — still active on the dashboard):`);
+  console.log(
+    `\n  Left OPEN (never part of the failure narrative — still active on the dashboard):`,
+  );
   for (const b of baseline) {
     console.log(`    ${b.componentId.padEnd(22)} ${b.workItemId}`);
   }
 
-  note(`\ndashboard: http://localhost:5173 — Live Feed shows the ${baseline.length} still-open item(s), analytics/MTTR now has ${results.length} closed incident(s) to compute from.`);
+  note(
+    `\ndashboard: http://localhost:5173 — Live Feed shows the ${baseline.length} still-open item(s), analytics/MTTR now has ${results.length} closed incident(s) to compute from.`,
+  );
 }
 
 main().catch((error: unknown) => {

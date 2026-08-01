@@ -22,7 +22,13 @@ export async function claimAlertDelivery(
   eventType: string,
   windowSeconds: number,
 ): Promise<boolean> {
-  const result = await redis.set(deliveryKey(workItemId, eventType), "1", "EX", windowSeconds, "NX");
+  const result = await redis.set(
+    deliveryKey(workItemId, eventType),
+    "1",
+    "EX",
+    windowSeconds,
+    "NX",
+  );
   return result === "OK";
 }
 

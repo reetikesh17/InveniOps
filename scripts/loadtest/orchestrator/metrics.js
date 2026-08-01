@@ -24,7 +24,8 @@ export function parsePrometheusText(text) {
         labels[pairMatch[1]] = pairMatch[2].replace(/\\"/g, '"').replace(/\\\\/g, "\\");
       }
     }
-    const value = valueStr === "+Inf" ? Infinity : valueStr === "-Inf" ? -Infinity : Number(valueStr);
+    const value =
+      valueStr === "+Inf" ? Infinity : valueStr === "-Inf" ? -Infinity : Number(valueStr);
     if (Number.isNaN(value)) {
       continue;
     }
@@ -79,7 +80,8 @@ export function diffHistogram(before, after, name, boundariesMs) {
   const buckets = boundaries.map((le) => {
     const leLabel = le === Infinity ? "+Inf" : String(le);
     const cumulativeInWindow =
-      findValue(after, `${name}_bucket`, { le: leLabel }) - findValue(before, `${name}_bucket`, { le: leLabel });
+      findValue(after, `${name}_bucket`, { le: leLabel }) -
+      findValue(before, `${name}_bucket`, { le: leLabel });
     return { le, cumulativeInWindow: Math.max(0, cumulativeInWindow) };
   });
   const count = diffValue(before, after, `${name}_count`);
@@ -112,21 +114,35 @@ export function computeMetricsDiff(before, after) {
   const acceptedBySeverity = {};
   const droppedBySeverityAndReason = {};
   for (const severity of SEVERITIES) {
-    receivedBySeverity[severity] = diffValue(before, after, "ims_signals_received_total", { severity });
-    acceptedBySeverity[severity] = diffValue(before, after, "ims_signals_accepted_total", { severity });
+    receivedBySeverity[severity] = diffValue(before, after, "ims_signals_received_total", {
+      severity,
+    });
+    acceptedBySeverity[severity] = diffValue(before, after, "ims_signals_accepted_total", {
+      severity,
+    });
     droppedBySeverityAndReason[severity] = {};
     for (const reason of DROP_REASONS) {
-      droppedBySeverityAndReason[severity][reason] = diffValue(before, after, "ims_signals_dropped_total", {
-        severity,
-        reason,
-      });
+      droppedBySeverityAndReason[severity][reason] = diffValue(
+        before,
+        after,
+        "ims_signals_dropped_total",
+        {
+          severity,
+          reason,
+        },
+      );
     }
   }
 
   const jobsProcessed = diffValue(before, after, "ims_queue_jobs_total", { outcome: "processed" });
   const jobsFailed = diffValue(before, after, "ims_queue_jobs_total", { outcome: "failed" });
 
-  const e2eDiffed = diffHistogram(before, after, "ims_signal_e2e_latency_ms", E2E_LATENCY_BUCKETS_MS);
+  const e2eDiffed = diffHistogram(
+    before,
+    after,
+    "ims_signal_e2e_latency_ms",
+    E2E_LATENCY_BUCKETS_MS,
+  );
   const e2eHistogram = {
     p50Ms: histogramPercentile(e2eDiffed, 0.5),
     p95Ms: histogramPercentile(e2eDiffed, 0.95),
@@ -135,5 +151,12 @@ export function computeMetricsDiff(before, after) {
     sum: e2eDiffed.sum,
   };
 
-  return { receivedBySeverity, acceptedBySeverity, droppedBySeverityAndReason, jobsProcessed, jobsFailed, e2eHistogram };
+  return {
+    receivedBySeverity,
+    acceptedBySeverity,
+    droppedBySeverityAndReason,
+    jobsProcessed,
+    jobsFailed,
+    e2eHistogram,
+  };
 }

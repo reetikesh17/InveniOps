@@ -51,74 +51,76 @@ describe("chaos: graceful shutdown (SIGTERM under active load)", () => {
     await backend?.stop();
   });
 
-  it(
-    "drains the buffer within the shutdown timeout and loses nothing in flight",
-    async () => {
-      const signals: SignalInput[] = Array.from({ length: BATCH_SIZE }, (_, i) => ({
-        signalId: `${RUN_TAG}-${i}`,
-        componentId: `${RUN_TAG}-component-${i % 20}`,
-        componentType: "API",
-        severity: i % 7 === 0 ? "P0" : "P3",
-        rawPayload: { chaosTest: "graceful-shutdown", index: i },
-        occurredAt: new Date().toISOString(),
-      }));
+  it("drains the buffer within the shutdown timeout and loses nothing in flight", async () => {
+    const signals: SignalInput[] = Array.from({ length: BATCH_SIZE }, (_, i) => ({
+      signalId: `${RUN_TAG}-${i}`,
+      componentId: `${RUN_TAG}-component-${i % 20}`,
+      componentType: "API",
+      severity: i % 7 === 0 ? "P0" : "P3",
+      rawPayload: { chaosTest: "graceful-shutdown", index: i },
+      occurredAt: new Date().toISOString(),
+    }));
 
-      const shutdownWindowStartedAt = new Date().toISOString();
+    const shutdownWindowStartedAt = new Date().toISOString();
 
-      // Fully await the ingest response before sending SIGTERM — racing
-      // them concurrently risks Docker tearing down the container's port
-      // forwarding mid-response (truncating it) before the app has even
-      // started its own shutdown sequence, which would be a test-harness
-      // artifact, not the thing being tested. The 202 response itself is
-      // near-instant (the buffer accepts in-memory), so the batch is still
-      // realistically draining through the buffer/queue by the time
-      // `stop` below sends SIGTERM a moment later — that's the actual
-      // "in flight" window this test cares about.
-      const ingestRes = await fetch(`${backend.baseUrl}/api/v1/signals`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(signals),
-      });
-      const ingestBody = (await ingestRes.json()) as { accepted?: number };
-      expect(ingestRes.status).toBe(202); // accepted before shutdown began tearing things down
-      expect(ingestBody.accepted).toBe(BATCH_SIZE);
+    // Fully await the ingest response before sending SIGTERM — racing
+    // them concurrently risks Docker tearing down the container's port
+    // forwarding mid-response (truncating it) before the app has even
+    // started its own shutdown sequence, which would be a test-harness
+    // artifact, not the thing being tested. The 202 response itself is
+    // near-instant (the buffer accepts in-memory), so the batch is still
+    // realistically draining through the buffer/queue by the time
+    // `stop` below sends SIGTERM a moment later — that's the actual
+    // "in flight" window this test cares about.
+    const ingestRes = await fetch(`${backend.baseUrl}/api/v1/signals`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(signals),
+    });
+    const ingestBody = (await ingestRes.json()) as { accepted?: number };
+    expect(ingestRes.status).toBe(202); // accepted before shutdown began tearing things down
+    expect(ingestBody.accepted).toBe(BATCH_SIZE);
 
-      await stop(backend.containerName, STOP_GRACE_SECONDS);
-      expect(await isRunning(backend.containerName)).toBe(false); // docker stop returned only once the container actually exited
+    await stop(backend.containerName, STOP_GRACE_SECONDS);
+    expect(await isRunning(backend.containerName)).toBe(false); // docker stop returned only once the container actually exited
 
-      // The shutdown hook itself ran and reported a drain result — proof
-      // this recovered via the graceful path, not merely "the process died
-      // and BullMQ's stalled-job mechanism bailed it out later."
-      const shutdownLogs = await logsSince(backend.containerName, shutdownWindowStartedAt);
-      expect(shutdownLogs).toContain("drained ingestion buffer on shutdown");
-      expect(shutdownLogs).toMatch(/"signal":"SIGTERM"/);
+    // The shutdown hook itself ran and reported a drain result — proof
+    // this recovered via the graceful path, not merely "the process died
+    // and BullMQ's stalled-job mechanism bailed it out later."
+    const shutdownLogs = await logsSince(backend.containerName, shutdownWindowStartedAt);
+    expect(shutdownLogs).toContain("drained ingestion buffer on shutdown");
+    expect(shutdownLogs).toMatch(/"signal":"SIGTERM"/);
 
-      await start(backend.containerName);
+    await start(backend.containerName);
+    await waitFor(
+      async () => {
+        try {
+          const { httpStatus } = await health(backend.baseUrl);
+          return httpStatus === 200 || httpStatus === 503;
+        } catch {
+          return false;
+        }
+      },
+      { timeoutMs: 30_000, description: "backend to come back up after restart" },
+    );
+
+    const { db, close } = await makeMongoDb();
+    try {
       await waitFor(
         async () => {
-          try {
-            const { httpStatus } = await health(backend.baseUrl);
-            return httpStatus === 200 || httpStatus === 503;
-          } catch {
-            return false;
-          }
+          const count = await db
+            .collection("signals")
+            .countDocuments({ signalId: { $regex: `^${RUN_TAG}-` } });
+          return count === BATCH_SIZE;
         },
-        { timeoutMs: 30_000, description: "backend to come back up after restart" },
+        {
+          timeoutMs: 60_000,
+          intervalMs: 1_000,
+          description: "every signal accepted before shutdown to persist",
+        },
       );
-
-      const { db, close } = await makeMongoDb();
-      try {
-        await waitFor(
-          async () => {
-            const count = await db.collection("signals").countDocuments({ signalId: { $regex: `^${RUN_TAG}-` } });
-            return count === BATCH_SIZE;
-          },
-          { timeoutMs: 60_000, intervalMs: 1_000, description: "every signal accepted before shutdown to persist" },
-        );
-      } finally {
-        await close();
-      }
-    },
-    150_000,
-  );
+    } finally {
+      await close();
+    }
+  }, 150_000);
 });

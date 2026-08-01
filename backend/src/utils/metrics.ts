@@ -116,11 +116,18 @@ export class Histogram {
   }
 
   snapshot(): HistogramSnapshot {
-    return { boundariesMs: this.boundariesMs, cumulativeCounts: [...this.counts], sum: this.sumMs, count: this.total };
+    return {
+      boundariesMs: this.boundariesMs,
+      cumulativeCounts: [...this.counts],
+      sum: this.sumMs,
+      count: this.total,
+    };
   }
 }
 
-export const E2E_LATENCY_BUCKETS_MS: readonly number[] = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+export const E2E_LATENCY_BUCKETS_MS: readonly number[] = [
+  10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
+];
 
 /**
  * Per-tick job processed/failed counts, average/p50/p99 end-to-end
@@ -311,7 +318,10 @@ export interface MetricsReporterOptions {
  * this line summarizes is also available in full, structured detail via
  * GET /metrics (Prometheus) and GET /health.
  */
-export function startMetricsReporter(counter: ThroughputCounter, options: MetricsReporterOptions): () => void {
+export function startMetricsReporter(
+  counter: ThroughputCounter,
+  options: MetricsReporterOptions,
+): () => void {
   const intervalMs = options.intervalMs ?? 5000;
   const seconds = intervalMs / 1000;
   let previousTotalDropped = 0;

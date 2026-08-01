@@ -30,7 +30,11 @@ export function FeedViewToggle({ view }: { view: FeedView }): JSX.Element {
   ];
 
   return (
-    <div className="inline-flex overflow-hidden rounded-md border border-border-strong" role="group" aria-label="Incident view">
+    <div
+      className="inline-flex overflow-hidden rounded-md border border-border-strong"
+      role="group"
+      aria-label="Incident view"
+    >
       {options.map((option, index) => {
         const isSelected = option.key === view;
         return (
@@ -40,7 +44,9 @@ export function FeedViewToggle({ view }: { view: FeedView }): JSX.Element {
             aria-pressed={isSelected}
             onClick={() => select(option.key)}
             className={`px-3 py-1 text-sm font-medium ${index > 0 ? "border-l border-border-strong" : ""} ${
-              isSelected ? "bg-ink text-surface-muted" : "bg-surface text-ink-muted hover:bg-surface-raised"
+              isSelected
+                ? "bg-ink text-surface-muted"
+                : "bg-surface text-ink-muted hover:bg-surface-raised"
             } ${FOCUS_RING}`}
           >
             {option.label}

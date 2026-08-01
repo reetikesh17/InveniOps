@@ -11,5 +11,9 @@ import { readFeedView } from "./FeedViewToggle";
  */
 export function LiveFeedPage(): JSX.Element {
   const [searchParams] = useSearchParams();
-  return readFeedView(searchParams) === "closed" ? <ClosedIncidentsView /> : <ActiveIncidentsView />;
+  return readFeedView(searchParams) === "closed" ? (
+    <ClosedIncidentsView />
+  ) : (
+    <ActiveIncidentsView />
+  );
 }

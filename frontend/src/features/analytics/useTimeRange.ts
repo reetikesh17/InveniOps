@@ -73,10 +73,13 @@ export function useTimeRange(): TimeRange {
   const rangeKey: RangeKey = isRangeKey(rangeParam) ? rangeParam : DEFAULT_RANGE;
 
   const intervalParam = searchParams.get("interval");
-  const intervalKey: IntervalKey = isIntervalKey(intervalParam) ? intervalParam : DEFAULT_INTERVAL_FOR_RANGE[rangeKey];
+  const intervalKey: IntervalKey = isIntervalKey(intervalParam)
+    ? intervalParam
+    : DEFAULT_INTERVAL_FOR_RANGE[rangeKey];
 
   const rangeSeconds = RANGE_OPTIONS.find((option) => option.key === rangeKey)?.seconds ?? 21_600;
-  const intervalSeconds = INTERVAL_OPTIONS.find((option) => option.key === intervalKey)?.seconds ?? 900;
+  const intervalSeconds =
+    INTERVAL_OPTIONS.find((option) => option.key === intervalKey)?.seconds ?? 900;
 
   const { fromIso, toIso, fromMs, toMs } = useMemo(() => {
     const now = Date.now();

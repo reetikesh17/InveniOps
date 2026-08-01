@@ -25,7 +25,10 @@ export function Header(): JSX.Element {
     <header className="border-b border-border bg-surface-raised">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-5 gap-y-2 px-4 py-2.5 sm:px-6">
         {/* Wordmark as an equipment stencil */}
-        <Link to="/" className={`flex items-baseline gap-2 rounded-sm ${DISPLAY_HEADING_CLASSES} ${FOCUS_RING}`}>
+        <Link
+          to="/"
+          className={`flex items-baseline gap-2 rounded-sm ${DISPLAY_HEADING_CLASSES} ${FOCUS_RING}`}
+        >
           Incident Console
           <span className={`${EYEBROW_CLASSES} tracking-widest`}>NOC</span>
         </Link>

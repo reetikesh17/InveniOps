@@ -70,7 +70,16 @@ export function buildSignalId(runId, scenario, shard, vu, iter, sampled) {
  * separate correlation log to parse or clock to reconcile beyond
  * container-vs-host, which Docker Desktop keeps in sync.
  */
-export function buildSignal({ runId, scenario, shard, componentCount, severityMix, vu, iter, sampleRate }) {
+export function buildSignal({
+  runId,
+  scenario,
+  shard,
+  componentCount,
+  severityMix,
+  vu,
+  iter,
+  sampleRate,
+}) {
   const sampled = sampleRate > 0 && Math.random() < sampleRate;
   const { componentType, componentId } = pickComponent(componentCount);
   const severity = weightedPick(severityMix);

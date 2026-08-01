@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildHealthResponse, type BuildHealthResponseInput } from "../../../../src/api/routes/health.js";
+import {
+  buildHealthResponse,
+  type BuildHealthResponseInput,
+} from "../../../../src/api/routes/health.js";
 import type { HealthSnapshot } from "../../../../src/services/observability/healthProbeInstance.js";
 import type { BufferStats } from "../../../../src/services/ingestion/buffer.js";
 import { Severity } from "@prisma/client";
@@ -71,14 +74,18 @@ describe("buildHealthResponse", () => {
   );
 
   it("returns 200/degraded (not 503) when dependencies are up but the buffer is shedding", () => {
-    const { httpStatus, body } = buildHealthResponse(makeInput({ bufferStats: makeBufferStats({ state: "shedding" }) }));
+    const { httpStatus, body } = buildHealthResponse(
+      makeInput({ bufferStats: makeBufferStats({ state: "shedding" }) }),
+    );
     expect(httpStatus).toBe(200);
     expect(body.status).toBe("degraded");
     expect(body.buffer.shedding).toBe(true);
   });
 
   it("includes uptime, version, and current throughput", () => {
-    const { body } = buildHealthResponse(makeInput({ uptimeSeconds: 999, version: "9.9.9", signalsPerSecond: 111 }));
+    const { body } = buildHealthResponse(
+      makeInput({ uptimeSeconds: 999, version: "9.9.9", signalsPerSecond: 111 }),
+    );
     expect(body.uptimeSeconds).toBe(999);
     expect(body.version).toBe("9.9.9");
     expect(body.throughput.signalsPerSecond).toBe(111);

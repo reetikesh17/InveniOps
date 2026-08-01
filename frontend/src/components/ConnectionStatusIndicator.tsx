@@ -37,7 +37,9 @@ export function ConnectionStatusIndicator(): JSX.Element {
     <span className={`inline-flex items-center gap-1.5 ${MONO_MICRO_CLASSES}`}>
       <span
         className="h-2 w-2 rounded-full"
-        style={filled ? { backgroundColor: dotColor } : { boxShadow: `inset 0 0 0 1.5px ${dotColor}` }}
+        style={
+          filled ? { backgroundColor: dotColor } : { boxShadow: `inset 0 0 0 1.5px ${dotColor}` }
+        }
         aria-hidden="true"
       />
       {label}

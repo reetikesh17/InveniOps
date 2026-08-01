@@ -8,7 +8,11 @@ export interface ErrorStateProps {
   readonly retryLabel?: string;
 }
 
-export function ErrorState({ message, onRetry, retryLabel = "Retry" }: ErrorStateProps): JSX.Element {
+export function ErrorState({
+  message,
+  onRetry,
+  retryLabel = "Retry",
+}: ErrorStateProps): JSX.Element {
   return (
     <div
       role="alert"

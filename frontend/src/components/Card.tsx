@@ -11,7 +11,12 @@ const PADDING: Record<NonNullable<CardProps["padding"]>, string> = {
   md: "p-4",
 };
 
-export function Card({ children, padding = "md", className = "", ...rest }: CardProps): JSX.Element {
+export function Card({
+  children,
+  padding = "md",
+  className = "",
+  ...rest
+}: CardProps): JSX.Element {
   return (
     <div
       className={`rounded-lg border border-border bg-surface shadow-sm ${PADDING[padding]} ${className}`}

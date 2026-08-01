@@ -52,7 +52,10 @@ function badRequest(res: Response<ErrorResponseBody>, message: string): void {
   res.status(400).json({ error: "validation_error", message });
 }
 
-async function handleThroughput(req: Request, res: Response<ThroughputResponseDto | ErrorResponseBody>): Promise<void> {
+async function handleThroughput(
+  req: Request,
+  res: Response<ThroughputResponseDto | ErrorResponseBody>,
+): Promise<void> {
   const parsed = rangeQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     badRequest(res, "from, to (dates) and interval (positive integer seconds) are required");
@@ -62,27 +65,42 @@ async function handleThroughput(req: Request, res: Response<ThroughputResponseDt
   res.status(200).json(await getService().getThroughput(from, to, interval));
 }
 
-async function handleIncidents(req: Request, res: Response<IncidentCountsResponseDto | ErrorResponseBody>): Promise<void> {
+async function handleIncidents(
+  req: Request,
+  res: Response<IncidentCountsResponseDto | ErrorResponseBody>,
+): Promise<void> {
   const parsed = groupByQuerySchema.safeParse(req.query);
   if (!parsed.success) {
-    badRequest(res, "from, to (dates), interval (positive integer seconds), and groupBy (componentType|severity) are required");
+    badRequest(
+      res,
+      "from, to (dates), interval (positive integer seconds), and groupBy (componentType|severity) are required",
+    );
     return;
   }
   const { from, to, interval, groupBy } = parsed.data;
   res.status(200).json(await getService().getIncidentCounts(from, to, interval, groupBy));
 }
 
-async function handleMttr(req: Request, res: Response<MttrTrendResponseDto | ErrorResponseBody>): Promise<void> {
+async function handleMttr(
+  req: Request,
+  res: Response<MttrTrendResponseDto | ErrorResponseBody>,
+): Promise<void> {
   const parsed = groupByQuerySchema.safeParse(req.query);
   if (!parsed.success) {
-    badRequest(res, "from, to (dates), interval (positive integer seconds), and groupBy (componentType|severity) are required");
+    badRequest(
+      res,
+      "from, to (dates), interval (positive integer seconds), and groupBy (componentType|severity) are required",
+    );
     return;
   }
   const { from, to, interval, groupBy } = parsed.data;
   res.status(200).json(await getService().getMttrTrend(from, to, interval, groupBy));
 }
 
-async function handleComponentHealth(req: Request, res: Response<ComponentHealthDto | ErrorResponseBody>): Promise<void> {
+async function handleComponentHealth(
+  req: Request,
+  res: Response<ComponentHealthDto | ErrorResponseBody>,
+): Promise<void> {
   const { id } = req.params;
   if (!id) {
     badRequest(res, "component id is required");
@@ -100,28 +118,44 @@ export const analyticsRouter = Router();
 
 analyticsRouter.get(
   "/throughput",
-  (req: Request, res: Response<ThroughputResponseDto | ErrorResponseBody>, next: NextFunction): void => {
+  (
+    req: Request,
+    res: Response<ThroughputResponseDto | ErrorResponseBody>,
+    next: NextFunction,
+  ): void => {
     handleThroughput(req, res).catch(next);
   },
 );
 
 analyticsRouter.get(
   "/incidents",
-  (req: Request, res: Response<IncidentCountsResponseDto | ErrorResponseBody>, next: NextFunction): void => {
+  (
+    req: Request,
+    res: Response<IncidentCountsResponseDto | ErrorResponseBody>,
+    next: NextFunction,
+  ): void => {
     handleIncidents(req, res).catch(next);
   },
 );
 
 analyticsRouter.get(
   "/mttr",
-  (req: Request, res: Response<MttrTrendResponseDto | ErrorResponseBody>, next: NextFunction): void => {
+  (
+    req: Request,
+    res: Response<MttrTrendResponseDto | ErrorResponseBody>,
+    next: NextFunction,
+  ): void => {
     handleMttr(req, res).catch(next);
   },
 );
 
 analyticsRouter.get(
   "/components/:id",
-  (req: Request, res: Response<ComponentHealthDto | ErrorResponseBody>, next: NextFunction): void => {
+  (
+    req: Request,
+    res: Response<ComponentHealthDto | ErrorResponseBody>,
+    next: NextFunction,
+  ): void => {
     handleComponentHealth(req, res).catch(next);
   },
 );

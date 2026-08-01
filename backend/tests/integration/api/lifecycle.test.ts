@@ -7,7 +7,11 @@ import { MongoClient, type Db } from "mongodb";
 import { createApp } from "../../../src/api/app.js";
 import { connectClients, disconnectClients } from "../../../src/repositories/clients.js";
 import { signalBuffer } from "../../../src/services/ingestion/signalBufferInstance.js";
-import { startWorkerSystem, stopWorkerSystem, type WorkerSystem } from "../../../src/workers/index.js";
+import {
+  startWorkerSystem,
+  stopWorkerSystem,
+  type WorkerSystem,
+} from "../../../src/workers/index.js";
 import { TEST_DATABASE_URL, TEST_MONGODB_URI } from "../testEnv.js";
 
 const COMPONENT_ID = `LIFECYCLE_TEST_${randomUUID()}`;
@@ -46,10 +50,12 @@ afterAll(async () => {
   });
 
   // Child rows first — work_items is referenced by both with ON DELETE RESTRICT.
-  const workItemIds = (await assertionPrisma.workItem.findMany({
-    where: { componentId: COMPONENT_ID },
-    select: { id: true },
-  })).map((workItem) => workItem.id);
+  const workItemIds = (
+    await assertionPrisma.workItem.findMany({
+      where: { componentId: COMPONENT_ID },
+      select: { id: true },
+    })
+  ).map((workItem) => workItem.id);
   await assertionPrisma.stateTransition.deleteMany({ where: { workItemId: { in: workItemIds } } });
   await assertionPrisma.rcaRecord.deleteMany({ where: { workItemId: { in: workItemIds } } });
   await assertionPrisma.workItem.deleteMany({ where: { componentId: COMPONENT_ID } });
@@ -60,7 +66,11 @@ afterAll(async () => {
   await disconnectClients();
 }, 30_000);
 
-async function waitUntil<T>(fn: () => Promise<T | undefined | null>, timeoutMs: number, intervalMs = 200): Promise<T> {
+async function waitUntil<T>(
+  fn: () => Promise<T | undefined | null>,
+  timeoutMs: number,
+  intervalMs = 200,
+): Promise<T> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const result = await fn();
@@ -128,7 +138,9 @@ describe("incident lifecycle: ingest -> investigate -> resolve -> reject bad clo
     // with signalCount still 0 momentarily, between creation and the
     // increment step, so wait for the count, not just existence).
     const workItemId = await waitUntil(async () => {
-      const workItem = await assertionPrisma.workItem.findFirst({ where: { componentId: COMPONENT_ID } });
+      const workItem = await assertionPrisma.workItem.findFirst({
+        where: { componentId: COMPONENT_ID },
+      });
       return workItem && workItem.signalCount >= 3 ? workItem.id : undefined;
     }, 20_000);
 
@@ -226,7 +238,10 @@ describe("incident lifecycle: ingest -> investigate -> resolve -> reject bad clo
     expect(closed.status).toBe(200);
     expect(closed.body["state"]).toBe("CLOSED");
     expect(closed.body["legalNextStates"]).toEqual([]);
-    expect(closed.body["rca"]).toMatchObject({ rootCauseCategory: "INFRASTRUCTURE_FAILURE", mttrSeconds });
+    expect(closed.body["rca"]).toMatchObject({
+      rootCauseCategory: "INFRASTRUCTURE_FAILURE",
+      mttrSeconds,
+    });
 
     const closedList = await getJson("/api/v1/incidents?limit=200");
     const closedItems = closedList.body["items"] as Array<Record<string, unknown>>;

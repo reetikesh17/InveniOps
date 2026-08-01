@@ -8,7 +8,11 @@ import { logger } from "../../utils/logger.js";
 import { throughputCounter, signalCounters } from "../../utils/metrics.js";
 import type { IngestionSignal } from "../../services/ingestion/buffer.js";
 import { signalBuffer } from "../../services/ingestion/signalBufferInstance.js";
-import { checkTokenBuckets, secondsUntilAvailable, type TokenBucketResult } from "../../rateLimit/tokenBucket.js";
+import {
+  checkTokenBuckets,
+  secondsUntilAvailable,
+  type TokenBucketResult,
+} from "../../rateLimit/tokenBucket.js";
 import { parseSignalBatch, type ValidationFieldError } from "./signalValidation.js";
 import { pickSeverityForComponentType } from "./syntheticSeverity.js";
 
@@ -41,7 +45,9 @@ interface IngestResponseBody {
  * whether the rate limiter itself is working. See
  * tests/chaos/redisOutage.test.ts.
  */
-async function checkRateLimitFailOpen(params: Parameters<typeof checkTokenBuckets>[1]): Promise<TokenBucketResult> {
+async function checkRateLimitFailOpen(
+  params: Parameters<typeof checkTokenBuckets>[1],
+): Promise<TokenBucketResult> {
   try {
     return await checkTokenBuckets(redis, params);
   } catch (error) {
@@ -63,7 +69,9 @@ function setRateLimitHeaders(res: Response, result: TokenBucketResult): void {
   res.setHeader("RateLimit-Remaining", String(Math.max(0, Math.floor(result.ip.remaining))));
   res.setHeader(
     "RateLimit-Reset",
-    String(secondsUntilAvailable(result.ip, config.rateLimit.ip.refillPerSecond, result.ip.capacity)),
+    String(
+      secondsUntilAvailable(result.ip, config.rateLimit.ip.refillPerSecond, result.ip.capacity),
+    ),
   );
 }
 
@@ -114,7 +122,11 @@ async function handleIngest(
     if (parsed.reason === "validation_failed") {
       res
         .status(400)
-        .json({ error: "validation_error", message: "one or more signals failed validation", details: parsed.errors });
+        .json({
+          error: "validation_error",
+          message: "one or more signals failed validation",
+          details: parsed.errors,
+        });
       return;
     }
     res.status(400).json({ error: "validation_error", message: parsed.message, details: [] });
@@ -139,7 +151,10 @@ async function handleIngest(
       ? config.rateLimit.global.refillPerSecond
       : config.rateLimit.ip.refillPerSecond;
 
-    res.setHeader("Retry-After", String(secondsUntilAvailable(limitedBucket, refillPerSecond, cost)));
+    res.setHeader(
+      "Retry-After",
+      String(secondsUntilAvailable(limitedBucket, refillPerSecond, cost)),
+    );
     res.status(429).json({
       error: "rate_limited",
       message: `rate limit exceeded (${rateLimitResult.limitedBy ?? "unknown"})`,
@@ -215,11 +230,17 @@ const SYNTHETIC_COMPONENT_SLOTS = 120;
  * the mix's proportions — modal at the type's strategy floor (RDBMS mostly
  * P0, Cache mostly P2) — while keeping each individual component stable.
  */
-function generateSyntheticSignal(index: number, overrides: SyntheticOverrides, now: Date, correlationId: string): IngestionSignal {
+function generateSyntheticSignal(
+  index: number,
+  overrides: SyntheticOverrides,
+  now: Date,
+  correlationId: string,
+): IngestionSignal {
   const numTypes = COMPONENT_TYPES.length;
   const ranksPerType = Math.max(1, Math.floor(SYNTHETIC_COMPONENT_SLOTS / numTypes));
   const slot = index % SYNTHETIC_COMPONENT_SLOTS;
-  const componentType = overrides.componentType ?? COMPONENT_TYPES[slot % numTypes] ?? ComponentType.API;
+  const componentType =
+    overrides.componentType ?? COMPONENT_TYPES[slot % numTypes] ?? ComponentType.API;
   const rank = Math.floor(slot / numTypes) % ranksPerType;
 
   return {
@@ -229,7 +250,9 @@ function generateSyntheticSignal(index: number, overrides: SyntheticOverrides, n
     componentType,
     // Deterministic per-component severity from the type's mix — an explicit
     // override still wins.
-    severity: overrides.severity ?? pickSeverityForComponentType(componentType, () => (rank + 0.5) / ranksPerType),
+    severity:
+      overrides.severity ??
+      pickSeverityForComponentType(componentType, () => (rank + 0.5) / ranksPerType),
     rawPayload: { synthetic: true, index },
     occurredAt: now,
     receivedAt: now,
@@ -296,7 +319,11 @@ export const signalsRouter = Router();
 
 signalsRouter.post(
   "/",
-  (req: Request, res: Response<IngestResponseBody | ErrorResponseBody>, next: NextFunction): void => {
+  (
+    req: Request,
+    res: Response<IngestResponseBody | ErrorResponseBody>,
+    next: NextFunction,
+  ): void => {
     handleIngest(req, res).catch(next);
   },
 );

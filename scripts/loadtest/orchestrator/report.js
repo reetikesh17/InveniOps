@@ -28,7 +28,8 @@ function fmtBytes(bytes) {
  */
 export function mergeK6Summaries(summaries) {
   const valid = summaries.filter(Boolean);
-  const sumField = (name, field) => valid.reduce((sum, s) => sum + (s.metrics?.[name]?.[field] ?? 0), 0);
+  const sumField = (name, field) =>
+    valid.reduce((sum, s) => sum + (s.metrics?.[name]?.[field] ?? 0), 0);
   const avgField = (name, field) => {
     const vals = valid.map((s) => s.metrics?.[name]?.[field]).filter((v) => typeof v === "number");
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
@@ -63,12 +64,18 @@ export function mergeK6Summaries(summaries) {
     "p(99)": maxField("http_req_duration", "p(99)"),
     max: maxField("http_req_duration", "max"),
     min: (() => {
-      const vals = valid.map((s) => s.metrics?.http_req_duration?.min).filter((v) => typeof v === "number");
+      const vals = valid
+        .map((s) => s.metrics?.http_req_duration?.min)
+        .filter((v) => typeof v === "number");
       return vals.length ? Math.min(...vals) : null;
     })(),
   };
 
-  return { metrics, shardCount: valid.length, note: "avg/p50/p95 are averaged across shards (approximate); p99/max are the worst observed across shards, not averaged." };
+  return {
+    metrics,
+    shardCount: valid.length,
+    note: "avg/p50/p95 are averaged across shards (approximate); p99/max are the worst observed across shards, not averaged.",
+  };
 }
 
 function percentileOf(sortedAsc, p) {
@@ -121,7 +128,8 @@ export function buildReport(input) {
   const bufferSaturated503 = k6.signals_buffer_saturated_503?.count ?? 0;
   const otherStatus = k6.signals_other_status?.count ?? 0;
   const requestErrors = k6.signals_request_errors?.count ?? 0;
-  const totalRequests = accepted202 + rateLimited429 + bufferSaturated503 + otherStatus + requestErrors;
+  const totalRequests =
+    accepted202 + rateLimited429 + bufferSaturated503 + otherStatus + requestErrors;
   const droppedIterations = k6.dropped_iterations?.count ?? 0;
   const durationVals = k6.http_req_duration || {};
 
@@ -184,7 +192,9 @@ export function buildReport(input) {
       peakQueueDepth: resourcePeaks.peakQueueDepth,
       peakDlqSize: resourcePeaks.peakDlqSize,
       peakBackendMemoryBytes: resourcePeaks.peakBackendMemoryBytes,
-      peakBackendMemoryMiB: resourcePeaks.peakBackendMemoryBytes ? resourcePeaks.peakBackendMemoryBytes / 1024 / 1024 : null,
+      peakBackendMemoryMiB: resourcePeaks.peakBackendMemoryBytes
+        ? resourcePeaks.peakBackendMemoryBytes / 1024 / 1024
+        : null,
     },
     warnings,
   };
@@ -207,38 +217,57 @@ export function renderConsoleSummary(report) {
   lines.push("");
   lines.push("EDGE (HTTP)");
   lines.push(`  Total requests:        ${report.edge.totalRequests}`);
-  lines.push(`  202 accepted:          ${report.edge.accepted202}  (${fmtPct(report.edge.accepted202 / (report.edge.totalRequests || 1))})`);
-  lines.push(`  429 rate-limited:      ${report.edge.rateLimited429}  (${fmtPct(report.edge.rateLimited429 / (report.edge.totalRequests || 1))})`);
-  lines.push(`  503 buffer-saturated:  ${report.edge.bufferSaturated503}  (${fmtPct(report.edge.bufferSaturated503 / (report.edge.totalRequests || 1))})`);
+  lines.push(
+    `  202 accepted:          ${report.edge.accepted202}  (${fmtPct(report.edge.accepted202 / (report.edge.totalRequests || 1))})`,
+  );
+  lines.push(
+    `  429 rate-limited:      ${report.edge.rateLimited429}  (${fmtPct(report.edge.rateLimited429 / (report.edge.totalRequests || 1))})`,
+  );
+  lines.push(
+    `  503 buffer-saturated:  ${report.edge.bufferSaturated503}  (${fmtPct(report.edge.bufferSaturated503 / (report.edge.totalRequests || 1))})`,
+  );
   lines.push(`  Other status:          ${report.edge.otherStatus}`);
   lines.push(`  Request errors:        ${report.edge.requestErrors}`);
   lines.push(`  Accepted/sec (avg):    ${report.edge.acceptedPerSec.toFixed(1)}`);
-  lines.push(`  Edge latency:          p50 ${fmtMs(report.edge.latencyMs.p50)}  p95 ${fmtMs(report.edge.latencyMs.p95)}  p99 ${fmtMs(report.edge.latencyMs.p99)}  max ${fmtMs(report.edge.latencyMs.max)}`);
+  lines.push(
+    `  Edge latency:          p50 ${fmtMs(report.edge.latencyMs.p50)}  p95 ${fmtMs(report.edge.latencyMs.p95)}  p99 ${fmtMs(report.edge.latencyMs.p99)}  max ${fmtMs(report.edge.latencyMs.max)}`,
+  );
   if (report.edge.generatorMayHaveBottlenecked) {
-    lines.push(`  ⚠ dropped_iterations=${report.edge.droppedIterations} — the GENERATOR could not keep up with the configured rate; the reported rate above is not the full offered load.`);
+    lines.push(
+      `  ⚠ dropped_iterations=${report.edge.droppedIterations} — the GENERATOR could not keep up with the configured rate; the reported rate above is not the full offered load.`,
+    );
   }
 
   lines.push("");
   lines.push("PERSISTENCE (the actual result of this test)");
   lines.push(`  Persisted to Mongo:    ${report.persistence.totalPersisted}`);
   lines.push(`  Persisted/sec (avg):   ${report.persistence.persistedPerSec.toFixed(1)}`);
-  lines.push(`  ACCEPTED vs PERSISTED GAP: ${report.persistence.gapVsAccepted.gapCount} (${fmtPct(report.persistence.gapVsAccepted.gapPercent)}) — signals the edge said "202 accepted" for but that had not landed in Mongo by the time this run's measurement window closed.`);
+  lines.push(
+    `  ACCEPTED vs PERSISTED GAP: ${report.persistence.gapVsAccepted.gapCount} (${fmtPct(report.persistence.gapVsAccepted.gapPercent)}) — signals the edge said "202 accepted" for but that had not landed in Mongo by the time this run's measurement window closed.`,
+  );
 
   lines.push("");
   lines.push("SHED / DROPPED (by severity, from the backend's own counters)");
   for (const severity of ["P0", "P1", "P2", "P3"]) {
     const reasons = report.backendCounters.droppedBySeverityAndReason[severity] || {};
-    const total = (reasons.shed_ceiling || 0) + (reasons.hard_capacity || 0) + (reasons.sink_failure || 0);
+    const total =
+      (reasons.shed_ceiling || 0) + (reasons.hard_capacity || 0) + (reasons.sink_failure || 0);
     if (total > 0) {
-      lines.push(`  ${severity}: ${total}  (shed_ceiling=${reasons.shed_ceiling || 0} hard_capacity=${reasons.hard_capacity || 0} sink_failure=${reasons.sink_failure || 0})`);
+      lines.push(
+        `  ${severity}: ${total}  (shed_ceiling=${reasons.shed_ceiling || 0} hard_capacity=${reasons.hard_capacity || 0} sink_failure=${reasons.sink_failure || 0})`,
+      );
     }
   }
 
   lines.push("");
   lines.push("END-TO-END LATENCY (receipt → persisted)");
-  lines.push(`  Backend batch histogram (job-level, oldest-in-batch): p50 ${fmtMs(report.endToEndLatency.backendBatchHistogram.p50Ms)}  p95 ${fmtMs(report.endToEndLatency.backendBatchHistogram.p95Ms)}  p99 ${fmtMs(report.endToEndLatency.backendBatchHistogram.p99Ms)}  (n=${report.endToEndLatency.backendBatchHistogram.observationCount})`);
+  lines.push(
+    `  Backend batch histogram (job-level, oldest-in-batch): p50 ${fmtMs(report.endToEndLatency.backendBatchHistogram.p50Ms)}  p95 ${fmtMs(report.endToEndLatency.backendBatchHistogram.p95Ms)}  p99 ${fmtMs(report.endToEndLatency.backendBatchHistogram.p99Ms)}  (n=${report.endToEndLatency.backendBatchHistogram.observationCount})`,
+  );
   const perSignal = report.endToEndLatency.perSignalPollingSample;
-  lines.push(`  Per-signal polling sample: p50 ${fmtMs(perSignal.p50Ms)}  p95 ${fmtMs(perSignal.p95Ms)}  p99 ${fmtMs(perSignal.p99Ms)}  (n=${perSignal.sampleSize})`);
+  lines.push(
+    `  Per-signal polling sample: p50 ${fmtMs(perSignal.p50Ms)}  p95 ${fmtMs(perSignal.p95Ms)}  p99 ${fmtMs(perSignal.p99Ms)}  (n=${perSignal.sampleSize})`,
+  );
 
   lines.push("");
   lines.push("RESOURCE USAGE");

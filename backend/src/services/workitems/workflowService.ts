@@ -51,7 +51,11 @@ export interface WorkflowMetricsWriter {
 
 /** Never throws — see src/services/realtime/eventPublisher.ts. Optional (defaults to a no-op below) so existing tests/callers don't need to supply one. */
 export interface WorkflowEventPublisher {
-  publishWorkItemStateChanged(workItem: WorkItem, fromState: string, toState: string): Promise<void>;
+  publishWorkItemStateChanged(
+    workItem: WorkItem,
+    fromState: string,
+    toState: string,
+  ): Promise<void>;
 }
 
 const noopMetricsWriter: WorkflowMetricsWriter = {
@@ -99,7 +103,11 @@ function toRcaCandidate(rawInput: unknown): RcaValidationCandidate {
 }
 
 function toSnapshot(workItem: WorkItemWithRca): WorkItemSnapshot {
-  return { id: workItem.id, state: workItem.state as WorkItemStateName, firstSignalAt: workItem.firstSignalAt };
+  return {
+    id: workItem.id,
+    state: workItem.state as WorkItemStateName,
+    firstSignalAt: workItem.firstSignalAt,
+  };
 }
 
 /**
@@ -280,7 +288,11 @@ export class WorkflowService {
       ]);
       // Real-time push — a CLOSED incident should disappear from the Live
       // Feed promptly, same as any other transition. Never throws.
-      await this.eventPublisher.publishWorkItemStateChanged(closedWorkItem, snapshot.state, "CLOSED");
+      await this.eventPublisher.publishWorkItemStateChanged(
+        closedWorkItem,
+        snapshot.state,
+        "CLOSED",
+      );
 
       return { outcome: "closed", workItem: closedWorkItem, mttrSeconds: mttrResult.mttrSeconds };
     } catch (error) {

@@ -1,5 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { FOCUS_RING } from "../../components/Button";
 import { Select } from "../../components";
 import { api } from "../../lib/api";
@@ -21,13 +29,23 @@ function formatMttr(ms: number): string {
   return formatDuration(Math.round(ms / 1000));
 }
 
-function GroupByToggle({ value, onChange }: { value: AnalyticsGroupBy; onChange: (v: AnalyticsGroupBy) => void }): JSX.Element {
+function GroupByToggle({
+  value,
+  onChange,
+}: {
+  value: AnalyticsGroupBy;
+  onChange: (v: AnalyticsGroupBy) => void;
+}): JSX.Element {
   const options: { key: AnalyticsGroupBy; label: string }[] = [
     { key: "severity", label: "Severity" },
     { key: "componentType", label: "Component type" },
   ];
   return (
-    <div className="inline-flex overflow-hidden rounded-md border border-border-strong" role="group" aria-label="Group by">
+    <div
+      className="inline-flex overflow-hidden rounded-md border border-border-strong"
+      role="group"
+      aria-label="Group by"
+    >
       {options.map((option, index) => {
         const isSelected = option.key === value;
         return (
@@ -37,7 +55,9 @@ function GroupByToggle({ value, onChange }: { value: AnalyticsGroupBy; onChange:
             aria-pressed={isSelected}
             onClick={() => onChange(option.key)}
             className={`px-2.5 py-1 text-xs font-medium ${index > 0 ? "border-l border-border-strong" : ""} ${
-              isSelected ? "bg-ink text-surface-muted" : "bg-surface text-ink-muted hover:bg-surface-raised"
+              isSelected
+                ? "bg-ink text-surface-muted"
+                : "bg-surface text-ink-muted hover:bg-surface-raised"
             } ${FOCUS_RING}`}
           >
             {option.label}
@@ -56,7 +76,11 @@ function TwoLineLegend({ avg, rolling }: { avg: string; rolling: string }): JSX.
         Bucket average
       </li>
       <li className="flex items-center gap-1.5">
-        <span className="h-1 w-4 rounded-full" style={{ backgroundColor: rolling }} aria-hidden="true" />
+        <span
+          className="h-1 w-4 rounded-full"
+          style={{ backgroundColor: rolling }}
+          aria-hidden="true"
+        />
         Rolling average (4 buckets)
       </li>
     </ul>
@@ -78,7 +102,12 @@ export function MttrPanel({ range }: MttrPanelProps): JSX.Element {
       api.getMttrTrend({ from: fromIso, to: toIso, interval: intervalSeconds, groupBy }, opts),
     [fromIso, toIso, intervalSeconds, groupBy],
   );
-  const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [fromIso, toIso, intervalSeconds, groupBy]);
+  const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [
+    fromIso,
+    toIso,
+    intervalSeconds,
+    groupBy,
+  ]);
 
   const order = groupBy === "severity" ? SEVERITY_ORDER : COMPONENT_TYPE_ORDER;
 
@@ -115,7 +144,11 @@ export function MttrPanel({ range }: MttrPanelProps): JSX.Element {
     }
     return data.points
       .filter((point) => point.value === effectiveValue)
-      .map((point) => ({ bucket: point.bucket, avg: point.avgMttrMs, rolling: point.rollingAvgMttrMs }))
+      .map((point) => ({
+        bucket: point.bucket,
+        avg: point.avgMttrMs,
+        rolling: point.rollingAvgMttrMs,
+      }))
       .sort((a, b) => a.bucket.localeCompare(b.bucket));
   }, [data, effectiveValue]);
 
@@ -175,7 +208,15 @@ export function MttrPanel({ range }: MttrPanelProps): JSX.Element {
                 />
               }
             />
-            <Line type="monotone" dataKey="avg" name="avg" stroke={c.lineFaint} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+            <Line
+              type="monotone"
+              dataKey="avg"
+              name="avg"
+              stroke={c.lineFaint}
+              strokeWidth={1.5}
+              dot={false}
+              isAnimationActive={false}
+            />
             <Line
               type="monotone"
               dataKey="rolling"

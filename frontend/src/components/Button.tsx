@@ -16,17 +16,23 @@ export const FOCUS_RING =
 // stays rationed: only `danger` borrows the P0 severity hue, since a
 // destructive action shares the "critical" meaning.
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary: "bg-ink text-surface-muted hover:bg-ink/85 disabled:bg-border-strong disabled:text-ink-faint",
+  primary:
+    "bg-ink text-surface-muted hover:bg-ink/85 disabled:bg-border-strong disabled:text-ink-faint",
   secondary:
     "bg-surface text-ink border border-border-strong hover:bg-surface-raised disabled:text-ink-faint disabled:bg-surface disabled:border-border",
-  danger: "bg-severity-p0 text-surface-muted hover:opacity-90 disabled:bg-border-strong disabled:text-ink-faint",
+  danger:
+    "bg-severity-p0 text-surface-muted hover:opacity-90 disabled:bg-border-strong disabled:text-ink-faint",
 };
 
 export function Spinner({ className = "h-4 w-4" }: { className?: string }): JSX.Element {
   return (
     <svg className={`animate-spin ${className}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
     </svg>
   );
 }

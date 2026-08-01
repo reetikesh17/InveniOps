@@ -3,7 +3,10 @@ import { Button, Select } from "../../components";
 import { COMPONENT_TYPES, SEVERITIES, WORK_ITEM_STATES } from "../../types";
 import { hasActiveFilters, parseFilters } from "./incidentFilters";
 
-const SEVERITY_OPTIONS = [{ value: "", label: "All severities" }, ...SEVERITIES.map((value) => ({ value, label: value }))];
+const SEVERITY_OPTIONS = [
+  { value: "", label: "All severities" },
+  ...SEVERITIES.map((value) => ({ value, label: value })),
+];
 // Active-view filter only lists the *active* states — CLOSED is excluded here
 // because the active feed never contains closed incidents (they live under the
 // "Closed" view toggle, see FeedViewToggle). Offering "Closed" here would be a
@@ -11,7 +14,10 @@ const SEVERITY_OPTIONS = [{ value: "", label: "All severities" }, ...SEVERITIES.
 const ACTIVE_STATES = WORK_ITEM_STATES.filter((state) => state !== "CLOSED");
 const STATE_OPTIONS = [
   { value: "", label: "All states" },
-  ...ACTIVE_STATES.map((value) => ({ value, label: value.charAt(0) + value.slice(1).toLowerCase() })),
+  ...ACTIVE_STATES.map((value) => ({
+    value,
+    label: value.charAt(0) + value.slice(1).toLowerCase(),
+  })),
 ];
 const COMPONENT_TYPE_OPTIONS = [
   { value: "", label: "All component types" },
@@ -66,7 +72,10 @@ export function IncidentFilterBar(): JSX.Element {
         />
       </div>
       {hasActiveFilters(filters) && (
-        <Button variant="secondary" onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}>
+        <Button
+          variant="secondary"
+          onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}
+        >
           Clear filters
         </Button>
       )}

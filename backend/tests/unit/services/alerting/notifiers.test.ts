@@ -48,7 +48,10 @@ describe("WebhookNotifier", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const notifier = new WebhookNotifier("pagerduty", { url: "https://example.test/hook", timeoutMs: 1000 });
+    const notifier = new WebhookNotifier("pagerduty", {
+      url: "https://example.test/hook",
+      timeoutMs: 1000,
+    });
     await expect(notifier.send(makeAlert(), makeContext())).resolves.toBeUndefined();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -62,14 +65,20 @@ describe("WebhookNotifier", () => {
   it("throws a NotifierDeliveryError on a non-2xx response", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
-    const notifier = new WebhookNotifier("pagerduty", { url: "https://example.test/hook", timeoutMs: 1000 });
+    const notifier = new WebhookNotifier("pagerduty", {
+      url: "https://example.test/hook",
+      timeoutMs: 1000,
+    });
     await expect(notifier.send(makeAlert(), makeContext())).rejects.toThrow(NotifierDeliveryError);
   });
 
   it("throws when the request errors (e.g. network failure)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
 
-    const notifier = new WebhookNotifier("pagerduty", { url: "https://example.test/hook", timeoutMs: 1000 });
+    const notifier = new WebhookNotifier("pagerduty", {
+      url: "https://example.test/hook",
+      timeoutMs: 1000,
+    });
     await expect(notifier.send(makeAlert(), makeContext())).rejects.toThrow(NotifierDeliveryError);
   });
 
@@ -83,7 +92,10 @@ describe("WebhookNotifier", () => {
       }),
     );
 
-    const notifier = new WebhookNotifier("pagerduty", { url: "https://example.test/hook", timeoutMs: 20 });
+    const notifier = new WebhookNotifier("pagerduty", {
+      url: "https://example.test/hook",
+      timeoutMs: 20,
+    });
     await expect(notifier.send(makeAlert(), makeContext())).rejects.toThrow(NotifierDeliveryError);
   });
 });
@@ -98,7 +110,10 @@ describe("SlackNotifier", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const notifier = new SlackNotifier({ url: "https://hooks.slack.test/x", timeoutMs: 1000 });
-    await notifier.send(makeAlert({ title: "RDBMS down" }), makeContext({ componentId: "RDBMS_01" }));
+    await notifier.send(
+      makeAlert({ title: "RDBMS down" }),
+      makeContext({ componentId: "RDBMS_01" }),
+    );
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string) as Record<string, unknown>;

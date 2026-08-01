@@ -29,7 +29,15 @@ import { IncidentTable } from "../incidents/IncidentTable";
 import { COMPONENT_TYPES, ROOT_CAUSE_CATEGORIES, SEVERITIES, WORK_ITEM_STATES } from "../../types";
 import type { WorkItem } from "../../types";
 
-function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }): JSX.Element {
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}): JSX.Element {
   return (
     <section className="flex flex-col gap-3">
       <div>
@@ -180,14 +188,20 @@ export function StyleGuidePage(): JSX.Element {
   return (
     <div className="flex flex-col gap-8 pb-16">
       <div>
-        <h1 className="font-display text-lg font-bold uppercase tracking-[0.1em] text-ink">Style Guide</h1>
+        <h1 className="font-display text-lg font-bold uppercase tracking-[0.1em] text-ink">
+          Style Guide
+        </h1>
         <p className="mt-1 font-body text-prose text-ink-muted">
-          Every reusable primitive in every state — the visual system the rest of the dashboard is built from. Resize
-          the window (375 / 768 / 1440px) and tab through the page to check responsiveness and focus order.
+          Every reusable primitive in every state — the visual system the rest of the dashboard is
+          built from. Resize the window (375 / 768 / 1440px) and tab through the page to check
+          responsiveness and focus order.
         </p>
       </div>
 
-      <Section title="Design tokens" description="Colour is rationed to the four severity hues; everything else is instrument-grey. Referenced by name, never a raw hex.">
+      <Section
+        title="Design tokens"
+        description="Colour is rationed to the four severity hues; everything else is instrument-grey. Referenced by name, never a raw hex."
+      >
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Swatch name="severity-p0" className="bg-severity-p0" />
           <Swatch name="severity-p1" className="bg-severity-p1" />
@@ -210,7 +224,10 @@ export function StyleGuidePage(): JSX.Element {
       >
         <div className="flex flex-col divide-y divide-border">
           {TYPE_SCALE.map((rung) => (
-            <div key={rung.name} className="grid grid-cols-1 items-baseline gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[7rem_1fr_16rem] sm:gap-4">
+            <div
+              key={rung.name}
+              className="grid grid-cols-1 items-baseline gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[7rem_1fr_16rem] sm:gap-4"
+            >
               <span className="font-mono text-mono-micro text-ink-muted">{rung.name}</span>
               <span className={rung.classes}>{rung.sample}</span>
               <span className="font-body text-prose text-ink-muted">{rung.spec}</span>
@@ -226,7 +243,10 @@ export function StyleGuidePage(): JSX.Element {
         <IncidentTable incidents={SAMPLE_INCIDENTS} />
       </Section>
 
-      <Section title="SeverityBadge" description="A rationed colour dot plus the mono code — colour and the P0/P1 code each carry severity independently, so it survives greyscale. (In the feed, severity is the leading spine instead.)">
+      <Section
+        title="SeverityBadge"
+        description="A rationed colour dot plus the mono code — colour and the P0/P1 code each carry severity independently, so it survives greyscale. (In the feed, severity is the leading spine instead.)"
+      >
         <div className="flex flex-wrap items-center gap-3">
           {SEVERITIES.map((severity) => (
             <SeverityBadge key={severity} severity={severity} />
@@ -234,7 +254,10 @@ export function StyleGuidePage(): JSX.Element {
         </div>
       </Section>
 
-      <Section title="AgeDot" description="The spine's age gauge, in isolation: hollow while fresh, fills solid once an OPEN/INVESTIGATING incident has sat past the threshold. A RESOLVED/CLOSED incident never fills, however old.">
+      <Section
+        title="AgeDot"
+        description="The spine's age gauge, in isolation: hollow while fresh, fills solid once an OPEN/INVESTIGATING incident has sat past the threshold. A RESOLVED/CLOSED incident never fills, however old."
+      >
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center gap-2">
             <AgeDot severity="P0" state="OPEN" since={new Date(now - 60_000).toISOString()} />
@@ -245,8 +268,14 @@ export function StyleGuidePage(): JSX.Element {
             <span className="font-mono text-mono-micro text-ink-muted">aged in state (filled)</span>
           </div>
           <div className="flex items-center gap-2">
-            <AgeDot severity="P3" state="RESOLVED" since={new Date(now - 15 * 60_000).toISOString()} />
-            <span className="font-mono text-mono-micro text-ink-muted">resolved, same age (never fills)</span>
+            <AgeDot
+              severity="P3"
+              state="RESOLVED"
+              since={new Date(now - 15 * 60_000).toISOString()}
+            />
+            <span className="font-mono text-mono-micro text-ink-muted">
+              resolved, same age (never fills)
+            </span>
           </div>
         </div>
       </Section>
@@ -259,7 +288,10 @@ export function StyleGuidePage(): JSX.Element {
         </div>
       </Section>
 
-      <Section title="Button" description="primary / secondary / danger, each with normal, loading, and disabled states.">
+      <Section
+        title="Button"
+        description="primary / secondary / danger, each with normal, loading, and disabled states."
+      >
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="flex flex-col gap-2">
             <Button variant="primary">Primary</Button>
@@ -306,15 +338,22 @@ export function StyleGuidePage(): JSX.Element {
       <Section title="Card">
         <Card padding="sm" className="bg-surface-muted">
           <p className="font-body text-prose text-ink">
-            A nested Card at <code className="font-mono text-mono-id">padding=&quot;sm&quot;</code> — Cards compose (this
-            style guide itself is built entirely from them).
+            A nested Card at <code className="font-mono text-mono-id">padding=&quot;sm&quot;</code>{" "}
+            — Cards compose (this style guide itself is built entirely from them).
           </p>
         </Card>
       </Section>
 
-      <Section title="Form fields" description="Input, Select, TextArea, DateTimeInput — each with a default, an error, and a disabled state.">
+      <Section
+        title="Form fields"
+        description="Input, Select, TextArea, DateTimeInput — each with a default, an error, and a disabled state."
+      >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Input label="Component ID" value={textValue} onChange={(e) => setTextValue(e.target.value)} />
+          <Input
+            label="Component ID"
+            value={textValue}
+            onChange={(e) => setTextValue(e.target.value)}
+          />
           <Input label="Component ID" defaultValue="" error="This field is required" />
           <Input label="Component ID" defaultValue="CACHE_CLUSTER_01" disabled />
           <Select
@@ -322,7 +361,10 @@ export function StyleGuidePage(): JSX.Element {
             placeholder="Select a category…"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            options={ROOT_CAUSE_CATEGORIES.map((c) => ({ value: c, label: c.replaceAll("_", " ") }))}
+            options={ROOT_CAUSE_CATEGORIES.map((c) => ({
+              value: c,
+              label: c.replaceAll("_", " "),
+            }))}
           />
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -332,7 +374,12 @@ export function StyleGuidePage(): JSX.Element {
             placeholder="Select…"
             options={COMPONENT_TYPES.map((c) => ({ value: c, label: c }))}
           />
-          <Select label="Component type" disabled options={COMPONENT_TYPES.map((c) => ({ value: c, label: c }))} defaultValue="RDBMS" />
+          <Select
+            label="Component type"
+            disabled
+            options={COMPONENT_TYPES.map((c) => ({ value: c, label: c }))}
+            defaultValue="RDBMS"
+          />
           <DateTimeInput label="Incident start time" />
           <DateTimeInput label="Incident end time" error="End time must be after start time" />
         </div>
@@ -341,7 +388,10 @@ export function StyleGuidePage(): JSX.Element {
         </div>
       </Section>
 
-      <Section title="Skeleton loaders" description="One shape per major layout — the Live Feed list and the Incident Detail page.">
+      <Section
+        title="Skeleton loaders"
+        description="One shape per major layout — the Live Feed list and the Incident Detail page."
+      >
         <div className="flex flex-col gap-6">
           <div>
             <p className="mb-2 font-mono text-mono-micro text-ink-muted">IncidentListSkeleton</p>
@@ -356,7 +406,10 @@ export function StyleGuidePage(): JSX.Element {
 
       <Section title="EmptyState">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <EmptyState headline="No active incidents" body="Everything is quiet — new incidents will appear here as they come in." />
+          <EmptyState
+            headline="No active incidents"
+            body="Everything is quiet — new incidents will appear here as they come in."
+          />
           <EmptyState
             icon={<InboxIcon />}
             headline="No signals yet"
@@ -367,26 +420,48 @@ export function StyleGuidePage(): JSX.Element {
       </Section>
 
       <Section title="ErrorState">
-        <ErrorState message="Couldn't load incidents — the request timed out." onRetry={() => showToast("success", "Retried")} />
+        <ErrorState
+          message="Couldn't load incidents — the request timed out."
+          onRetry={() => showToast("success", "Retried")}
+        />
       </Section>
 
-      <Section title="Toast" description="Transient success/failure feedback — auto-dismisses after 5s, or close it manually.">
+      <Section
+        title="Toast"
+        description="Transient success/failure feedback — auto-dismisses after 5s, or close it manually."
+      >
         <div className="flex flex-wrap gap-3">
-          <Button variant="primary" onClick={() => showToast("success", "RCA submitted — incident closed.")}>
+          <Button
+            variant="primary"
+            onClick={() => showToast("success", "RCA submitted — incident closed.")}
+          >
             Trigger success toast
           </Button>
-          <Button variant="danger" onClick={() => showToast("error", "Transition failed: work item is no longer RESOLVED.")}>
+          <Button
+            variant="danger"
+            onClick={() =>
+              showToast("error", "Transition failed: work item is no longer RESOLVED.")
+            }
+          >
             Trigger error toast
           </Button>
         </div>
       </Section>
 
-      <Section title="RelativeTime" description="Hover any value to see the absolute timestamp; each updates itself on an interval.">
+      <Section
+        title="RelativeTime"
+        description="Hover any value to see the absolute timestamp; each updates itself on an interval."
+      >
         <div className="flex flex-col gap-2 text-sm text-ink">
           {SAMPLE_TIMESTAMPS.map((sample) => (
             <div key={sample.label} className="flex items-center gap-3">
-              <RelativeTime value={new Date(Date.now() - sample.offsetMs)} className="font-mono text-mono-num tabular-nums" />
-              <span className="font-body text-prose text-ink-muted">(constructed as &quot;{sample.label}&quot;)</span>
+              <RelativeTime
+                value={new Date(Date.now() - sample.offsetMs)}
+                className="font-mono text-mono-num tabular-nums"
+              />
+              <span className="font-body text-prose text-ink-muted">
+                (constructed as &quot;{sample.label}&quot;)
+              </span>
             </div>
           ))}
         </div>

@@ -44,7 +44,9 @@ async function waitForHealth(targetUrl) {
   const res = await fetch(`${targetUrl}/health`);
   const body = await res.json();
   if (body.status === "unhealthy") {
-    throw new Error(`Backend reports unhealthy before the test even started: ${JSON.stringify(body)}`);
+    throw new Error(
+      `Backend reports unhealthy before the test even started: ${JSON.stringify(body)}`,
+    );
   }
 }
 
@@ -57,7 +59,12 @@ async function bulkTestOnce(targetUrl, count) {
     body: JSON.stringify({ count }),
   });
   const body = await res.json().catch(() => ({}));
-  return { status: res.status, accepted: body.accepted ?? 0, dropped: body.dropped ?? 0, durationMs: Date.now() - startedAtMs };
+  return {
+    status: res.status,
+    accepted: body.accepted ?? 0,
+    dropped: body.dropped ?? 0,
+    durationMs: Date.now() - startedAtMs,
+  };
 }
 
 /** Keeps `concurrency` bulk-test requests in flight until `stopAtMs`. */
@@ -78,7 +85,9 @@ async function driveLoad(targetUrl, batchSize, concurrency, stopAtMs, totals) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const globalConfig = JSON.parse(readFileSync(path.join(LOADTEST_ROOT, "configs", "scenarios.json"), "utf8"));
+  const globalConfig = JSON.parse(
+    readFileSync(path.join(LOADTEST_ROOT, "configs", "scenarios.json"), "utf8"),
+  );
 
   const durationS = Number(args.durationS ?? 20);
   const batchSize = Number(args.batchSize ?? 2000);
@@ -93,7 +102,9 @@ async function main() {
   const backendContainer = args.backendContainer ?? globalConfig.backendContainer;
 
   await waitForHealth(targetUrl);
-  console.log(`InveniOps pipeline stress — label=${label} target=${targetUrl} durationS=${durationS} batchSize=${batchSize} concurrency=${concurrency}`);
+  console.log(
+    `InveniOps pipeline stress — label=${label} target=${targetUrl} durationS=${durationS} batchSize=${batchSize} concurrency=${concurrency}`,
+  );
 
   const mongoClient = new MongoClient(globalConfig.mongoUri);
   await mongoClient.connect();
@@ -120,7 +131,9 @@ async function main() {
   // through whatever backlog is already durably queued in BullMQ? That's
   // Mongo/Postgres/debouncer/worker-concurrency capacity, cleanly separated
   // from "how aggressively did this script happen to offer load."
-  console.log(`Offered load finished (${offeredWallMs}ms, ${persistedAtOfferStop} persisted so far). Draining the backlog (queue depth -> 0)...`);
+  console.log(
+    `Offered load finished (${offeredWallMs}ms, ${persistedAtOfferStop} persisted so far). Draining the backlog (queue depth -> 0)...`,
+  );
   const drainStartMs = Date.now();
   const drainDeadline = drainStartMs + 60_000;
   let drained = false;

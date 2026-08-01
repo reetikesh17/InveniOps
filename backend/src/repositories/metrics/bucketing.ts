@@ -9,7 +9,9 @@ import type { BucketSpec } from "./types.js";
  */
 export function toBucketSpec(intervalSeconds: number): BucketSpec {
   if (!Number.isInteger(intervalSeconds) || intervalSeconds <= 0) {
-    throw new Error(`interval must be a positive integer number of seconds, got ${intervalSeconds}`);
+    throw new Error(
+      `interval must be a positive integer number of seconds, got ${intervalSeconds}`,
+    );
   }
   if (intervalSeconds % 86_400 === 0) {
     return { unit: "day", binSize: intervalSeconds / 86_400 };

@@ -40,7 +40,10 @@ export async function start(container: string): Promise<void> {
 }
 
 /** SIGKILL immediately — no chance for the process to run its own shutdown hooks. Use this for "crash," stop() for "graceful shutdown." */
-export async function kill(container: string, signal: "SIGKILL" | "SIGTERM" = "SIGKILL"): Promise<void> {
+export async function kill(
+  container: string,
+  signal: "SIGKILL" | "SIGTERM" = "SIGKILL",
+): Promise<void> {
   await docker(["kill", "--signal", signal, container]);
 }
 

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ComponentType, Severity, WorkItemStatus, type WorkItem, type StateTransition } from "@prisma/client";
+import {
+  ComponentType,
+  Severity,
+  WorkItemStatus,
+  type WorkItem,
+  type StateTransition,
+} from "@prisma/client";
 import {
   DashboardProjectionService,
   type WorkItemReadStore,
@@ -7,7 +13,11 @@ import {
   type DashboardCache,
   type Pagination,
 } from "../../../../src/services/dashboard/dashboardProjection.js";
-import { CacheUnavailableError, type IncidentSummary, type ActiveIncidentPage } from "../../../../src/repositories/redis/dashboardCache.js";
+import {
+  CacheUnavailableError,
+  type IncidentSummary,
+  type ActiveIncidentPage,
+} from "../../../../src/repositories/redis/dashboardCache.js";
 import type { SignalDocument } from "../../../../src/repositories/mongo/signalRepository.js";
 import type { WorkItemWithRca } from "../../../../src/repositories/postgres/index.js";
 
@@ -71,7 +81,9 @@ function fakeWorkItemStore(
       return Promise.resolve(workItems.filter((workItem) => workItem.state === "CLOSED").length);
     },
     listTransitions(workItemId: string): Promise<StateTransition[]> {
-      return Promise.resolve(transitions.filter((transition) => transition.workItemId === workItemId));
+      return Promise.resolve(
+        transitions.filter((transition) => transition.workItemId === workItemId),
+      );
     },
   };
 }
@@ -80,7 +92,9 @@ function fakeSignalStore(documents: readonly SignalDocument[]): SignalReadStore 
   return {
     findByWorkItemId(workItemId: string, pagination: Pagination): Promise<SignalDocument[]> {
       const matching = documents.filter((doc) => doc.workItemId === workItemId);
-      return Promise.resolve(matching.slice(pagination.offset, pagination.offset + pagination.limit));
+      return Promise.resolve(
+        matching.slice(pagination.offset, pagination.offset + pagination.limit),
+      );
     },
     countByWorkItemId(workItemId: string): Promise<number> {
       return Promise.resolve(documents.filter((doc) => doc.workItemId === workItemId).length);
@@ -147,10 +161,17 @@ describe("DashboardProjectionService — cache genuinely unavailable (not just c
       makeWorkItem({ id: "wi-1", severity: Severity.P0 }),
       makeWorkItem({ id: "wi-2", severity: Severity.P1 }),
     ];
-    const workItemStore = fakeWorkItemStore(workItems.map((workItem) => ({ ...workItem, rca: null })));
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), unavailableCache(), {
-      repopulateCap: 100,
-    });
+    const workItemStore = fakeWorkItemStore(
+      workItems.map((workItem) => ({ ...workItem, rca: null })),
+    );
+    const service = new DashboardProjectionService(
+      workItemStore,
+      fakeSignalStore([]),
+      unavailableCache(),
+      {
+        repopulateCap: 100,
+      },
+    );
 
     const page = await service.getActiveIncidents({ limit: 10, offset: 0 });
 
@@ -163,9 +184,14 @@ describe("DashboardProjectionService — cache genuinely unavailable (not just c
   it("getIncidentDetail falls back to Postgres for an active incident instead of throwing", async () => {
     const workItem = makeWorkItem({ id: "wi-1", state: WorkItemStatus.INVESTIGATING });
     const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }]);
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), unavailableCache(), {
-      repopulateCap: 100,
-    });
+    const service = new DashboardProjectionService(
+      workItemStore,
+      fakeSignalStore([]),
+      unavailableCache(),
+      {
+        repopulateCap: 100,
+      },
+    );
 
     const detail = await service.getIncidentDetail("wi-1");
 
@@ -176,9 +202,14 @@ describe("DashboardProjectionService — cache genuinely unavailable (not just c
   it("getIncidentSignals still resolves (existence check degrades to Postgres) instead of throwing", async () => {
     const workItem = makeWorkItem({ id: "wi-1" });
     const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }]);
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), unavailableCache(), {
-      repopulateCap: 100,
-    });
+    const service = new DashboardProjectionService(
+      workItemStore,
+      fakeSignalStore([]),
+      unavailableCache(),
+      {
+        repopulateCap: 100,
+      },
+    );
 
     const page = await service.getIncidentSignals("wi-1", { limit: 10, offset: 0 });
 
@@ -194,7 +225,9 @@ describe("DashboardProjectionService.getActiveIncidents", () => {
     await cache.upsertActiveIncident(workItem);
 
     const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }]);
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, { repopulateCap: 100 });
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, {
+      repopulateCap: 100,
+    });
 
     const page = await service.getActiveIncidents({ limit: 10, offset: 0 });
 
@@ -208,9 +241,13 @@ describe("DashboardProjectionService.getActiveIncidents", () => {
       makeWorkItem({ id: "wi-1", severity: Severity.P0 }),
       makeWorkItem({ id: "wi-2", severity: Severity.P1 }),
     ];
-    const workItemStore = fakeWorkItemStore(workItems.map((workItem) => ({ ...workItem, rca: null })));
+    const workItemStore = fakeWorkItemStore(
+      workItems.map((workItem) => ({ ...workItem, rca: null })),
+    );
     const cache = fakeCache(); // starts empty — simulates a cold/flushed cache
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, { repopulateCap: 100 });
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, {
+      repopulateCap: 100,
+    });
 
     const page = await service.getActiveIncidents({ limit: 10, offset: 0 });
 
@@ -225,7 +262,9 @@ describe("DashboardProjectionService.getActiveIncidents", () => {
     await cache.upsertActiveIncident(workItem);
 
     const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }]);
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, { repopulateCap: 100 });
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, {
+      repopulateCap: 100,
+    });
 
     const page = await service.getActiveIncidents({ limit: 10, offset: 50 });
 
@@ -259,7 +298,9 @@ describe("DashboardProjectionService.getClosedIncidents", () => {
   });
 
   it("paginates the closed set", async () => {
-    const workItems = [0, 1, 2].map((i) => makeWorkItem({ id: `wi-${i}`, state: WorkItemStatus.CLOSED, closedAt: NOW }));
+    const workItems = [0, 1, 2].map((i) =>
+      makeWorkItem({ id: `wi-${i}`, state: WorkItemStatus.CLOSED, closedAt: NOW }),
+    );
     const service = new DashboardProjectionService(
       fakeWorkItemStore(workItems.map((workItem) => ({ ...workItem, rca: null }))),
       fakeSignalStore([]),
@@ -280,7 +321,9 @@ describe("DashboardProjectionService.getIncidentDetail", () => {
     const cache = fakeCache();
     await cache.upsertActiveIncident(workItem);
     const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }]);
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, { repopulateCap: 100 });
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, {
+      repopulateCap: 100,
+    });
 
     const detail = await service.getIncidentDetail("wi-1");
 
@@ -294,7 +337,9 @@ describe("DashboardProjectionService.getIncidentDetail", () => {
     const workItem = makeWorkItem({ state: WorkItemStatus.INVESTIGATING });
     const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }]);
     const cache = fakeCache();
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, { repopulateCap: 100 });
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, {
+      repopulateCap: 100,
+    });
 
     const detail = await service.getIncidentDetail("wi-1");
 
@@ -318,20 +363,30 @@ describe("DashboardProjectionService.getIncidentDetail", () => {
     const workItem = makeWorkItem({ state: WorkItemStatus.CLOSED, closedAt: NOW });
     const workItemStore = fakeWorkItemStore([{ ...workItem, rca }]);
     const cache = fakeCache();
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, { repopulateCap: 100 });
+    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), cache, {
+      repopulateCap: 100,
+    });
 
     const detail = await service.getIncidentDetail("wi-1");
 
     expect(detail?.state).toBe("CLOSED");
     expect(detail?.legalNextStates).toEqual([]);
-    expect(detail?.rca).toMatchObject({ mttrSeconds: 3600, rootCauseCategory: "INFRASTRUCTURE_FAILURE" });
+    expect(detail?.rca).toMatchObject({
+      mttrSeconds: 3600,
+      rootCauseCategory: "INFRASTRUCTURE_FAILURE",
+    });
     expect(cache.upsertCalls).toHaveLength(0); // CLOSED never gets written into the active cache
   });
 
   it("returns null for a nonexistent incident", async () => {
-    const service = new DashboardProjectionService(fakeWorkItemStore([]), fakeSignalStore([]), fakeCache(), {
-      repopulateCap: 100,
-    });
+    const service = new DashboardProjectionService(
+      fakeWorkItemStore([]),
+      fakeSignalStore([]),
+      fakeCache(),
+      {
+        repopulateCap: 100,
+      },
+    );
     expect(await service.getIncidentDetail("missing")).toBeNull();
   });
 });
@@ -350,9 +405,14 @@ describe("DashboardProjectionService.getIncidentSignals", () => {
       receivedAt: NOW,
       workItemId: workItem.id,
     }));
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore(documents), fakeCache(), {
-      repopulateCap: 100,
-    });
+    const service = new DashboardProjectionService(
+      workItemStore,
+      fakeSignalStore(documents),
+      fakeCache(),
+      {
+        repopulateCap: 100,
+      },
+    );
 
     const page = await service.getIncidentSignals("wi-1", { limit: 2, offset: 0 });
 
@@ -361,9 +421,14 @@ describe("DashboardProjectionService.getIncidentSignals", () => {
   });
 
   it("returns null for a nonexistent incident rather than an empty page", async () => {
-    const service = new DashboardProjectionService(fakeWorkItemStore([]), fakeSignalStore([]), fakeCache(), {
-      repopulateCap: 100,
-    });
+    const service = new DashboardProjectionService(
+      fakeWorkItemStore([]),
+      fakeSignalStore([]),
+      fakeCache(),
+      {
+        repopulateCap: 100,
+      },
+    );
     expect(await service.getIncidentSignals("missing", { limit: 10, offset: 0 })).toBeNull();
   });
 });
@@ -383,25 +448,46 @@ describe("DashboardProjectionService.getIncidentTransitions", () => {
 
   it("returns the full audit trail for an existing incident, oldest first as the store provides it", async () => {
     const workItem = makeWorkItem();
-    const workItemStore = fakeWorkItemStore([{ ...workItem, rca: null }], [
-      makeTransition({ id: "st-1", toState: WorkItemStatus.INVESTIGATING }),
-      makeTransition({ id: "st-2", fromState: WorkItemStatus.INVESTIGATING, toState: WorkItemStatus.RESOLVED }),
-    ]);
-    const service = new DashboardProjectionService(workItemStore, fakeSignalStore([]), fakeCache(), {
-      repopulateCap: 100,
-    });
+    const workItemStore = fakeWorkItemStore(
+      [{ ...workItem, rca: null }],
+      [
+        makeTransition({ id: "st-1", toState: WorkItemStatus.INVESTIGATING }),
+        makeTransition({
+          id: "st-2",
+          fromState: WorkItemStatus.INVESTIGATING,
+          toState: WorkItemStatus.RESOLVED,
+        }),
+      ],
+    );
+    const service = new DashboardProjectionService(
+      workItemStore,
+      fakeSignalStore([]),
+      fakeCache(),
+      {
+        repopulateCap: 100,
+      },
+    );
 
     const transitions = await service.getIncidentTransitions("wi-1");
 
     expect(transitions).toHaveLength(2);
     expect(transitions?.map((t) => t.id)).toEqual(["st-1", "st-2"]);
-    expect(transitions?.[0]).toMatchObject({ fromState: "OPEN", toState: "INVESTIGATING", actor: "operator-1" });
+    expect(transitions?.[0]).toMatchObject({
+      fromState: "OPEN",
+      toState: "INVESTIGATING",
+      actor: "operator-1",
+    });
   });
 
   it("returns null for a nonexistent incident rather than an empty list", async () => {
-    const service = new DashboardProjectionService(fakeWorkItemStore([]), fakeSignalStore([]), fakeCache(), {
-      repopulateCap: 100,
-    });
+    const service = new DashboardProjectionService(
+      fakeWorkItemStore([]),
+      fakeSignalStore([]),
+      fakeCache(),
+      {
+        repopulateCap: 100,
+      },
+    );
     expect(await service.getIncidentTransitions("missing")).toBeNull();
   });
 });

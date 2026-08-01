@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Button, EmptyState, ErrorState, RelativeTime, SeverityBadge, SkeletonBlock } from "../../components";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  RelativeTime,
+  SeverityBadge,
+  SkeletonBlock,
+} from "../../components";
 import { ChevronDownIcon } from "../../components/icons";
 import { api, ApiRequestError, type ApiErrorInfo } from "../../lib/api";
 import { friendlyErrorMessage } from "../../lib/errorMessages";
@@ -14,7 +21,11 @@ function toErrorInfo(error: unknown): ApiErrorInfo {
   if (error instanceof ApiRequestError) {
     return error.info;
   }
-  return { kind: "unknown", status: 0, message: error instanceof Error ? error.message : "unexpected error" };
+  return {
+    kind: "unknown",
+    status: 0,
+    message: error instanceof Error ? error.message : "unexpected error",
+  };
 }
 
 function isKnownSeverity(value: string): value is Severity {
@@ -32,14 +43,21 @@ function SignalRow({ signal }: { signal: Signal }): JSX.Element {
         aria-expanded={expanded}
         className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-surface-muted"
       >
-        <ChevronDownIcon className={`h-4 w-4 shrink-0 text-ink-muted transition-transform ${expanded ? "rotate-180" : ""}`} />
+        <ChevronDownIcon
+          className={`h-4 w-4 shrink-0 text-ink-muted transition-transform ${expanded ? "rotate-180" : ""}`}
+        />
         {isKnownSeverity(signal.severity) ? (
           <SeverityBadge severity={signal.severity} />
         ) : (
           <span className="text-xs font-semibold text-ink-muted">{signal.severity}</span>
         )}
-        <RelativeTime value={signal.receivedAt} className="font-mono text-mono-num tabular-nums text-ink-muted" />
-        <span className="ml-auto truncate font-mono text-mono-id text-ink-muted">{signal.signalId}</span>
+        <RelativeTime
+          value={signal.receivedAt}
+          className="font-mono text-mono-num tabular-nums text-ink-muted"
+        />
+        <span className="ml-auto truncate font-mono text-mono-id text-ink-muted">
+          {signal.signalId}
+        </span>
       </button>
       {expanded && (
         <pre className="overflow-x-auto bg-surface-muted px-3 py-2.5 font-mono text-xs text-ink">
@@ -72,7 +90,11 @@ export function SignalsPanel({ incidentId }: SignalsPanelProps): JSX.Element {
     setLoading(true);
     setError(null);
     api
-      .getIncidentSignals(incidentId, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, order }, { signal: controller.signal })
+      .getIncidentSignals(
+        incidentId,
+        { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE, order },
+        { signal: controller.signal },
+      )
       .then((result) => {
         if (controller.signal.aborted) {
           return;
@@ -82,7 +104,10 @@ export function SignalsPanel({ incidentId }: SignalsPanelProps): JSX.Element {
         setLoading(false);
       })
       .catch((err: unknown) => {
-        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+        if (
+          controller.signal.aborted ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
           return;
         }
         setError(toErrorInfo(err));
@@ -130,7 +155,10 @@ export function SignalsPanel({ incidentId }: SignalsPanelProps): JSX.Element {
       ) : error ? (
         <ErrorState message={friendlyErrorMessage(error, "signals")} onRetry={retry} />
       ) : total === 0 ? (
-        <EmptyState headline="No signals recorded" body="Nothing has been linked to this incident yet." />
+        <EmptyState
+          headline="No signals recorded"
+          body="Nothing has been linked to this incident yet."
+        />
       ) : (
         <>
           <ul className="overflow-hidden rounded-lg border border-border">
@@ -138,7 +166,13 @@ export function SignalsPanel({ incidentId }: SignalsPanelProps): JSX.Element {
               <SignalRow key={signal.signalId} signal={signal} />
             ))}
           </ul>
-          <Pagination page={page} pageCount={pageCount} totalCount={total} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            totalCount={total}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </>
       )}
     </div>

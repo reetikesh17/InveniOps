@@ -262,7 +262,9 @@ export class PostgresWorkItemRepository {
    * which composes this with the Mongo aggregation-store metrics rather
    * than sourcing everything from one place.
    */
-  async countByComponentIdGroupedByState(componentId: string): Promise<Readonly<Record<string, number>>> {
+  async countByComponentIdGroupedByState(
+    componentId: string,
+  ): Promise<Readonly<Record<string, number>>> {
     const rows = await this.prisma.workItem.groupBy({
       by: ["state"],
       where: { componentId },

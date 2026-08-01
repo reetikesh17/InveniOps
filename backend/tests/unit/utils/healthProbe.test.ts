@@ -81,7 +81,13 @@ describe("CachedProbe", () => {
     let shouldFail = false;
     const probe = new CachedProbe(
       () => (shouldFail ? Promise.reject(new Error("down")) : Promise.resolve("good")),
-      { intervalMs: 10_000, timeoutMs: 1_000, fallback: "fallback", label: "test", logger: { error: vi.fn() } },
+      {
+        intervalMs: 10_000,
+        timeoutMs: 1_000,
+        fallback: "fallback",
+        label: "test",
+        logger: { error: vi.fn() },
+      },
     );
 
     await probe.start();

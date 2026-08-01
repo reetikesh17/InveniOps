@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { Severity, WorkItemStatus } from "@prisma/client";
-import { renderPrometheusMetrics, type MetricsSnapshotInput } from "../../../../src/api/routes/metrics.js";
+import {
+  renderPrometheusMetrics,
+  type MetricsSnapshotInput,
+} from "../../../../src/api/routes/metrics.js";
 import { E2E_LATENCY_BUCKETS_MS } from "../../../../src/utils/metrics.js";
 
 function zeroBySeverity(): Record<Severity, number> {
@@ -13,7 +16,10 @@ function zeroDropReasons(): Record<"shed_ceiling" | "hard_capacity" | "sink_fail
 
 function makeSnapshot(overrides: Partial<MetricsSnapshotInput> = {}): MetricsSnapshotInput {
   return {
-    signalCounters: { received: { ...zeroBySeverity(), [Severity.P1]: 10 }, accepted: { ...zeroBySeverity(), [Severity.P1]: 9 } },
+    signalCounters: {
+      received: { ...zeroBySeverity(), [Severity.P1]: 10 },
+      accepted: { ...zeroBySeverity(), [Severity.P1]: 9 },
+    },
     droppedBySeverityAndReason: {
       [Severity.P0]: zeroDropReasons(),
       [Severity.P1]: { ...zeroDropReasons(), shed_ceiling: 1 },
@@ -45,7 +51,10 @@ function assertValidPrometheusText(text: string): void {
   const lines = text.split("\n").filter((line) => line.length > 0);
   for (const line of lines) {
     const isComment = line.startsWith("# HELP ") || line.startsWith("# TYPE ");
-    expect(isComment || SAMPLE_LINE.test(line), `not a valid HELP/TYPE/sample line: ${JSON.stringify(line)}`).toBe(true);
+    expect(
+      isComment || SAMPLE_LINE.test(line),
+      `not a valid HELP/TYPE/sample line: ${JSON.stringify(line)}`,
+    ).toBe(true);
   }
 }
 

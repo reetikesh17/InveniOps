@@ -4,7 +4,10 @@ import { config } from "../../config/index.js";
 import { prisma, getMongoDb, redis } from "../../repositories/clients.js";
 import { PostgresWorkItemRepository } from "../../repositories/postgres/index.js";
 import { MongoSignalRepository } from "../../repositories/mongo/signalRepository.js";
-import { DashboardCacheRepository, type IncidentSummary } from "../../repositories/redis/dashboardCache.js";
+import {
+  DashboardCacheRepository,
+  type IncidentSummary,
+} from "../../repositories/redis/dashboardCache.js";
 import {
   DashboardProjectionService,
   toIncidentSummary,
@@ -43,14 +46,25 @@ function getServices(): Services {
       dashboard: new DashboardProjectionService(workItemStore, signalStore, cache, {
         repopulateCap: config.dashboard.repopulateCap,
       }),
-      workflow: new WorkflowService(workItemStore, cache, alertDispatcher, getMetricsWriter(), incidentEventPublisher),
+      workflow: new WorkflowService(
+        workItemStore,
+        cache,
+        alertDispatcher,
+        getMetricsWriter(),
+        incidentEventPublisher,
+      ),
     };
   }
   return services;
 }
 
 const paginationQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(config.dashboard.listMaxLimit).default(config.dashboard.listDefaultLimit),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(config.dashboard.listMaxLimit)
+    .default(config.dashboard.listDefaultLimit),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
@@ -94,9 +108,13 @@ type IncidentDetailResponseBody = IncidentDetailDto | ErrorResponseBody;
 type IncidentListResponseBody = PageResponseBody<IncidentSummary> | ErrorResponseBody;
 type SignalsResponseBody = PageResponseBody<SignalDto> | ErrorResponseBody;
 type RcaResponseBody = (IncidentSummary & { readonly mttrSeconds: number }) | ErrorResponseBody;
-type TransitionsResponseBody = { readonly items: readonly StateTransitionDto[] } | ErrorResponseBody;
+type TransitionsResponseBody =
+  { readonly items: readonly StateTransitionDto[] } | ErrorResponseBody;
 
-async function handleListIncidents(req: Request, res: Response<IncidentListResponseBody>): Promise<void> {
+async function handleListIncidents(
+  req: Request,
+  res: Response<IncidentListResponseBody>,
+): Promise<void> {
   const parsed = listQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     res.status(400).json({ error: "validation_error", message: "invalid pagination parameters" });
@@ -112,7 +130,10 @@ async function handleListIncidents(req: Request, res: Response<IncidentListRespo
   res.status(200).json({ items: page.items, total: page.total, limit, offset });
 }
 
-async function handleGetIncident(req: Request, res: Response<IncidentDetailResponseBody>): Promise<void> {
+async function handleGetIncident(
+  req: Request,
+  res: Response<IncidentDetailResponseBody>,
+): Promise<void> {
   const { id } = req.params;
   if (!id) {
     res.status(400).json({ error: "validation_error", message: "incident id is required" });
@@ -128,7 +149,10 @@ async function handleGetIncident(req: Request, res: Response<IncidentDetailRespo
   res.status(200).json(detail);
 }
 
-async function handleGetIncidentSignals(req: Request, res: Response<SignalsResponseBody>): Promise<void> {
+async function handleGetIncidentSignals(
+  req: Request,
+  res: Response<SignalsResponseBody>,
+): Promise<void> {
   const { id } = req.params;
   if (!id) {
     res.status(400).json({ error: "validation_error", message: "incident id is required" });
@@ -151,7 +175,10 @@ async function handleGetIncidentSignals(req: Request, res: Response<SignalsRespo
   res.status(200).json({ items: page.items, total: page.total, limit, offset });
 }
 
-async function handleGetIncidentTransitions(req: Request, res: Response<TransitionsResponseBody>): Promise<void> {
+async function handleGetIncidentTransitions(
+  req: Request,
+  res: Response<TransitionsResponseBody>,
+): Promise<void> {
   const { id } = req.params;
   if (!id) {
     res.status(400).json({ error: "validation_error", message: "incident id is required" });
@@ -179,12 +206,19 @@ async function handleTransition(req: Request, res: Response<IncidentResponseBody
     res.status(400).json({
       error: "validation_error",
       message: "invalid transition request",
-      errors: parsedBody.error.issues.map((issue) => ({ field: issue.path.join(".") || "(root)", message: issue.message })),
+      errors: parsedBody.error.issues.map((issue) => ({
+        field: issue.path.join(".") || "(root)",
+        message: issue.message,
+      })),
     });
     return;
   }
 
-  const outcome = await getServices().workflow.transitionWorkItem(id, parsedBody.data.toState, parsedBody.data.actor);
+  const outcome = await getServices().workflow.transitionWorkItem(
+    id,
+    parsedBody.data.toState,
+    parsedBody.data.actor,
+  );
 
   switch (outcome.outcome) {
     case "not_found":
@@ -220,33 +254,47 @@ async function handleSubmitRca(req: Request, res: Response<RcaResponseBody>): Pr
   // what produces the field-level errors for the 422 response, and it's
   // deliberately the single source of truth for what makes an RCA valid,
   // not a second, possibly-drifting copy of the same rules at this layer.
-  const outcome = await getServices().workflow.submitIncidentRca(id, req.body, parsedActor.data.actor);
+  const outcome = await getServices().workflow.submitIncidentRca(
+    id,
+    req.body,
+    parsedActor.data.actor,
+  );
 
   switch (outcome.outcome) {
     case "not_found":
       res.status(404).json({ error: "not_found", message: `No incident with id ${id}` });
       return;
     case "invalid_rca":
-      res.status(422).json({ error: "invalid_rca", message: "RCA failed validation", errors: outcome.errors });
+      res
+        .status(422)
+        .json({ error: "invalid_rca", message: "RCA failed validation", errors: outcome.errors });
       return;
     case "invalid_state":
       res.status(409).json({ error: "invalid_state", message: outcome.message });
       return;
     case "closed":
-      res.status(200).json({ ...toIncidentSummary(outcome.workItem), mttrSeconds: outcome.mttrSeconds });
+      res
+        .status(200)
+        .json({ ...toIncidentSummary(outcome.workItem), mttrSeconds: outcome.mttrSeconds });
       return;
   }
 }
 
 export const workitemsRouter = Router();
 
-workitemsRouter.get("/", (req: Request, res: Response<IncidentListResponseBody>, next: NextFunction): void => {
-  handleListIncidents(req, res).catch(next);
-});
+workitemsRouter.get(
+  "/",
+  (req: Request, res: Response<IncidentListResponseBody>, next: NextFunction): void => {
+    handleListIncidents(req, res).catch(next);
+  },
+);
 
-workitemsRouter.get("/:id", (req: Request, res: Response<IncidentDetailResponseBody>, next: NextFunction): void => {
-  handleGetIncident(req, res).catch(next);
-});
+workitemsRouter.get(
+  "/:id",
+  (req: Request, res: Response<IncidentDetailResponseBody>, next: NextFunction): void => {
+    handleGetIncident(req, res).catch(next);
+  },
+);
 
 workitemsRouter.get(
   "/:id/signals",
@@ -269,6 +317,9 @@ workitemsRouter.post(
   },
 );
 
-workitemsRouter.post("/:id/rca", (req: Request, res: Response<RcaResponseBody>, next: NextFunction): void => {
-  handleSubmitRca(req, res).catch(next);
-});
+workitemsRouter.post(
+  "/:id/rca",
+  (req: Request, res: Response<RcaResponseBody>, next: NextFunction): void => {
+    handleSubmitRca(req, res).catch(next);
+  },
+);

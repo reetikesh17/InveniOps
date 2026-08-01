@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { api } from "../lib/api";
 import type { HealthResponse } from "../types/health";
 
@@ -52,14 +60,19 @@ export function HealthProvider({ children }: { children: ReactNode }): JSX.Eleme
         setHealth(snapshot);
         setPhase("reachable");
       } catch (error) {
-        if (cancelled || (error instanceof DOMException && error.name === "AbortError") || controller.signal.aborted) {
+        if (
+          cancelled ||
+          (error instanceof DOMException && error.name === "AbortError") ||
+          controller.signal.aborted
+        ) {
           return;
         }
         fails += 1;
         setPhase("unreachable");
       }
       if (!cancelled) {
-        const delay = fails === 0 ? BASE_INTERVAL_MS : Math.min(BASE_INTERVAL_MS * 2 ** fails, MAX_BACKOFF_MS);
+        const delay =
+          fails === 0 ? BASE_INTERVAL_MS : Math.min(BASE_INTERVAL_MS * 2 ** fails, MAX_BACKOFF_MS);
         timer = setTimeout(() => void tick(), delay);
       }
     }

@@ -1,6 +1,12 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Button, EmptyState, ErrorState, IncidentListSkeleton, MONO_MICRO_CLASSES } from "../../components";
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  IncidentListSkeleton,
+  MONO_MICRO_CLASSES,
+} from "../../components";
 import { CheckCircleIcon, ExclamationTriangleIcon } from "../../components/icons";
 import { friendlyErrorMessage } from "../../lib/errorMessages";
 import { useDelayedFlag } from "../../hooks/useDelayedFlag";
@@ -19,10 +25,19 @@ import { Pagination } from "./Pagination";
 const PAGE_SIZE = 25;
 
 // Neutral by default; only polling (a degraded transport) borrows the P1 hue.
-const TRANSPORT_CONFIG: Record<IncidentsConnectionStatus, { label: string; dotStyle: CSSProperties }> = {
-  connecting: { label: "connecting", dotStyle: { boxShadow: "inset 0 0 0 1.5px var(--color-ink-faint)" } },
+const TRANSPORT_CONFIG: Record<
+  IncidentsConnectionStatus,
+  { label: string; dotStyle: CSSProperties }
+> = {
+  connecting: {
+    label: "connecting",
+    dotStyle: { boxShadow: "inset 0 0 0 1.5px var(--color-ink-faint)" },
+  },
   live: { label: "live", dotStyle: { backgroundColor: "var(--color-ink)" } },
-  polling: { label: "polling · updates delayed", dotStyle: { backgroundColor: "var(--color-severity-p1)" } },
+  polling: {
+    label: "polling · updates delayed",
+    dotStyle: { backgroundColor: "var(--color-severity-p1)" },
+  },
 };
 
 function TransportStatusPill({ status }: { status: IncidentsConnectionStatus }): JSX.Element {
@@ -64,7 +79,9 @@ export function ActiveIncidentsView(): JSX.Element {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
-          <h1 className="font-display text-lg font-bold uppercase tracking-[0.1em] text-ink">Live Feed</h1>
+          <h1 className="font-display text-lg font-bold uppercase tracking-[0.1em] text-ink">
+            Live Feed
+          </h1>
           <FeedViewToggle view="active" />
         </div>
         <TransportStatusPill status={connectionStatus} />
@@ -79,7 +96,9 @@ export function ActiveIncidentsView(): JSX.Element {
           className="flex flex-wrap items-center gap-3 rounded-md border border-border border-l-[3px] bg-surface-raised px-4 py-2.5 text-sm"
         >
           <ExclamationTriangleIcon className="h-4 w-4 shrink-0 text-severity-p0" />
-          <span className="font-body text-ink">Couldn&apos;t refresh incidents — showing the last known data.</span>
+          <span className="font-body text-ink">
+            Couldn&apos;t refresh incidents — showing the last known data.
+          </span>
           <Button variant="secondary" onClick={refresh} className="ml-auto">
             Retry
           </Button>
@@ -104,7 +123,10 @@ export function ActiveIncidentsView(): JSX.Element {
           body="Try widening your severity, state, or component type filter."
           action={
             hasActiveFilters(filters) ? (
-              <Button variant="secondary" onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}>
+              <Button
+                variant="secondary"
+                onClick={() => setSearchParams(new URLSearchParams(), { replace: true })}
+              >
                 Clear filters
               </Button>
             ) : undefined
@@ -113,7 +135,13 @@ export function ActiveIncidentsView(): JSX.Element {
       ) : (
         <>
           <IncidentTable incidents={pageItems} />
-          <Pagination page={page} pageCount={pageCount} totalCount={filtered.length} pageSize={PAGE_SIZE} onPageChange={setPage} />
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            totalCount={filtered.length}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
         </>
       )}
     </div>

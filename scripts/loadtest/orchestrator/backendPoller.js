@@ -30,7 +30,13 @@ export function startBackendPoller(baseUrl, intervalMs, onSample) {
       peakDlqSize = Math.max(peakDlqSize, dlqSize);
       latest = { bufferFillRatio, queueDepth, dlqSize };
 
-      onSample({ atMs: Date.now(), elapsedMs: Date.now() - startedAtMs, bufferFillRatio, queueDepth, dlqSize });
+      onSample({
+        atMs: Date.now(),
+        elapsedMs: Date.now() - startedAtMs,
+        bufferFillRatio,
+        queueDepth,
+        dlqSize,
+      });
     } catch (error) {
       onSample({ atMs: Date.now(), elapsedMs: Date.now() - startedAtMs, error: String(error) });
     }

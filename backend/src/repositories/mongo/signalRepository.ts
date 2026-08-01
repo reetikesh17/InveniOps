@@ -77,7 +77,9 @@ export class MongoSignalRepository {
    * treated as failure, since ordered:false means every non-conflicting
    * document in the call still landed.
    */
-  async insertManyIdempotent(signals: readonly SignalDocument[]): Promise<InsertManyIdempotentResult> {
+  async insertManyIdempotent(
+    signals: readonly SignalDocument[],
+  ): Promise<InsertManyIdempotentResult> {
     if (signals.length === 0) {
       return { insertedSignalIds: [] };
     }
@@ -108,7 +110,10 @@ export class MongoSignalRepository {
     }
   }
 
-  async findByWorkItemId(workItemId: string, pagination: SignalPagination): Promise<SignalDocument[]> {
+  async findByWorkItemId(
+    workItemId: string,
+    pagination: SignalPagination,
+  ): Promise<SignalDocument[]> {
     return this.collection
       .find({ workItemId })
       .sort({ receivedAt: pagination.order === "desc" ? -1 : 1 })
@@ -117,7 +122,11 @@ export class MongoSignalRepository {
       .toArray();
   }
 
-  async findByComponentInWindow(componentId: string, from: Date, to: Date): Promise<SignalDocument[]> {
+  async findByComponentInWindow(
+    componentId: string,
+    from: Date,
+    to: Date,
+  ): Promise<SignalDocument[]> {
     return this.collection
       .find({ componentId, receivedAt: { $gte: from, $lte: to } })
       .sort({ receivedAt: 1 })
@@ -148,5 +157,8 @@ function writeErrorIndexes(error: MongoBulkWriteError): readonly number[] {
 
 function isAllDuplicateKeyErrors(error: MongoBulkWriteError): boolean {
   const writeErrors = asWriteErrorArray(error.writeErrors);
-  return writeErrors.length > 0 && writeErrors.every((writeError) => writeError.code === DUPLICATE_KEY_ERROR_CODE);
+  return (
+    writeErrors.length > 0 &&
+    writeErrors.every((writeError) => writeError.code === DUPLICATE_KEY_ERROR_CODE)
+  );
 }

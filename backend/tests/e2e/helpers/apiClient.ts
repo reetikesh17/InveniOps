@@ -54,13 +54,21 @@ export async function postSignals(signals: readonly SignalInput[]): Promise<Inge
     }
 
     const body = (await res.json().catch(() => ({}))) as { accepted?: number; dropped?: number };
-    return { status: res.status, accepted: body.accepted ?? 0, dropped: body.dropped ?? 0, rateLimitRetries: retries };
+    return {
+      status: res.status,
+      accepted: body.accepted ?? 0,
+      dropped: body.dropped ?? 0,
+      rateLimitRetries: retries,
+    };
   }
 }
 
 export interface HealthResponse {
   readonly status: "healthy" | "degraded" | "unhealthy";
-  readonly dependencies: Record<"postgres" | "mongo" | "redis" | "queue", { status: "up" | "down"; latencyMs: number }>;
+  readonly dependencies: Record<
+    "postgres" | "mongo" | "redis" | "queue",
+    { status: "up" | "down"; latencyMs: number }
+  >;
   readonly buffer: { depth: number; capacity: number; fillFraction: number; shedding: boolean };
   readonly queue: { waitingCount: number; activeCount: number; dlqSize: number };
 }
@@ -85,7 +93,9 @@ export interface IncidentSummaryDto {
   readonly rca?: unknown;
 }
 
-export async function getIncident(id: string): Promise<{ status: number; body: IncidentSummaryDto & Record<string, unknown> }> {
+export async function getIncident(
+  id: string,
+): Promise<{ status: number; body: IncidentSummaryDto & Record<string, unknown> }> {
   const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}`);
   const body = (await res.json()) as IncidentSummaryDto & Record<string, unknown>;
   return { status: res.status, body };
@@ -115,7 +125,10 @@ export interface RcaInput {
   readonly preventionSteps?: string;
 }
 
-export async function submitRca(id: string, rca: RcaInput): Promise<{ status: number; body: Record<string, unknown> }> {
+export async function submitRca(
+  id: string,
+  rca: RcaInput,
+): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/rca`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -134,7 +147,9 @@ export interface StateTransitionDto {
   readonly occurredAt: string;
 }
 
-export async function getTransitions(id: string): Promise<{ status: number; items: readonly StateTransitionDto[] }> {
+export async function getTransitions(
+  id: string,
+): Promise<{ status: number; items: readonly StateTransitionDto[] }> {
   const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/transitions`);
   const body = (await res.json().catch(() => ({ items: [] }))) as { items?: StateTransitionDto[] };
   return { status: res.status, items: body.items ?? [] };
@@ -148,8 +163,12 @@ export interface ComponentHealthDto {
   readonly openWorkItemsByState: Record<string, number>;
 }
 
-export async function getComponentHealth(componentId: string): Promise<{ status: number; body: ComponentHealthDto }> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/analytics/components/${encodeURIComponent(componentId)}`);
+export async function getComponentHealth(
+  componentId: string,
+): Promise<{ status: number; body: ComponentHealthDto }> {
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/analytics/components/${encodeURIComponent(componentId)}`,
+  );
   const body = (await res.json()) as ComponentHealthDto;
   return { status: res.status, body };
 }

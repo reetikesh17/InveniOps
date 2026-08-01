@@ -25,13 +25,31 @@ const NINETY_DAYS_SECONDS = 90 * 24 * 60 * 60;
 // High write-volume, short-lived-value series (raw throughput/transition/
 // delivery events) get 30 days. Lower-volume, longer-value series (one row
 // per work item created or closed) get 90 days for a meaningful trend line.
-const SIGNAL_VOLUME: SeriesDefinition = { name: "signal_volume_metrics", retentionSeconds: THIRTY_DAYS_SECONDS };
-const WORKITEM_CREATED: SeriesDefinition = { name: "workitem_created_metrics", retentionSeconds: NINETY_DAYS_SECONDS };
-const STATE_TRANSITION: SeriesDefinition = { name: "state_transition_metrics", retentionSeconds: THIRTY_DAYS_SECONDS };
+const SIGNAL_VOLUME: SeriesDefinition = {
+  name: "signal_volume_metrics",
+  retentionSeconds: THIRTY_DAYS_SECONDS,
+};
+const WORKITEM_CREATED: SeriesDefinition = {
+  name: "workitem_created_metrics",
+  retentionSeconds: NINETY_DAYS_SECONDS,
+};
+const STATE_TRANSITION: SeriesDefinition = {
+  name: "state_transition_metrics",
+  retentionSeconds: THIRTY_DAYS_SECONDS,
+};
 const MTTR: SeriesDefinition = { name: "mttr_metrics", retentionSeconds: NINETY_DAYS_SECONDS };
-const ALERT_DISPATCH: SeriesDefinition = { name: "alert_dispatch_metrics", retentionSeconds: THIRTY_DAYS_SECONDS };
+const ALERT_DISPATCH: SeriesDefinition = {
+  name: "alert_dispatch_metrics",
+  retentionSeconds: THIRTY_DAYS_SECONDS,
+};
 
-const ALL_SERIES: readonly SeriesDefinition[] = [SIGNAL_VOLUME, WORKITEM_CREATED, STATE_TRANSITION, MTTR, ALERT_DISPATCH];
+const ALL_SERIES: readonly SeriesDefinition[] = [
+  SIGNAL_VOLUME,
+  WORKITEM_CREATED,
+  STATE_TRANSITION,
+  MTTR,
+  ALERT_DISPATCH,
+];
 
 // Rolling MTTR aggregate window, in buckets (current + this many prior) —
 // see queryMttrTrend.
@@ -105,7 +123,11 @@ export class MongoMetricsRepository {
       return;
     }
     await this.db.collection(SIGNAL_VOLUME.name).insertMany(
-      points.map((p) => ({ ts: p.ts, dims: { componentId: p.componentId, severity: p.severity }, count: p.count })),
+      points.map((p) => ({
+        ts: p.ts,
+        dims: { componentId: p.componentId, severity: p.severity },
+        count: p.count,
+      })),
       { ordered: false },
     );
   }
@@ -115,7 +137,11 @@ export class MongoMetricsRepository {
       return;
     }
     await this.db.collection(WORKITEM_CREATED.name).insertMany(
-      points.map((p) => ({ ts: p.ts, dims: { componentType: p.componentType, severity: p.severity }, count: 1 })),
+      points.map((p) => ({
+        ts: p.ts,
+        dims: { componentType: p.componentType, severity: p.severity },
+        count: 1,
+      })),
       { ordered: false },
     );
   }
@@ -184,8 +210,16 @@ export class MongoMetricsRepository {
       },
       { $sort: { bucket: 1, componentId: 1, severity: 1 } },
     ];
-    const docs = await this.db.collection(SIGNAL_VOLUME.name).aggregate<ThroughputAggDoc>(pipeline).toArray();
-    return docs.map((doc) => ({ bucket: doc.bucket, componentId: doc.componentId, severity: doc.severity, count: doc.count }));
+    const docs = await this.db
+      .collection(SIGNAL_VOLUME.name)
+      .aggregate<ThroughputAggDoc>(pipeline)
+      .toArray();
+    return docs.map((doc) => ({
+      bucket: doc.bucket,
+      componentId: doc.componentId,
+      severity: doc.severity,
+      count: doc.count,
+    }));
   }
 
   /** Work items created, bucketed by time and grouped by one dimension — GET /analytics/incidents. */
@@ -202,7 +236,12 @@ export class MongoMetricsRepository {
     return docs.map((doc) => ({ bucket: doc.bucket, value: doc.value, count: doc.count }));
   }
 
-  private groupedCountPipeline(from: Date, to: Date, interval: BucketSpec, groupBy: IncidentGroupBy): Document[] {
+  private groupedCountPipeline(
+    from: Date,
+    to: Date,
+    interval: BucketSpec,
+    groupBy: IncidentGroupBy,
+  ): Document[] {
     return [
       { $match: { ts: { $gte: from, $lt: to } } },
       {
@@ -249,7 +288,10 @@ export class MongoMetricsRepository {
           partitionBy: "$_id.value",
           sortBy: { "_id.bucket": 1 },
           output: {
-            rollingAvgMttrMs: { $avg: "$avgMttrMs", window: { documents: [-ROLLING_WINDOW_BUCKETS, 0] } },
+            rollingAvgMttrMs: {
+              $avg: "$avgMttrMs",
+              window: { documents: [-ROLLING_WINDOW_BUCKETS, 0] },
+            },
           },
         },
       },
@@ -276,7 +318,10 @@ export class MongoMetricsRepository {
   }
 
   /** Recent signal volume + all-time average MTTR for one component, both aggregated server-side — feeds GET /analytics/components/:id. */
-  async queryComponentHealth(componentId: string, recentSince: Date): Promise<ComponentHealthAggregate> {
+  async queryComponentHealth(
+    componentId: string,
+    recentSince: Date,
+  ): Promise<ComponentHealthAggregate> {
     const [volumeDocs, mttrDocs] = await Promise.all([
       this.db
         .collection(SIGNAL_VOLUME.name)

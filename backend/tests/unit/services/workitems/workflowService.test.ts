@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ComponentType, Severity, WorkItemStatus, type WorkItem, type RcaRecord } from "@prisma/client";
+import {
+  ComponentType,
+  Severity,
+  WorkItemStatus,
+  type WorkItem,
+  type RcaRecord,
+} from "@prisma/client";
 import {
   WorkflowService,
   type WorkItemWorkflowStore,
@@ -14,7 +20,10 @@ import type {
 } from "../../../../src/repositories/postgres/workItemRepository.js";
 import type { WorkItemWithRca } from "../../../../src/repositories/postgres/index.js";
 import { OptimisticConcurrencyError } from "../../../../src/repositories/postgres/index.js";
-import type { MttrPoint, StateTransitionPoint } from "../../../../src/repositories/metrics/index.js";
+import type {
+  MttrPoint,
+  StateTransitionPoint,
+} from "../../../../src/repositories/metrics/index.js";
 
 const FIRST_SIGNAL_AT = new Date("2026-01-01T00:00:00.000Z");
 const VALID_TEXT = "Restarted the connection pool after exhausting max connections.";
@@ -130,7 +139,10 @@ interface DispatchCall {
   readonly eventType: string;
 }
 
-function fakeDispatcher(): { dispatch(workItem: WorkItem, eventType: string): Promise<void>; calls: DispatchCall[] } {
+function fakeDispatcher(): {
+  dispatch(workItem: WorkItem, eventType: string): Promise<void>;
+  calls: DispatchCall[];
+} {
   const calls: DispatchCall[] = [];
   return {
     calls,
@@ -171,7 +183,11 @@ function fakeEventPublisher(): WorkflowEventPublisher & { readonly calls: StateC
   const calls: StateChangedCall[] = [];
   return {
     calls,
-    publishWorkItemStateChanged(workItem: WorkItem, fromState: string, toState: string): Promise<void> {
+    publishWorkItemStateChanged(
+      workItem: WorkItem,
+      fromState: string,
+      toState: string,
+    ): Promise<void> {
       calls.push({ workItemId: workItem.id, fromState, toState });
       return Promise.resolve();
     },
@@ -212,7 +228,11 @@ describe("WorkflowService.transitionWorkItem", () => {
   });
 
   it("rejects CLOSED unconditionally — no RCA payload is ever supplied through this method, regardless of current state", async () => {
-    for (const state of [WorkItemStatus.OPEN, WorkItemStatus.INVESTIGATING, WorkItemStatus.RESOLVED] as const) {
+    for (const state of [
+      WorkItemStatus.OPEN,
+      WorkItemStatus.INVESTIGATING,
+      WorkItemStatus.RESOLVED,
+    ] as const) {
       const store = fakeWorkItemStore(makeWorkItem({ state }));
       const service = new WorkflowService(store, fakeCache(), fakeDispatcher());
 
@@ -242,7 +262,9 @@ describe("WorkflowService.transitionWorkItem", () => {
 
   it("records a state-transition metrics point with time-in-state measured from the prior updatedAt", async () => {
     const enteredOpenAt = new Date("2026-01-01T00:00:00.000Z");
-    const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN, updatedAt: enteredOpenAt }));
+    const store = fakeWorkItemStore(
+      makeWorkItem({ state: WorkItemStatus.OPEN, updatedAt: enteredOpenAt }),
+    );
     const metricsWriter = fakeMetricsWriter();
     const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), metricsWriter);
     const now = new Date("2026-01-01T00:10:00.000Z"); // 10 minutes later
@@ -257,17 +279,31 @@ describe("WorkflowService.transitionWorkItem", () => {
   it("publishes a real-time state-changed event on a successful transition", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }));
     const eventPublisher = fakeEventPublisher();
-    const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), fakeMetricsWriter(), eventPublisher);
+    const service = new WorkflowService(
+      store,
+      fakeCache(),
+      fakeDispatcher(),
+      fakeMetricsWriter(),
+      eventPublisher,
+    );
 
     await service.transitionWorkItem("wi-1", "INVESTIGATING", "alice");
 
-    expect(eventPublisher.calls).toEqual([{ workItemId: "wi-1", fromState: "OPEN", toState: "INVESTIGATING" }]);
+    expect(eventPublisher.calls).toEqual([
+      { workItemId: "wi-1", fromState: "OPEN", toState: "INVESTIGATING" },
+    ]);
   });
 
   it("does not publish a real-time event for a rejected (illegal) transition", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }));
     const eventPublisher = fakeEventPublisher();
-    const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), fakeMetricsWriter(), eventPublisher);
+    const service = new WorkflowService(
+      store,
+      fakeCache(),
+      fakeDispatcher(),
+      fakeMetricsWriter(),
+      eventPublisher,
+    );
 
     await service.transitionWorkItem("wi-1", "RESOLVED", "alice");
 
@@ -318,7 +354,9 @@ describe("WorkflowService.submitIncidentRca", () => {
   });
 
   it("closes a RESOLVED work item given a valid RCA, computing MTTR from firstSignalAt to submission time, and evicts it from the active cache", async () => {
-    const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.RESOLVED, firstSignalAt: FIRST_SIGNAL_AT }));
+    const store = fakeWorkItemStore(
+      makeWorkItem({ state: WorkItemStatus.RESOLVED, firstSignalAt: FIRST_SIGNAL_AT }),
+    );
     const cache = fakeCache();
     const dispatcher = fakeDispatcher();
     const service = new WorkflowService(store, cache, dispatcher);
@@ -342,7 +380,11 @@ describe("WorkflowService.submitIncidentRca", () => {
   it("records both a RESOLVED->CLOSED state-transition point and an MTTR point on close", async () => {
     const resolvedAt = new Date("2026-01-01T02:00:00.000Z");
     const store = fakeWorkItemStore(
-      makeWorkItem({ state: WorkItemStatus.RESOLVED, firstSignalAt: FIRST_SIGNAL_AT, updatedAt: resolvedAt }),
+      makeWorkItem({
+        state: WorkItemStatus.RESOLVED,
+        firstSignalAt: FIRST_SIGNAL_AT,
+        updatedAt: resolvedAt,
+      }),
     );
     const metricsWriter = fakeMetricsWriter();
     const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), metricsWriter);
@@ -352,7 +394,14 @@ describe("WorkflowService.submitIncidentRca", () => {
 
     expect(result.outcome).toBe("closed");
     expect(metricsWriter.transitionCalls).toEqual([
-      [{ ts: submittedAt, fromState: "RESOLVED", toState: "CLOSED", timeInStateMs: 30 * 60 * 1000 }],
+      [
+        {
+          ts: submittedAt,
+          fromState: "RESOLVED",
+          toState: "CLOSED",
+          timeInStateMs: 30 * 60 * 1000,
+        },
+      ],
     ]);
     expect(metricsWriter.mttrCalls).toEqual([
       [
@@ -381,17 +430,31 @@ describe("WorkflowService.submitIncidentRca", () => {
   it("publishes a real-time state-changed event (RESOLVED->CLOSED) on a successful close", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.RESOLVED }));
     const eventPublisher = fakeEventPublisher();
-    const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), fakeMetricsWriter(), eventPublisher);
+    const service = new WorkflowService(
+      store,
+      fakeCache(),
+      fakeDispatcher(),
+      fakeMetricsWriter(),
+      eventPublisher,
+    );
 
     await service.submitIncidentRca("wi-1", validRcaInput(), "alice");
 
-    expect(eventPublisher.calls).toEqual([{ workItemId: "wi-1", fromState: "RESOLVED", toState: "CLOSED" }]);
+    expect(eventPublisher.calls).toEqual([
+      { workItemId: "wi-1", fromState: "RESOLVED", toState: "CLOSED" },
+    ]);
   });
 
   it("does not publish a real-time event for a rejected RCA submission", async () => {
     const store = fakeWorkItemStore(makeWorkItem({ state: WorkItemStatus.OPEN }));
     const eventPublisher = fakeEventPublisher();
-    const service = new WorkflowService(store, fakeCache(), fakeDispatcher(), fakeMetricsWriter(), eventPublisher);
+    const service = new WorkflowService(
+      store,
+      fakeCache(),
+      fakeDispatcher(),
+      fakeMetricsWriter(),
+      eventPublisher,
+    );
 
     await service.submitIncidentRca("wi-1", validRcaInput(), "alice");
 

@@ -54,7 +54,12 @@ export class MongoSampler {
         const atMs = Date.now();
         onSample({ atMs, elapsedMs: atMs - startedAtMs, count });
       } catch (error) {
-        onSample({ atMs: Date.now(), elapsedMs: Date.now() - startedAtMs, count: null, error: String(error) });
+        onSample({
+          atMs: Date.now(),
+          elapsedMs: Date.now() - startedAtMs,
+          count: null,
+          error: String(error),
+        });
       }
       if (!stopped) {
         timer = setTimeout(tick, intervalMs);
@@ -102,7 +107,10 @@ export class MongoSampler {
           if (seen.has(doc.signalId)) {
             continue;
           }
-          const sentAtMs = doc.rawPayload && typeof doc.rawPayload.sentAtMs === "number" ? doc.rawPayload.sentAtMs : null;
+          const sentAtMs =
+            doc.rawPayload && typeof doc.rawPayload.sentAtMs === "number"
+              ? doc.rawPayload.sentAtMs
+              : null;
           seen.set(doc.signalId, {
             sentAtMs,
             firstSeenAtMs: atMs,

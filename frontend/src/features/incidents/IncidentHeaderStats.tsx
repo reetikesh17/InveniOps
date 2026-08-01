@@ -74,11 +74,21 @@ export function IncidentHeaderStats({ incidents }: IncidentHeaderStatsProps): JS
           <span className={EYEBROW_CLASSES}>Urgency profile</span>
           <div className="flex items-center gap-3">
             {SEVERITIES.map((severity) => (
-              <span key={severity} className="inline-flex items-center gap-1.5" title={`${severity}: ${counts[severity]}`}>
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: SEVERITY_COLOR_VAR[severity] }} aria-hidden="true" />
+              <span
+                key={severity}
+                className="inline-flex items-center gap-1.5"
+                title={`${severity}: ${counts[severity]}`}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: SEVERITY_COLOR_VAR[severity] }}
+                  aria-hidden="true"
+                />
                 {/* Not MONO_MICRO_CLASSES here — that forces lowercase, which would turn "P0" into "p0". */}
                 <span className="font-mono text-mono-micro text-ink-muted">{severity}</span>
-                <span className={`font-mono text-mono-num tabular-nums ${counts[severity] > 0 ? "text-ink" : "text-ink-muted"}`}>
+                <span
+                  className={`font-mono text-mono-num tabular-nums ${counts[severity] > 0 ? "text-ink" : "text-ink-muted"}`}
+                >
                   {counts[severity]}
                 </span>
               </span>
@@ -92,14 +102,21 @@ export function IncidentHeaderStats({ incidents }: IncidentHeaderStatsProps): JS
       </div>
 
       {/* Segmented severity ribbon — proportional runs, 1px gaps via the track. */}
-      <div className="flex h-1.5 w-full gap-px overflow-hidden rounded-sm bg-border" role="img" aria-label={`Active by severity: ${SEVERITIES.map((s) => `${counts[s]} ${s}`).join(", ")}`}>
+      <div
+        className="flex h-1.5 w-full gap-px overflow-hidden rounded-sm bg-border"
+        role="img"
+        aria-label={`Active by severity: ${SEVERITIES.map((s) => `${counts[s]} ${s}`).join(", ")}`}
+      >
         {total === 0
           ? null
           : SEVERITIES.filter((severity) => counts[severity] > 0).map((severity) => (
               <span
                 key={severity}
                 className="h-full"
-                style={{ width: `${(counts[severity] / total) * 100}%`, backgroundColor: SEVERITY_COLOR_VAR[severity] }}
+                style={{
+                  width: `${(counts[severity] / total) * 100}%`,
+                  backgroundColor: SEVERITY_COLOR_VAR[severity],
+                }}
               />
             ))}
       </div>

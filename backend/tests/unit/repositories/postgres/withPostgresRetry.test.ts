@@ -5,7 +5,10 @@ import { withPostgresRetry } from "../../../../src/repositories/postgres/withPos
 const CLIENT_VERSION = "5.16.1";
 
 function knownError(code: string): Prisma.PrismaClientKnownRequestError {
-  return new Prisma.PrismaClientKnownRequestError(`mock ${code}`, { code, clientVersion: CLIENT_VERSION });
+  return new Prisma.PrismaClientKnownRequestError(`mock ${code}`, {
+    code,
+    clientVersion: CLIENT_VERSION,
+  });
 }
 
 // withPostgresRetry hard-codes 3 attempts — asserted directly (not just

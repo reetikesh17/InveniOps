@@ -73,14 +73,24 @@ export function ComponentHealthPanel({ range }: ComponentHealthPanelProps): JSX.
 
   const fetcher = useCallback(
     async (opts: CallOptions): Promise<HealthRow[]> => {
-      const throughput = await api.getThroughput({ from: fromIso, to: toIso, interval: intervalSeconds }, opts);
+      const throughput = await api.getThroughput(
+        { from: fromIso, to: toIso, interval: intervalSeconds },
+        opts,
+      );
       const componentIds = [...new Set(throughput.points.map((point) => point.componentId))];
-      const healths = await Promise.all(componentIds.map((id) => api.getComponentHealth(id, rangeSeconds, opts)));
+      const healths = await Promise.all(
+        componentIds.map((id) => api.getComponentHealth(id, rangeSeconds, opts)),
+      );
       return healths.map(toRow).sort(rankWorstFirst);
     },
     [fromIso, toIso, intervalSeconds, rangeSeconds],
   );
-  const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [fromIso, toIso, intervalSeconds, rangeSeconds]);
+  const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [
+    fromIso,
+    toIso,
+    intervalSeconds,
+    rangeSeconds,
+  ]);
 
   const rows = useMemo(() => data ?? [], [data]);
 
@@ -94,8 +104,15 @@ export function ComponentHealthPanel({ range }: ComponentHealthPanelProps): JSX.
       onRetry={refetch}
       emptyMessage="No component activity in this range."
     >
-      <div role="table" aria-label="Component health" className="overflow-hidden rounded-lg border border-border">
-        <div role="row" className="hidden gap-3 border-b border-border bg-surface-muted px-3 py-2 sm:flex">
+      <div
+        role="table"
+        aria-label="Component health"
+        className="overflow-hidden rounded-lg border border-border"
+      >
+        <div
+          role="row"
+          className="hidden gap-3 border-b border-border bg-surface-muted px-3 py-2 sm:flex"
+        >
           <HeaderCell className="w-8">#</HeaderCell>
           <HeaderCell className="flex-1">Component</HeaderCell>
           <HeaderCell className="w-24 text-right">Incidents</HeaderCell>
@@ -110,26 +127,45 @@ export function ComponentHealthPanel({ range }: ComponentHealthPanelProps): JSX.
               role="row"
               className="flex flex-col gap-1 p-3 text-sm sm:flex-row sm:items-center sm:gap-3"
             >
-              <div role="cell" className="hidden w-8 shrink-0 font-mono text-mono-num tabular-nums text-ink-muted sm:block">
+              <div
+                role="cell"
+                className="hidden w-8 shrink-0 font-mono text-mono-num tabular-nums text-ink-muted sm:block"
+              >
                 {index + 1}
               </div>
               <div role="cell" className="min-w-0 flex-1 font-mono text-mono-id text-ink">
-                <span className="mr-1 font-mono text-mono-num text-ink-muted sm:hidden">#{index + 1}</span>
+                <span className="mr-1 font-mono text-mono-num text-ink-muted sm:hidden">
+                  #{index + 1}
+                </span>
                 {row.componentId}
               </div>
-              <div role="cell" className="shrink-0 font-mono text-mono-num tabular-nums text-ink sm:w-24 sm:text-right">
+              <div
+                role="cell"
+                className="shrink-0 font-mono text-mono-num tabular-nums text-ink sm:w-24 sm:text-right"
+              >
                 <FieldLabel>Incidents</FieldLabel>
                 {row.incidentCount}
               </div>
-              <div role="cell" className="shrink-0 font-mono text-mono-num tabular-nums sm:w-20 sm:text-right">
+              <div
+                role="cell"
+                className="shrink-0 font-mono text-mono-num tabular-nums sm:w-20 sm:text-right"
+              >
                 <FieldLabel>Open</FieldLabel>
-                <span className={row.openCount > 0 ? "font-semibold text-severity-p0" : "text-ink"}>{row.openCount}</span>
+                <span className={row.openCount > 0 ? "font-semibold text-severity-p0" : "text-ink"}>
+                  {row.openCount}
+                </span>
               </div>
-              <div role="cell" className="shrink-0 font-mono text-mono-num tabular-nums text-ink sm:w-24 sm:text-right">
+              <div
+                role="cell"
+                className="shrink-0 font-mono text-mono-num tabular-nums text-ink sm:w-24 sm:text-right"
+              >
                 <FieldLabel>Avg MTTR</FieldLabel>
                 {row.avgMttrMs === null ? "—" : formatDuration(Math.round(row.avgMttrMs / 1000))}
               </div>
-              <div role="cell" className="shrink-0 font-mono text-mono-num tabular-nums text-ink-muted sm:w-24 sm:text-right">
+              <div
+                role="cell"
+                className="shrink-0 font-mono text-mono-num tabular-nums text-ink-muted sm:w-24 sm:text-right"
+              >
                 <FieldLabel>Signals</FieldLabel>
                 {row.recentSignalCount}
               </div>

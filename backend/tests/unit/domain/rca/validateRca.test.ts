@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { validateRca, MIN_TEXT_FIELD_LENGTH } from "../../../../src/domain/rca/validateRca.js";
 import { ROOT_CAUSE_CATEGORIES } from "../../../../src/domain/rca/types.js";
-import type { RcaField, RcaRecord, RcaValidationContext, RcaValidationResult } from "../../../../src/domain/rca/types.js";
+import type {
+  RcaField,
+  RcaRecord,
+  RcaValidationContext,
+  RcaValidationResult,
+} from "../../../../src/domain/rca/types.js";
 
 const FIRST_SIGNAL_AT = new Date("2026-01-01T00:00:00.000Z");
 const NOW = new Date("2026-01-02T00:00:00.000Z");
@@ -33,9 +38,9 @@ describe("validateRca", () => {
 
   describe("incidentStartTime", () => {
     it("fails when undefined", () => {
-      expect(fieldErrors(validateRca(validRca({ incidentStartTime: undefined }), CONTEXT))).toContain(
-        "incidentStartTime",
-      );
+      expect(
+        fieldErrors(validateRca(validRca({ incidentStartTime: undefined }), CONTEXT)),
+      ).toContain("incidentStartTime");
     });
 
     it("fails when null", () => {
@@ -73,9 +78,9 @@ describe("validateRca", () => {
 
   describe("rootCauseCategory", () => {
     it("fails when undefined", () => {
-      expect(fieldErrors(validateRca(validRca({ rootCauseCategory: undefined }), CONTEXT))).toContain(
-        "rootCauseCategory",
-      );
+      expect(
+        fieldErrors(validateRca(validRca({ rootCauseCategory: undefined }), CONTEXT)),
+      ).toContain("rootCauseCategory");
     });
 
     it("fails when an empty string", () => {
@@ -104,38 +109,51 @@ describe("validateRca", () => {
     });
   });
 
-  describe.each(["rootCauseDescription", "fixApplied", "preventionSteps"] as const)("%s", (field) => {
-    it("fails when undefined", () => {
-      expect(fieldErrors(validateRca(validRca({ [field]: undefined }), CONTEXT))).toContain(field);
-    });
+  describe.each(["rootCauseDescription", "fixApplied", "preventionSteps"] as const)(
+    "%s",
+    (field) => {
+      it("fails when undefined", () => {
+        expect(fieldErrors(validateRca(validRca({ [field]: undefined }), CONTEXT))).toContain(
+          field,
+        );
+      });
 
-    it("fails when whitespace only", () => {
-      expect(fieldErrors(validateRca(validRca({ [field]: "        " }), CONTEXT))).toContain(field);
-    });
+      it("fails when whitespace only", () => {
+        expect(fieldErrors(validateRca(validRca({ [field]: "        " }), CONTEXT))).toContain(
+          field,
+        );
+      });
 
-    it("fails when a single character", () => {
-      expect(fieldErrors(validateRca(validRca({ [field]: "x" }), CONTEXT))).toContain(field);
-    });
+      it("fails when a single character", () => {
+        expect(fieldErrors(validateRca(validRca({ [field]: "x" }), CONTEXT))).toContain(field);
+      });
 
-    it(`fails at ${MIN_TEXT_FIELD_LENGTH - 1} characters (one under the minimum)`, () => {
-      const result = validateRca(validRca({ [field]: "a".repeat(MIN_TEXT_FIELD_LENGTH - 1) }), CONTEXT);
-      expect(fieldErrors(result)).toContain(field);
-    });
+      it(`fails at ${MIN_TEXT_FIELD_LENGTH - 1} characters (one under the minimum)`, () => {
+        const result = validateRca(
+          validRca({ [field]: "a".repeat(MIN_TEXT_FIELD_LENGTH - 1) }),
+          CONTEXT,
+        );
+        expect(fieldErrors(result)).toContain(field);
+      });
 
-    it(`passes at exactly ${MIN_TEXT_FIELD_LENGTH} characters (the minimum)`, () => {
-      const result = validateRca(validRca({ [field]: "a".repeat(MIN_TEXT_FIELD_LENGTH) }), CONTEXT);
-      expect(result.valid).toBe(true);
-    });
+      it(`passes at exactly ${MIN_TEXT_FIELD_LENGTH} characters (the minimum)`, () => {
+        const result = validateRca(
+          validRca({ [field]: "a".repeat(MIN_TEXT_FIELD_LENGTH) }),
+          CONTEXT,
+        );
+        expect(result.valid).toBe(true);
+      });
 
-    it("trims surrounding whitespace before checking length", () => {
-      const padded = `   ${"a".repeat(MIN_TEXT_FIELD_LENGTH)}   `;
-      expect(validateRca(validRca({ [field]: padded }), CONTEXT).valid).toBe(true);
-    });
+      it("trims surrounding whitespace before checking length", () => {
+        const padded = `   ${"a".repeat(MIN_TEXT_FIELD_LENGTH)}   `;
+        expect(validateRca(validRca({ [field]: padded }), CONTEXT).valid).toBe(true);
+      });
 
-    it("passes with meaningful text well over the minimum", () => {
-      expect(validateRca(validRca({ [field]: VALID_TEXT }), CONTEXT).valid).toBe(true);
-    });
-  });
+      it("passes with meaningful text well over the minimum", () => {
+        expect(validateRca(validRca({ [field]: VALID_TEXT }), CONTEXT).valid).toBe(true);
+      });
+    },
+  );
 
   describe("incidentEndTime must be strictly after incidentStartTime", () => {
     it("fails when end equals start", () => {
@@ -150,14 +168,20 @@ describe("validateRca", () => {
     it("fails when end is before start", () => {
       const start = new Date("2026-01-01T01:00:00.000Z");
       const end = new Date(start.getTime() - 1000);
-      const result = validateRca(validRca({ incidentStartTime: start, incidentEndTime: end }), CONTEXT);
+      const result = validateRca(
+        validRca({ incidentStartTime: start, incidentEndTime: end }),
+        CONTEXT,
+      );
       expect(fieldErrors(result)).toContain("incidentEndTime");
     });
 
     it("passes when end is exactly one second after start", () => {
       const start = new Date("2026-01-01T01:00:00.000Z");
       const end = new Date(start.getTime() + 1000);
-      const result = validateRca(validRca({ incidentStartTime: start, incidentEndTime: end }), CONTEXT);
+      const result = validateRca(
+        validRca({ incidentStartTime: start, incidentEndTime: end }),
+        CONTEXT,
+      );
       expect(result.valid).toBe(true);
     });
   });
@@ -166,7 +190,10 @@ describe("validateRca", () => {
     it("fails when start is before firstSignalAt", () => {
       const start = new Date(FIRST_SIGNAL_AT.getTime() - 1000);
       const result = validateRca(
-        validRca({ incidentStartTime: start, incidentEndTime: new Date(start.getTime() + 3_600_000) }),
+        validRca({
+          incidentStartTime: start,
+          incidentEndTime: new Date(start.getTime() + 3_600_000),
+        }),
         CONTEXT,
       );
       expect(fieldErrors(result)).toContain("incidentStartTime");
@@ -175,7 +202,10 @@ describe("validateRca", () => {
     it("passes when start equals firstSignalAt exactly", () => {
       const start = new Date(FIRST_SIGNAL_AT.getTime());
       const result = validateRca(
-        validRca({ incidentStartTime: start, incidentEndTime: new Date(start.getTime() + 3_600_000) }),
+        validRca({
+          incidentStartTime: start,
+          incidentEndTime: new Date(start.getTime() + 3_600_000),
+        }),
         CONTEXT,
       );
       expect(result.valid).toBe(true);
@@ -197,7 +227,10 @@ describe("validateRca", () => {
     });
 
     it("fails when incidentEndTime is after now", () => {
-      const result = validateRca(validRca({ incidentEndTime: new Date(NOW.getTime() + 1000) }), CONTEXT);
+      const result = validateRca(
+        validRca({ incidentEndTime: new Date(NOW.getTime() + 1000) }),
+        CONTEXT,
+      );
       expect(fieldErrors(result)).toContain("incidentEndTime");
     });
 
@@ -207,14 +240,20 @@ describe("validateRca", () => {
     it("does not flag incidentStartTime as 'in the future' when it equals now exactly", () => {
       const start = new Date(NOW.getTime());
       const end = new Date(start.getTime() + 1000);
-      const result = validateRca(validRca({ incidentStartTime: start, incidentEndTime: end }), CONTEXT);
+      const result = validateRca(
+        validRca({ incidentStartTime: start, incidentEndTime: end }),
+        CONTEXT,
+      );
       expect(fieldErrors(result)).not.toContain("incidentStartTime");
     });
 
     it("passes when incidentEndTime equals now exactly", () => {
       const end = new Date(NOW.getTime());
       const start = new Date(end.getTime() - 1000);
-      const result = validateRca(validRca({ incidentStartTime: start, incidentEndTime: end }), CONTEXT);
+      const result = validateRca(
+        validRca({ incidentStartTime: start, incidentEndTime: end }),
+        CONTEXT,
+      );
       expect(result.valid).toBe(true);
     });
   });

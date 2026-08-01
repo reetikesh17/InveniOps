@@ -13,8 +13,18 @@ import { toBucketSpec } from "../../repositories/metrics/index.js";
 // substitute fakes with zero real Postgres/Mongo.
 export interface MetricsQueryStore {
   queryThroughput(from: Date, to: Date, interval: BucketSpec): Promise<ThroughputBucket[]>;
-  queryIncidentCounts(from: Date, to: Date, interval: BucketSpec, groupBy: IncidentGroupBy): Promise<GroupedCountBucket[]>;
-  queryMttrTrend(from: Date, to: Date, interval: BucketSpec, groupBy: IncidentGroupBy): Promise<MttrTrendBucket[]>;
+  queryIncidentCounts(
+    from: Date,
+    to: Date,
+    interval: BucketSpec,
+    groupBy: IncidentGroupBy,
+  ): Promise<GroupedCountBucket[]>;
+  queryMttrTrend(
+    from: Date,
+    to: Date,
+    interval: BucketSpec,
+    groupBy: IncidentGroupBy,
+  ): Promise<MttrTrendBucket[]>;
   queryComponentHealth(componentId: string, recentSince: Date): Promise<ComponentHealthAggregate>;
 }
 
@@ -87,8 +97,16 @@ export class AnalyticsQueryService {
     private readonly workItemStore: ComponentWorkItemStore,
   ) {}
 
-  async getThroughput(from: Date, to: Date, intervalSeconds: number): Promise<ThroughputResponseDto> {
-    const buckets = await this.metricsStore.queryThroughput(from, to, toBucketSpec(intervalSeconds));
+  async getThroughput(
+    from: Date,
+    to: Date,
+    intervalSeconds: number,
+  ): Promise<ThroughputResponseDto> {
+    const buckets = await this.metricsStore.queryThroughput(
+      from,
+      to,
+      toBucketSpec(intervalSeconds),
+    );
     return {
       from: from.toISOString(),
       to: to.toISOString(),
@@ -108,13 +126,22 @@ export class AnalyticsQueryService {
     intervalSeconds: number,
     groupBy: IncidentGroupBy,
   ): Promise<IncidentCountsResponseDto> {
-    const buckets = await this.metricsStore.queryIncidentCounts(from, to, toBucketSpec(intervalSeconds), groupBy);
+    const buckets = await this.metricsStore.queryIncidentCounts(
+      from,
+      to,
+      toBucketSpec(intervalSeconds),
+      groupBy,
+    );
     return {
       from: from.toISOString(),
       to: to.toISOString(),
       intervalSeconds,
       groupBy,
-      points: buckets.map((bucket) => ({ bucket: bucket.bucket.toISOString(), value: bucket.value, count: bucket.count })),
+      points: buckets.map((bucket) => ({
+        bucket: bucket.bucket.toISOString(),
+        value: bucket.value,
+        count: bucket.count,
+      })),
     };
   }
 
@@ -124,7 +151,12 @@ export class AnalyticsQueryService {
     intervalSeconds: number,
     groupBy: IncidentGroupBy,
   ): Promise<MttrTrendResponseDto> {
-    const buckets = await this.metricsStore.queryMttrTrend(from, to, toBucketSpec(intervalSeconds), groupBy);
+    const buckets = await this.metricsStore.queryMttrTrend(
+      from,
+      to,
+      toBucketSpec(intervalSeconds),
+      groupBy,
+    );
     return {
       from: from.toISOString(),
       to: to.toISOString(),
@@ -140,7 +172,10 @@ export class AnalyticsQueryService {
     };
   }
 
-  async getComponentHealth(componentId: string, windowSeconds: number): Promise<ComponentHealthDto> {
+  async getComponentHealth(
+    componentId: string,
+    windowSeconds: number,
+  ): Promise<ComponentHealthDto> {
     const recentSince = new Date(Date.now() - windowSeconds * 1000);
     const [aggregate, openWorkItemsByState] = await Promise.all([
       this.metricsStore.queryComponentHealth(componentId, recentSince),

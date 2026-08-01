@@ -23,8 +23,16 @@ export interface ValidationFieldError {
 
 export type SignalBatchParseResult =
   | { readonly ok: true; readonly signals: readonly SignalInput[] }
-  | { readonly ok: false; readonly reason: "empty_batch" | "batch_too_large"; readonly message: string }
-  | { readonly ok: false; readonly reason: "validation_failed"; readonly errors: readonly ValidationFieldError[] };
+  | {
+      readonly ok: false;
+      readonly reason: "empty_batch" | "batch_too_large";
+      readonly message: string;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "validation_failed";
+      readonly errors: readonly ValidationFieldError[];
+    };
 
 /**
  * Accepts either a single signal object or a JSON array of them (the POST

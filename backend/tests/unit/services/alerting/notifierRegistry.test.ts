@@ -3,7 +3,11 @@ import { createNotifierRegistry } from "../../../../src/services/alerting/notifi
 import { WebhookNotifier } from "../../../../src/services/alerting/notifiers/webhook.js";
 import { SlackNotifier } from "../../../../src/services/alerting/notifiers/slack.js";
 
-function fakeLogger(): { info: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn> } {
+function fakeLogger(): {
+  info: ReturnType<typeof vi.fn>;
+  warn: ReturnType<typeof vi.fn>;
+  error: ReturnType<typeof vi.fn>;
+} {
   return { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
 }
 
@@ -24,7 +28,12 @@ describe("createNotifierRegistry", () => {
     ).not.toThrow();
 
     const registry = createNotifierRegistry(
-      { slackWebhookUrl: undefined, pagerdutyWebhookUrl: undefined, emailWebhookUrl: undefined, channelTimeoutMs: 1000 },
+      {
+        slackWebhookUrl: undefined,
+        pagerdutyWebhookUrl: undefined,
+        emailWebhookUrl: undefined,
+        channelTimeoutMs: 1000,
+      },
       logger,
     );
 
@@ -37,7 +46,12 @@ describe("createNotifierRegistry", () => {
   it("logs a startup warning (not an error, not a throw) for each unconfigured channel", () => {
     const logger = fakeLogger();
     createNotifierRegistry(
-      { slackWebhookUrl: undefined, pagerdutyWebhookUrl: undefined, emailWebhookUrl: undefined, channelTimeoutMs: 1000 },
+      {
+        slackWebhookUrl: undefined,
+        pagerdutyWebhookUrl: undefined,
+        emailWebhookUrl: undefined,
+        channelTimeoutMs: 1000,
+      },
       logger,
     );
 

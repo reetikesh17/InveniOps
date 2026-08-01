@@ -31,7 +31,13 @@ export function makeSignal(overrides: Partial<SignalInput> = {}): SignalInput {
 
 export interface IngestResult {
   readonly status: number;
-  readonly body: { accepted?: number; dropped?: number; signalIds?: string[]; error?: string; message?: string };
+  readonly body: {
+    accepted?: number;
+    dropped?: number;
+    signalIds?: string[];
+    error?: string;
+    message?: string;
+  };
   readonly durationMs: number;
 }
 
@@ -43,11 +49,16 @@ function withOccurredAt(signal: SignalInput): SignalInput {
   return { ...signal, occurredAt: signal.occurredAt ?? new Date().toISOString() };
 }
 
-export async function postSignals(signals: SignalInput | readonly SignalInput[], timeoutMs = 10_000): Promise<IngestResult> {
+export async function postSignals(
+  signals: SignalInput | readonly SignalInput[],
+  timeoutMs = 10_000,
+): Promise<IngestResult> {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const normalized = Array.isArray(signals) ? signals.map(withOccurredAt) : withOccurredAt(signals as SignalInput);
+  const normalized = Array.isArray(signals)
+    ? signals.map(withOccurredAt)
+    : withOccurredAt(signals as SignalInput);
   try {
     const res = await fetch(`${API_BASE_URL}/api/v1/signals`, {
       method: "POST",
@@ -64,7 +75,10 @@ export async function postSignals(signals: SignalInput | readonly SignalInput[],
 
 export interface HealthResponse {
   readonly status: "healthy" | "degraded" | "unhealthy";
-  readonly dependencies: Record<"postgres" | "mongo" | "redis" | "queue", { status: "up" | "down"; latencyMs: number }>;
+  readonly dependencies: Record<
+    "postgres" | "mongo" | "redis" | "queue",
+    { status: "up" | "down"; latencyMs: number }
+  >;
   readonly buffer: { depth: number; capacity: number; fillFraction: number; shedding: boolean };
   readonly queue: { waitingCount: number; activeCount: number; dlqSize: number };
 }
@@ -88,13 +102,20 @@ export interface IncidentSummaryDto {
   readonly signalCount: number;
 }
 
-export async function listActiveIncidents(limit = 50): Promise<{ status: number; items: IncidentSummaryDto[]; total: number }> {
+export async function listActiveIncidents(
+  limit = 50,
+): Promise<{ status: number; items: IncidentSummaryDto[]; total: number }> {
   const res = await fetch(`${API_BASE_URL}/api/v1/incidents?limit=${limit}`);
-  const body = (await res.json().catch(() => ({ items: [], total: 0 }))) as { items?: IncidentSummaryDto[]; total?: number };
+  const body = (await res.json().catch(() => ({ items: [], total: 0 }))) as {
+    items?: IncidentSummaryDto[];
+    total?: number;
+  };
   return { status: res.status, items: body.items ?? [], total: body.total ?? 0 };
 }
 
-export async function getIncident(id: string): Promise<{ status: number; body: Record<string, unknown> }> {
+export async function getIncident(
+  id: string,
+): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}`);
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   return { status: res.status, body };
@@ -110,12 +131,15 @@ export async function transitionIncident(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/transition`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ toState, actor }),
-      signal: controller.signal,
-    });
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/transition`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toState, actor }),
+        signal: controller.signal,
+      },
+    );
     const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     return { status: res.status, body, durationMs: Date.now() - startedAt };
   } finally {

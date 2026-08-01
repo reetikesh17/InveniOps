@@ -27,7 +27,11 @@ function resolvedWorkItem(): WorkItemSnapshot {
 describe("createRcaCloseGuard", () => {
   it("allows RESOLVED -> CLOSED through the real state graph when the RCA is valid", () => {
     const graph = createWorkItemStateGraph(createRcaCloseGuard(() => NOW));
-    const context: TransitionContext = { workItem: resolvedWorkItem(), to: "CLOSED", payload: validRca() };
+    const context: TransitionContext = {
+      workItem: resolvedWorkItem(),
+      to: "CLOSED",
+      payload: validRca(),
+    };
 
     expect(graph.RESOLVED.transition(context)).toBe(graph.CLOSED);
   });
@@ -35,7 +39,11 @@ describe("createRcaCloseGuard", () => {
   it("blocks RESOLVED -> CLOSED through the real state graph when the RCA is invalid", () => {
     const graph = createWorkItemStateGraph(createRcaCloseGuard(() => NOW));
     const invalidRca: RcaRecord = { ...validRca(), fixApplied: "" };
-    const context: TransitionContext = { workItem: resolvedWorkItem(), to: "CLOSED", payload: invalidRca };
+    const context: TransitionContext = {
+      workItem: resolvedWorkItem(),
+      to: "CLOSED",
+      payload: invalidRca,
+    };
 
     expect(() => graph.RESOLVED.transition(context)).toThrow(InvalidTransitionError);
   });
@@ -50,7 +58,9 @@ describe("createRcaCloseGuard", () => {
   it("returns false when the payload is not an RCA-shaped object", () => {
     const guard = createRcaCloseGuard(() => NOW);
 
-    expect(guard({ workItem: resolvedWorkItem(), to: "CLOSED", payload: "not an object" })).toBe(false);
+    expect(guard({ workItem: resolvedWorkItem(), to: "CLOSED", payload: "not an object" })).toBe(
+      false,
+    );
     expect(guard({ workItem: resolvedWorkItem(), to: "CLOSED", payload: 42 })).toBe(false);
   });
 

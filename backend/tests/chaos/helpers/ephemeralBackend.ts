@@ -76,7 +76,11 @@ export async function startEphemeralBackend(
         return false;
       }
     },
-    { timeoutMs: 30_000, intervalMs: 500, description: `ephemeral backend ${containerName} to respond on /health` },
+    {
+      timeoutMs: 30_000,
+      intervalMs: 500,
+      description: `ephemeral backend ${containerName} to respond on /health`,
+    },
   );
 
   return {

@@ -36,11 +36,10 @@ export const RCA_FIELD_LABELS: Record<RcaFieldName, string> = {
   preventionSteps: "Prevention steps",
 };
 
-const TEXT_FIELDS: readonly Extract<RcaFieldName, "rootCauseDescription" | "fixApplied" | "preventionSteps">[] = [
-  "rootCauseDescription",
-  "fixApplied",
-  "preventionSteps",
-];
+const TEXT_FIELDS: readonly Extract<
+  RcaFieldName,
+  "rootCauseDescription" | "fixApplied" | "preventionSteps"
+>[] = ["rootCauseDescription", "fixApplied", "preventionSteps"];
 
 export interface RcaFormValues {
   /** All datetime fields are `datetime-local` strings ("YYYY-MM-DDTHH:mm"), empty when unset. */
@@ -82,7 +81,10 @@ function isKnownCategory(value: string): boolean {
  * the backend. Returns at most one message per field (the first rule that
  * fails), which is what the inline UI displays.
  */
-export function validateRcaForm(values: RcaFormValues, context: RcaValidationContext): RcaFieldErrors {
+export function validateRcaForm(
+  values: RcaFormValues,
+  context: RcaValidationContext,
+): RcaFieldErrors {
   const errors: RcaFieldErrors = {};
 
   const start = parseLocal(values.incidentStartTime);
@@ -107,7 +109,8 @@ export function validateRcaForm(values: RcaFormValues, context: RcaValidationCon
     if (trimmed.length === 0) {
       errors[field] = `${RCA_FIELD_LABELS[field]} is required.`;
     } else if (trimmed.length < MIN_TEXT_FIELD_LENGTH) {
-      errors[field] = `${RCA_FIELD_LABELS[field]} must be at least ${MIN_TEXT_FIELD_LENGTH} characters.`;
+      errors[field] =
+        `${RCA_FIELD_LABELS[field]} must be at least ${MIN_TEXT_FIELD_LENGTH} characters.`;
     }
   }
 

@@ -49,14 +49,23 @@ export function PanelShell({
       </div>
 
       {loading ? (
-        <div className="flex flex-col gap-2" style={{ minHeight: CHART_HEIGHT }} role="status" aria-label={`Loading ${title}`}>
+        <div
+          className="flex flex-col gap-2"
+          style={{ minHeight: CHART_HEIGHT }}
+          role="status"
+          aria-label={`Loading ${title}`}
+        >
           {showSkeleton && <SkeletonBlock className="h-full min-h-[220px] w-full" />}
         </div>
       ) : error ? (
         <ErrorState message={friendlyErrorMessage(error, title.toLowerCase())} onRetry={onRetry} />
       ) : isEmpty ? (
         <div className="flex items-center justify-center" style={{ minHeight: CHART_HEIGHT }}>
-          <EmptyState icon={<BarChartIcon className="h-8 w-8" />} headline="Nothing to chart yet" body={emptyMessage} />
+          <EmptyState
+            icon={<BarChartIcon className="h-8 w-8" />}
+            headline="Nothing to chart yet"
+            body={emptyMessage}
+          />
         </div>
       ) : (
         children

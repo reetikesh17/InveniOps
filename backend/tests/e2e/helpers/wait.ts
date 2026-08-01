@@ -9,7 +9,10 @@ export interface WaitForOptions {
 }
 
 /** Polls `check` until it resolves true, or throws once `timeoutMs` elapses. */
-export async function waitFor(check: () => Promise<boolean>, options: WaitForOptions): Promise<void> {
+export async function waitFor(
+  check: () => Promise<boolean>,
+  options: WaitForOptions,
+): Promise<void> {
   const intervalMs = options.intervalMs ?? 500;
   const deadline = Date.now() + options.timeoutMs;
   let lastError: unknown;
@@ -26,7 +29,9 @@ export async function waitFor(check: () => Promise<boolean>, options: WaitForOpt
   }
 
   const suffix = lastError ? ` (last check threw: ${String(lastError)})` : "";
-  throw new Error(`waitFor timed out after ${options.timeoutMs}ms: ${options.description}${suffix}`);
+  throw new Error(
+    `waitFor timed out after ${options.timeoutMs}ms: ${options.description}${suffix}`,
+  );
 }
 
 /** Like waitFor, but returns the value `produce()` returned once `isReady` accepts it. */

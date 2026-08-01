@@ -7,7 +7,10 @@ import {
 
 const CLIENT_VERSION = "5.16.1";
 
-function knownError(code: string, meta?: Record<string, unknown>): Prisma.PrismaClientKnownRequestError {
+function knownError(
+  code: string,
+  meta?: Record<string, unknown>,
+): Prisma.PrismaClientKnownRequestError {
   return new Prisma.PrismaClientKnownRequestError(`mock ${code}`, {
     code,
     clientVersion: CLIENT_VERSION,
@@ -72,7 +75,9 @@ describe("isUniqueConstraintViolation", () => {
   });
 
   it("matches a P2002 whose array meta.target includes the index name", () => {
-    const error = knownError("P2002", { target: ["component_id", "idx_work_items_active_component_id"] });
+    const error = knownError("P2002", {
+      target: ["component_id", "idx_work_items_active_component_id"],
+    });
     expect(isUniqueConstraintViolation(error, "idx_work_items_active_component_id")).toBe(true);
   });
 
@@ -92,6 +97,8 @@ describe("isUniqueConstraintViolation", () => {
   });
 
   it("does not match a non-Prisma error", () => {
-    expect(isUniqueConstraintViolation(new Error("nope"), "idx_work_items_active_component_id")).toBe(false);
+    expect(
+      isUniqueConstraintViolation(new Error("nope"), "idx_work_items_active_component_id"),
+    ).toBe(false);
   });
 });

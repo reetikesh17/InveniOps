@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { PrismaClient, ComponentType, Severity, WorkItemStatus } from "@prisma/client";
 import { Redis } from "ioredis";
 import { PostgresWorkItemRepository } from "../../../src/repositories/postgres/workItemRepository.js";
-import { createDefaultAlertStrategyRegistry, getEscalationPolicy } from "../../../src/domain/alerting/index.js";
+import {
+  createDefaultAlertStrategyRegistry,
+  getEscalationPolicy,
+} from "../../../src/domain/alerting/index.js";
 import { NotifierRegistry } from "../../../src/services/alerting/notifierRegistry.js";
 import { InMemoryNotifier } from "../../../src/services/alerting/notifiers/inMemory.js";
 import { ConsoleNotifier } from "../../../src/services/alerting/notifiers/console.js";
@@ -19,7 +22,9 @@ const redis = new Redis(TEST_REDIS_URL);
 const workItemStore = new PostgresWorkItemRepository(prisma);
 
 afterAll(async () => {
-  await prisma.stateTransition.deleteMany({ where: { workItem: { componentId: { startsWith: COMPONENT_PREFIX } } } });
+  await prisma.stateTransition.deleteMany({
+    where: { workItem: { componentId: { startsWith: COMPONENT_PREFIX } } },
+  });
   await prisma.workItem.deleteMany({ where: { componentId: { startsWith: COMPONENT_PREFIX } } });
   await prisma.$disconnect();
   await redis.quit();
@@ -51,7 +56,13 @@ function buildHarness(): Harness {
     undefined,
     noopLogger,
   );
-  const scheduler = new EscalationScheduler(workItemStore, strategyRegistry, dispatcher, { checkIntervalMs: 60_000 }, noopLogger);
+  const scheduler = new EscalationScheduler(
+    workItemStore,
+    strategyRegistry,
+    dispatcher,
+    { checkIntervalMs: 60_000 },
+    noopLogger,
+  );
 
   return { scheduler, pagerduty, email };
 }
@@ -73,7 +84,9 @@ describe("EscalationScheduler", () => {
 
     expect(pagerduty.sent).toHaveLength(1);
 
-    const transitions = await prisma.stateTransition.findMany({ where: { workItemId: created.id } });
+    const transitions = await prisma.stateTransition.findMany({
+      where: { workItemId: created.id },
+    });
     expect(transitions).toHaveLength(1);
     expect(transitions[0]).toMatchObject({
       actor: "system:escalation",
@@ -97,7 +110,9 @@ describe("EscalationScheduler", () => {
     await scheduler.tick();
 
     expect(pagerduty.sent).toHaveLength(1);
-    const transitions = await prisma.stateTransition.findMany({ where: { workItemId: created.id } });
+    const transitions = await prisma.stateTransition.findMany({
+      where: { workItemId: created.id },
+    });
     expect(transitions).toHaveLength(1);
   });
 

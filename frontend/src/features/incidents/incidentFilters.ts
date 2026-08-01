@@ -19,7 +19,10 @@ export function parseFilters(params: URLSearchParams): IncidentFilters {
  * Filters an already backend-sorted list — never reorders it, so the
  * severity/recency order the server chose survives filtering untouched.
  */
-export function applyFilters(incidents: readonly WorkItem[], filters: IncidentFilters): readonly WorkItem[] {
+export function applyFilters(
+  incidents: readonly WorkItem[],
+  filters: IncidentFilters,
+): readonly WorkItem[] {
   return incidents.filter(
     (incident) =>
       (filters.severity === "" || incident.severity === filters.severity) &&

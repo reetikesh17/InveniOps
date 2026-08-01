@@ -12,6 +12,12 @@ import { IncidentEventSubscriber } from "./eventSubscriber.js";
 // connectClients(). Shared by workers/index.ts (publish on creation),
 // src/api/routes/workitems.ts (publish on transition, via WorkflowService),
 // and src/api/routes/incidentStream.ts (subscribe, for SSE).
-export const incidentEventPublisher: IncidentEventPublisher = new IncidentEventPublisher(redis, logger);
+export const incidentEventPublisher: IncidentEventPublisher = new IncidentEventPublisher(
+  redis,
+  logger,
+);
 
-export const incidentEventSubscriber: IncidentEventSubscriber = new IncidentEventSubscriber(config.redis.url, logger);
+export const incidentEventSubscriber: IncidentEventSubscriber = new IncidentEventSubscriber(
+  config.redis.url,
+  logger,
+);

@@ -8,7 +8,11 @@ import { Redis } from "ioredis";
 import { createApp } from "../../../src/api/app.js";
 import { connectClients, disconnectClients } from "../../../src/repositories/clients.js";
 import { signalBuffer } from "../../../src/services/ingestion/signalBufferInstance.js";
-import { startWorkerSystem, stopWorkerSystem, type WorkerSystem } from "../../../src/workers/index.js";
+import {
+  startWorkerSystem,
+  stopWorkerSystem,
+  type WorkerSystem,
+} from "../../../src/workers/index.js";
 import { DashboardCacheRepository } from "../../../src/repositories/redis/dashboardCache.js";
 import { TEST_DATABASE_URL, TEST_MONGODB_URI, TEST_REDIS_URL } from "../testEnv.js";
 
@@ -73,14 +77,20 @@ afterAll(async () => {
   });
   await Promise.all(createdWorkItemIds.map(({ id }) => assertionCache.removeIncident(id)));
 
-  await assertionPrisma.workItem.deleteMany({ where: { componentId: { startsWith: COMPONENT_PREFIX } } });
-  await assertionDb.collection("signals").deleteMany({ componentId: { $regex: `^${COMPONENT_PREFIX}` } });
+  await assertionPrisma.workItem.deleteMany({
+    where: { componentId: { startsWith: COMPONENT_PREFIX } },
+  });
+  await assertionDb
+    .collection("signals")
+    .deleteMany({ componentId: { $regex: `^${COMPONENT_PREFIX}` } });
   // signal_volume_metrics carries componentId as a dim, so this run's
   // contribution is cleanly identifiable — workitem_created_metrics
   // doesn't (by design, see docs/data-model.md), so its handful of
   // CACHE/P2 points from this run are left for the collection's own TTL
   // to expire, same as any other real aggregation write would be.
-  await assertionDb.collection("signal_volume_metrics").deleteMany({ "dims.componentId": { $regex: `^${COMPONENT_PREFIX}` } });
+  await assertionDb
+    .collection("signal_volume_metrics")
+    .deleteMany({ "dims.componentId": { $regex: `^${COMPONENT_PREFIX}` } });
 
   await assertionPrisma.$disconnect();
   await assertionMongoClient.close();
@@ -98,7 +108,11 @@ function makeSignalPayload(index: number): Record<string, unknown> {
   };
 }
 
-async function waitUntil(predicate: () => Promise<boolean>, timeoutMs: number, intervalMs = 200): Promise<void> {
+async function waitUntil(
+  predicate: () => Promise<boolean>,
+  timeoutMs: number,
+  intervalMs = 200,
+): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (await predicate()) {
@@ -112,66 +126,63 @@ async function waitUntil(predicate: () => Promise<boolean>, timeoutMs: number, i
 }
 
 describe("full write path: HTTP -> buffer -> queue -> worker -> debouncer -> stores -> cache", () => {
-  it(
-    "processes 10,000 signals end to end — all land in Mongo, correctly debounced in Postgres, nothing left in the DLQ",
-    async () => {
-      const batches: Array<Array<Record<string, unknown>>> = [];
-      for (let start = 0; start < TOTAL_SIGNALS; start += BATCH_SIZE) {
-        batches.push(Array.from({ length: BATCH_SIZE }, (_, i) => makeSignalPayload(start + i)));
-      }
+  it("processes 10,000 signals end to end — all land in Mongo, correctly debounced in Postgres, nothing left in the DLQ", async () => {
+    const batches: Array<Array<Record<string, unknown>>> = [];
+    for (let start = 0; start < TOTAL_SIGNALS; start += BATCH_SIZE) {
+      batches.push(Array.from({ length: BATCH_SIZE }, (_, i) => makeSignalPayload(start + i)));
+    }
 
-      const responses = await Promise.all(
-        batches.map((batch) =>
-          fetch(`${baseUrl}/api/v1/signals`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(batch),
-          }),
-        ),
-      );
+    const responses = await Promise.all(
+      batches.map((batch) =>
+        fetch(`${baseUrl}/api/v1/signals`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(batch),
+        }),
+      ),
+    );
 
-      for (const response of responses) {
-        expect(response.status).toBe(202);
-      }
+    for (const response of responses) {
+      expect(response.status).toBe(202);
+    }
 
-      const signalFilter = { componentId: { $regex: `^${COMPONENT_PREFIX}` } };
+    const signalFilter = { componentId: { $regex: `^${COMPONENT_PREFIX}` } };
 
-      // Ingestion is async past the 202 — poll until the worker system has
-      // actually drained the buffer, processed every queued batch, and
-      // persisted everything.
-      await waitUntil(
-        async () => (await assertionDb.collection("signals").countDocuments(signalFilter)) >= TOTAL_SIGNALS,
-        60_000,
-      );
+    // Ingestion is async past the 202 — poll until the worker system has
+    // actually drained the buffer, processed every queued batch, and
+    // persisted everything.
+    await waitUntil(
+      async () =>
+        (await assertionDb.collection("signals").countDocuments(signalFilter)) >= TOTAL_SIGNALS,
+      60_000,
+    );
 
-      const totalMongoDocs = await assertionDb.collection("signals").countDocuments(signalFilter);
-      expect(totalMongoDocs).toBe(TOTAL_SIGNALS);
+    const totalMongoDocs = await assertionDb.collection("signals").countDocuments(signalFilter);
+    expect(totalMongoDocs).toBe(TOTAL_SIGNALS);
 
-      const withoutWorkItem = await assertionDb
-        .collection("signals")
-        .countDocuments({ ...signalFilter, workItemId: null });
-      expect(withoutWorkItem).toBe(0);
+    const withoutWorkItem = await assertionDb
+      .collection("signals")
+      .countDocuments({ ...signalFilter, workItemId: null });
+    expect(withoutWorkItem).toBe(0);
 
-      // Debouncing: 10,000 signals across 20 distinct components, all
-      // arriving well within the debounce window, must collapse to
-      // exactly one work item per component — not 10,000, not more than
-      // COMPONENT_COUNT.
-      const workItems = await assertionPrisma.workItem.findMany({
-        where: { componentId: { startsWith: COMPONENT_PREFIX } },
-      });
-      expect(workItems).toHaveLength(COMPONENT_COUNT);
+    // Debouncing: 10,000 signals across 20 distinct components, all
+    // arriving well within the debounce window, must collapse to
+    // exactly one work item per component — not 10,000, not more than
+    // COMPONENT_COUNT.
+    const workItems = await assertionPrisma.workItem.findMany({
+      where: { componentId: { startsWith: COMPONENT_PREFIX } },
+    });
+    expect(workItems).toHaveLength(COMPONENT_COUNT);
 
-      const totalSignalCount = workItems.reduce((sum, workItem) => sum + workItem.signalCount, 0);
-      expect(totalSignalCount).toBe(TOTAL_SIGNALS);
-      for (const workItem of workItems) {
-        expect(workItem.signalCount).toBe(TOTAL_SIGNALS / COMPONENT_COUNT);
-      }
+    const totalSignalCount = workItems.reduce((sum, workItem) => sum + workItem.signalCount, 0);
+    expect(totalSignalCount).toBe(TOTAL_SIGNALS);
+    for (const workItem of workItems) {
+      expect(workItem.signalCount).toBe(TOTAL_SIGNALS / COMPONENT_COUNT);
+    }
 
-      // Nothing exhausted its retries — the whole burst succeeded cleanly.
-      const dlqJobCounts = await workerSystem.deadLetterQueue.getJobCounts();
-      const dlqSize = Object.values(dlqJobCounts).reduce((sum, count) => sum + count, 0);
-      expect(dlqSize).toBe(0);
-    },
-    120_000,
-  );
+    // Nothing exhausted its retries — the whole burst succeeded cleanly.
+    const dlqJobCounts = await workerSystem.deadLetterQueue.getJobCounts();
+    const dlqSize = Object.values(dlqJobCounts).reduce((sum, count) => sum + count, 0);
+    expect(dlqSize).toBe(0);
+  }, 120_000);
 });

@@ -8,12 +8,20 @@ import { IncidentsProvider } from "./hooks/useIncidents";
 // Route-level code splitting: every page is its own chunk, so the initial
 // load ships only the shell + the landing route. Analytics in particular
 // pulls in recharts (~470 kB), which no other page needs.
-const LiveFeedPage = lazy(() => import("./features/incidents/LiveFeedPage").then((m) => ({ default: m.LiveFeedPage })));
-const IncidentDetailPage = lazy(() =>
-  import("./features/incidents/IncidentDetailPage").then((m) => ({ default: m.IncidentDetailPage })),
+const LiveFeedPage = lazy(() =>
+  import("./features/incidents/LiveFeedPage").then((m) => ({ default: m.LiveFeedPage })),
 );
-const AnalyticsPage = lazy(() => import("./features/analytics/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage })));
-const StyleGuidePage = lazy(() => import("./features/styleguide/StyleGuidePage").then((m) => ({ default: m.StyleGuidePage })));
+const IncidentDetailPage = lazy(() =>
+  import("./features/incidents/IncidentDetailPage").then((m) => ({
+    default: m.IncidentDetailPage,
+  })),
+);
+const AnalyticsPage = lazy(() =>
+  import("./features/analytics/AnalyticsPage").then((m) => ({ default: m.AnalyticsPage })),
+);
+const StyleGuidePage = lazy(() =>
+  import("./features/styleguide/StyleGuidePage").then((m) => ({ default: m.StyleGuidePage })),
+);
 
 // Each route element is (a) error-boundaried so a crash degrades to a
 // recoverable card instead of a white screen, and (b) Suspense-wrapped for
@@ -60,10 +68,38 @@ const router = createBrowserRouter([
   {
     element: <RootLayout />,
     children: [
-      { path: "/", element: <Route label="the live feed"><LiveFeedPage /></Route> },
-      { path: "/incidents/:id", element: <Route label="this incident"><IncidentDetailPage /></Route> },
-      { path: "/analytics", element: <Route label="analytics"><AnalyticsPage /></Route> },
-      { path: "/styleguide", element: <Route label="the style guide"><StyleGuidePage /></Route> },
+      {
+        path: "/",
+        element: (
+          <Route label="the live feed">
+            <LiveFeedPage />
+          </Route>
+        ),
+      },
+      {
+        path: "/incidents/:id",
+        element: (
+          <Route label="this incident">
+            <IncidentDetailPage />
+          </Route>
+        ),
+      },
+      {
+        path: "/analytics",
+        element: (
+          <Route label="analytics">
+            <AnalyticsPage />
+          </Route>
+        ),
+      },
+      {
+        path: "/styleguide",
+        element: (
+          <Route label="the style guide">
+            <StyleGuidePage />
+          </Route>
+        ),
+      },
     ],
   },
 ]);

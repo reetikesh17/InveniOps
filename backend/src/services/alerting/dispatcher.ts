@@ -109,7 +109,10 @@ export class AlertDispatcher {
 
       await this.fanOut(alert, context, workItem.id);
     } catch (error) {
-      this.logger?.error({ error, workItemId: workItem.id, eventType }, "alert dispatch failed unexpectedly");
+      this.logger?.error(
+        { error, workItemId: workItem.id, eventType },
+        "alert dispatch failed unexpectedly",
+      );
     }
   }
 
@@ -137,13 +140,20 @@ export class AlertDispatcher {
       const strategy = this.strategyRegistry.resolve(workItem.componentType);
       const baseAlert = strategy.buildAlert(context);
       const escalation = getEscalationPolicy(baseAlert.severity);
-      const alert = withEventFraming({ ...baseAlert, channels: [escalation.escalateTo] }, "created", workItem);
+      const alert = withEventFraming(
+        { ...baseAlert, channels: [escalation.escalateTo] },
+        "created",
+        workItem,
+      );
 
       await this.fanOut(alert, context, workItem.id);
       this.metrics?.recordEscalation();
       return true;
     } catch (error) {
-      this.logger?.error({ error, workItemId: workItem.id }, "escalation dispatch failed unexpectedly");
+      this.logger?.error(
+        { error, workItemId: workItem.id },
+        "escalation dispatch failed unexpectedly",
+      );
       return false;
     }
   }
@@ -156,10 +166,17 @@ export class AlertDispatcher {
         .filter((notifier): notifier is Notifier => notifier !== undefined),
     ];
 
-    await Promise.all(targets.map((notifier) => this.sendVia(notifier, alert, context, workItemId)));
+    await Promise.all(
+      targets.map((notifier) => this.sendVia(notifier, alert, context, workItemId)),
+    );
   }
 
-  private async sendVia(notifier: Notifier, alert: Alert, context: AlertContext, workItemId: string): Promise<void> {
+  private async sendVia(
+    notifier: Notifier,
+    alert: Alert,
+    context: AlertContext,
+    workItemId: string,
+  ): Promise<void> {
     try {
       await retry(() => notifier.send(alert, context), {
         attempts: this.options.maxAttempts,
@@ -185,7 +202,10 @@ export class AlertDispatcher {
    * every possible implementation of the interface — wrapped here too, so
    * a misbehaving metrics writer still can't affect alert delivery.
    */
-  private async recordDispatchMetric(channel: string, outcome: "delivered" | "failed"): Promise<void> {
+  private async recordDispatchMetric(
+    channel: string,
+    outcome: "delivered" | "failed",
+  ): Promise<void> {
     const writer = this.metricsWriterProvider?.();
     if (!writer) {
       return;

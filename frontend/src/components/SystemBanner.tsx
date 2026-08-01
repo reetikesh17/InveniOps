@@ -34,9 +34,16 @@ const TONE_ICON: Record<BannerTone, string> = {
  *    signals under backpressure. Surfaced specifically so a reviewer sees the
  *    backpressure mechanism working, distinct from an outage.
  */
-function deriveBanner(phase: string, health: ReturnType<typeof useSystemHealth>["health"]): BannerContent | null {
+function deriveBanner(
+  phase: string,
+  health: ReturnType<typeof useSystemHealth>["health"],
+): BannerContent | null {
   if (phase === "unreachable") {
-    return { tone: "critical", message: "Can't reach the backend — retrying automatically.", showRetry: true };
+    return {
+      tone: "critical",
+      message: "Can't reach the backend — retrying automatically.",
+      showRetry: true,
+    };
   }
   if (phase === "reachable" && health) {
     if (health.status === "unhealthy") {
@@ -44,12 +51,17 @@ function deriveBanner(phase: string, health: ReturnType<typeof useSystemHealth>[
         .filter(([, dep]) => dep.status === "down")
         .map(([name]) => name);
       const which = down.length > 0 ? ` (${down.join(", ")})` : "";
-      return { tone: "critical", message: `A backend dependency is unavailable${which} — some data may be stale or missing.`, showRetry: false };
+      return {
+        tone: "critical",
+        message: `A backend dependency is unavailable${which} — some data may be stale or missing.`,
+        showRetry: false,
+      };
     }
     if (health.status === "degraded" || health.buffer.shedding) {
       return {
         tone: "warning",
-        message: "System under load — shedding incoming signals under backpressure. Newer data may lag briefly.",
+        message:
+          "System under load — shedding incoming signals under backpressure. Newer data may lag briefly.",
         showRetry: false,
       };
     }

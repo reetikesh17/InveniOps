@@ -115,7 +115,12 @@ describe("SignalBuffer", () => {
   describe("watermark hysteresis", () => {
     it("engages shedding at the high-water mark and disengages at the low-water mark", async () => {
       const buffer = new SignalBuffer(
-        makeOptions({ capacity: 100, highWaterMarkFraction: 0.8, lowWaterMarkFraction: 0.5, drainBatchSize: 1 }),
+        makeOptions({
+          capacity: 100,
+          highWaterMarkFraction: 0.8,
+          lowWaterMarkFraction: 0.5,
+          drainBatchSize: 1,
+        }),
       );
 
       for (let i = 0; i < 79; i += 1) {
@@ -140,7 +145,12 @@ describe("SignalBuffer", () => {
 
     it("does not re-enter shedding until crossing the high-water mark again (no flapping at the boundary)", async () => {
       const buffer = new SignalBuffer(
-        makeOptions({ capacity: 100, highWaterMarkFraction: 0.8, lowWaterMarkFraction: 0.5, drainBatchSize: 1 }),
+        makeOptions({
+          capacity: 100,
+          highWaterMarkFraction: 0.8,
+          lowWaterMarkFraction: 0.5,
+          drainBatchSize: 1,
+        }),
       );
 
       for (let i = 0; i < 80; i += 1) {
@@ -364,7 +374,9 @@ describe("SignalBuffer", () => {
           await new Promise((resolve) => setTimeout(resolve, 20));
         },
       };
-      const buffer = new SignalBuffer(makeOptions({ capacity: 500, drainBatchSize: 5, sink: slowSink }));
+      const buffer = new SignalBuffer(
+        makeOptions({ capacity: 500, drainBatchSize: 5, sink: slowSink }),
+      );
 
       for (let i = 0; i < 50; i += 1) {
         buffer.submit(makeSignal(Severity.P2));
@@ -458,7 +470,9 @@ describe("SignalBuffer", () => {
 
     it("drains a batch on each interval tick", async () => {
       const sink = recordingSink();
-      const buffer = new SignalBuffer(makeOptions({ drainIntervalMs: 10, drainBatchSize: 5, sink }));
+      const buffer = new SignalBuffer(
+        makeOptions({ drainIntervalMs: 10, drainBatchSize: 5, sink }),
+      );
       buffer.submit(makeSignal(Severity.P1));
       buffer.submit(makeSignal(Severity.P1));
 
@@ -482,7 +496,9 @@ describe("SignalBuffer", () => {
           concurrentCalls -= 1;
         },
       };
-      const buffer = new SignalBuffer(makeOptions({ drainIntervalMs: 10, drainBatchSize: 5, sink: slowSink }));
+      const buffer = new SignalBuffer(
+        makeOptions({ drainIntervalMs: 10, drainBatchSize: 5, sink: slowSink }),
+      );
       for (let i = 0; i < 3; i += 1) {
         buffer.submit(makeSignal(Severity.P1));
       }

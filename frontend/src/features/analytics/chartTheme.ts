@@ -83,7 +83,10 @@ export function useChartColors(): ChartColors {
   useEffect(() => {
     const refresh = (): void => setColors(snapshot());
     const observer = new MutationObserver(refresh);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
     const media = window.matchMedia("(prefers-color-scheme: light)");
     media.addEventListener("change", refresh);
     return () => {
@@ -108,7 +111,12 @@ export function makeTimeTickFormatter(fromMs: number, toMs: number): (iso: strin
       return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     }
     if (spanMs <= 7 * oneDay) {
-      return date.toLocaleString([], { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      return date.toLocaleString([], {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     }
     return date.toLocaleDateString([], { month: "numeric", day: "numeric" });
   };

@@ -36,7 +36,11 @@ export interface TimeInStateIndicatorProps {
   readonly className?: string;
 }
 
-export function TimeInStateIndicator({ since, state, className = "" }: TimeInStateIndicatorProps): JSX.Element {
+export function TimeInStateIndicator({
+  since,
+  state,
+  className = "",
+}: TimeInStateIndicatorProps): JSX.Element {
   const sinceMs = new Date(since).getTime();
   const escalates = ESCALATING_STATES.includes(state);
   const [elapsedMs, setElapsedMs] = useState<number>(() => Date.now() - sinceMs);
@@ -52,7 +56,9 @@ export function TimeInStateIndicator({ since, state, className = "" }: TimeInSta
   const { className: tierClass, marker } = tier(elapsedMs, escalates);
 
   return (
-    <span className={`inline-flex items-center gap-1 font-mono tabular-nums ${tierClass} ${className}`}>
+    <span
+      className={`inline-flex items-center gap-1 font-mono tabular-nums ${tierClass} ${className}`}
+    >
       <RelativeTime value={since} />
       {/* Sized relative to the surrounding text (not an absolute px) so it
           always scales with wherever this indicator is used. */}

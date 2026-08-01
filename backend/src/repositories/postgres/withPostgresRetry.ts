@@ -21,9 +21,16 @@ export function withPostgresRetry<T>(fn: () => Promise<T>): Promise<T> {
     baseDelayMs: BASE_DELAY_MS,
     shouldRetry: isTransientPrismaError,
     onRetry: (error, attempt, delayMs) => {
-      const code = error instanceof Error && "code" in error ? (error as { code?: unknown }).code : undefined;
+      const code =
+        error instanceof Error && "code" in error ? (error as { code?: unknown }).code : undefined;
       logger.warn(
-        { attempt, maxAttempts: ATTEMPTS, delayMs, errorCode: code, error: error instanceof Error ? error.message : String(error) },
+        {
+          attempt,
+          maxAttempts: ATTEMPTS,
+          delayMs,
+          errorCode: code,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "retrying postgres operation after a transient error",
       );
     },

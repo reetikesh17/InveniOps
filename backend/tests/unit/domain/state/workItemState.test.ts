@@ -11,9 +11,10 @@ const ALL_STATES = ["OPEN", "INVESTIGATING", "RESOLVED", "CLOSED"] as const;
 
 const LEGAL_PAIRS = new Set(["OPEN->INVESTIGATING", "INVESTIGATING->RESOLVED", "RESOLVED->CLOSED"]);
 
-const ILLEGAL_PAIRS: readonly (readonly [WorkItemStateName, WorkItemStateName])[] = ALL_STATES.flatMap((from) =>
-  ALL_STATES.filter((to) => !LEGAL_PAIRS.has(`${from}->${to}`)).map((to) => [from, to] as const),
-);
+const ILLEGAL_PAIRS: readonly (readonly [WorkItemStateName, WorkItemStateName])[] =
+  ALL_STATES.flatMap((from) =>
+    ALL_STATES.filter((to) => !LEGAL_PAIRS.has(`${from}->${to}`)).map((to) => [from, to] as const),
+  );
 
 function makeContext(
   currentState: WorkItemStateName,
@@ -21,7 +22,11 @@ function makeContext(
   payload?: unknown,
 ): TransitionContext {
   return {
-    workItem: { id: "wi-1", state: currentState, firstSignalAt: new Date("2026-01-01T00:00:00.000Z") },
+    workItem: {
+      id: "wi-1",
+      state: currentState,
+      firstSignalAt: new Date("2026-01-01T00:00:00.000Z"),
+    },
     to,
     payload,
   };
@@ -92,7 +97,9 @@ describe("work item state machine", () => {
   describe("CLOSED is terminal", () => {
     it.each(ALL_STATES)("CLOSED -> %s always throws", (to) => {
       const graph = createWorkItemStateGraph(() => true);
-      expect(() => graph.CLOSED.transition(makeContext("CLOSED", to))).toThrow(InvalidTransitionError);
+      expect(() => graph.CLOSED.transition(makeContext("CLOSED", to))).toThrow(
+        InvalidTransitionError,
+      );
     });
 
     it("has no legal next states", () => {

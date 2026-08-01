@@ -1,5 +1,10 @@
 import { InvalidTransitionError } from "./errors.js";
-import type { TransitionContext, TransitionGuard, WorkItemState, WorkItemStateName } from "./types.js";
+import type {
+  TransitionContext,
+  TransitionGuard,
+  WorkItemState,
+  WorkItemStateName,
+} from "./types.js";
 
 export interface TransitionEntry {
   readonly target: WorkItemState;

@@ -13,7 +13,11 @@ export interface MiddleTruncateProps {
  * to a longer ID; this fixes it regardless of width. Pair with a `title`
  * attribute on an ancestor for the full value on hover.
  */
-export function MiddleTruncate({ text, tailChars = 6, className = "" }: MiddleTruncateProps): JSX.Element {
+export function MiddleTruncate({
+  text,
+  tailChars = 6,
+  className = "",
+}: MiddleTruncateProps): JSX.Element {
   if (text.length <= tailChars + 4) {
     // Short enough that the ordinary CSS ellipsis (if it even triggers) can't
     // obscure anything worth keeping separate — no need for the split.

@@ -12,7 +12,12 @@ import { MongoSampler } from "./mongoSample.js";
 import { startBackendPoller } from "./backendPoller.js";
 import { startMemoryPoller } from "./dockerStats.js";
 import { scrapeMetrics, computeMetricsDiff } from "./metrics.js";
-import { buildReport, renderConsoleSummary, summarizePerSignalSamples, mergeK6Summaries } from "./report.js";
+import {
+  buildReport,
+  renderConsoleSummary,
+  summarizePerSignalSamples,
+  mergeK6Summaries,
+} from "./report.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOADTEST_ROOT = path.resolve(__dirname, "..");
@@ -47,7 +52,9 @@ async function waitForHealth(targetUrl) {
   }
   const body = await res.json();
   if (body.status !== "healthy") {
-    throw new Error(`Backend reports unhealthy before the test even started: ${JSON.stringify(body)}`);
+    throw new Error(
+      `Backend reports unhealthy before the test even started: ${JSON.stringify(body)}`,
+    );
   }
 }
 
@@ -131,10 +138,18 @@ function runK6Shard(shardIndex, env, network, k6Dir, outDir) {
 
 /** Runs shardCount k6 containers in parallel, each a distinct SHARD_INDEX, all otherwise sharing baseEnv. */
 async function runK6Shards(shardCount, baseEnv, network, k6Dir, outDir) {
-  console.log(`Launching ${shardCount} k6 shard container(s) in parallel (log per shard: k6-shard-<i>.log)...`);
+  console.log(
+    `Launching ${shardCount} k6 shard container(s) in parallel (log per shard: k6-shard-<i>.log)...`,
+  );
   const exitCodes = await Promise.all(
     Array.from({ length: shardCount }, (_, i) =>
-      runK6Shard(i, { ...baseEnv, SHARD_COUNT: String(shardCount), SHARD_INDEX: String(i) }, network, k6Dir, outDir),
+      runK6Shard(
+        i,
+        { ...baseEnv, SHARD_COUNT: String(shardCount), SHARD_INDEX: String(i) },
+        network,
+        k6Dir,
+        outDir,
+      ),
     ),
   );
   console.log(`All shards exited: [${exitCodes.join(", ")}]`);
@@ -163,14 +178,20 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args.scenario) {
     console.error("Usage: node orchestrator/run.js --scenario <name> [--key value ...]");
-    console.error("Scenarios: sustained-ramp, burst-recovery, mixed-components, debounce-concentrated, debounce-spread");
+    console.error(
+      "Scenarios: sustained-ramp, burst-recovery, mixed-components, debounce-concentrated, debounce-spread",
+    );
     process.exit(1);
   }
 
-  const globalConfig = JSON.parse(readFileSync(path.join(LOADTEST_ROOT, "configs", "scenarios.json"), "utf8"));
+  const globalConfig = JSON.parse(
+    readFileSync(path.join(LOADTEST_ROOT, "configs", "scenarios.json"), "utf8"),
+  );
   const scenarioDefaults = globalConfig.scenarios[args.scenario];
   if (!scenarioDefaults) {
-    console.error(`Unknown scenario "${args.scenario}". Known: ${Object.keys(globalConfig.scenarios).join(", ")}`);
+    console.error(
+      `Unknown scenario "${args.scenario}". Known: ${Object.keys(globalConfig.scenarios).join(", ")}`,
+    );
     process.exit(1);
   }
 
@@ -196,24 +217,38 @@ async function main() {
 
   const preExisting = await mongoSampler.countPersisted(runId);
   if (preExisting > 0) {
-    console.warn(`WARNING: ${preExisting} documents already match runId prefix before the test started (unexpected).`);
+    console.warn(
+      `WARNING: ${preExisting} documents already match runId prefix before the test started (unexpected).`,
+    );
   }
 
   const metricsBefore = await scrapeMetrics(globalConfig.targetUrl);
 
   const persistedTimeSeries = [];
-  const stopPersistedPoller = mongoSampler.startPersistedCountPoller(runId, globalConfig.pollIntervalMs, (sample) => {
-    persistedTimeSeries.push(sample);
-  });
+  const stopPersistedPoller = mongoSampler.startPersistedCountPoller(
+    runId,
+    globalConfig.pollIntervalMs,
+    (sample) => {
+      persistedTimeSeries.push(sample);
+    },
+  );
   const latencyPoller = mongoSampler.startLatencySamplePoller(runId, globalConfig.pollIntervalMs);
   const backendSamples = [];
-  const backendPoller = startBackendPoller(globalConfig.targetUrl, globalConfig.pollIntervalMs, (sample) => {
-    backendSamples.push(sample);
-  });
+  const backendPoller = startBackendPoller(
+    globalConfig.targetUrl,
+    globalConfig.pollIntervalMs,
+    (sample) => {
+      backendSamples.push(sample);
+    },
+  );
   const memorySamples = [];
-  const memoryPoller = startMemoryPoller(globalConfig.backendContainer, globalConfig.pollIntervalMs, (sample) => {
-    memorySamples.push(sample);
-  });
+  const memoryPoller = startMemoryPoller(
+    globalConfig.backendContainer,
+    globalConfig.pollIntervalMs,
+    (sample) => {
+      memorySamples.push(sample);
+    },
+  );
 
   const startedAt = new Date().toISOString();
 
@@ -230,16 +265,26 @@ async function main() {
   let exitCodes = [];
   const warnings = [];
   try {
-    exitCodes = await runK6Shards(shardCount, k6Env, globalConfig.dockerNetwork, path.join(LOADTEST_ROOT, "k6"), outDir);
+    exitCodes = await runK6Shards(
+      shardCount,
+      k6Env,
+      globalConfig.dockerNetwork,
+      path.join(LOADTEST_ROOT, "k6"),
+      outDir,
+    );
   } catch (error) {
     warnings.push(`k6 launch failed: ${error}`);
   }
   const failedShards = exitCodes.filter((c) => c !== 0).length;
   if (failedShards > 0) {
-    warnings.push(`${failedShards}/${shardCount} k6 shard(s) exited non-zero — check k6-shard-<i>.log in the output dir.`);
+    warnings.push(
+      `${failedShards}/${shardCount} k6 shard(s) exited non-zero — check k6-shard-<i>.log in the output dir.`,
+    );
   }
 
-  console.log("Waiting for the pipeline to drain (queue depth -> 0) before taking the final snapshot...");
+  console.log(
+    "Waiting for the pipeline to drain (queue depth -> 0) before taking the final snapshot...",
+  );
   const drainResult = await waitForDrain(
     backendPoller,
     globalConfig.settleTimeoutMs,
@@ -274,7 +319,9 @@ async function main() {
   const shardSummaries = [];
   for (let i = 0; i < shardCount; i += 1) {
     try {
-      shardSummaries.push(JSON.parse(readFileSync(path.join(outDir, `k6-summary-${i}.json`), "utf8")));
+      shardSummaries.push(
+        JSON.parse(readFileSync(path.join(outDir, `k6-summary-${i}.json`), "utf8")),
+      );
     } catch (error) {
       warnings.push(`Could not read shard ${i}'s k6 summary export: ${error}`);
     }
@@ -296,7 +343,9 @@ async function main() {
   let dockerInfo = {};
   try {
     const { execFileSync } = await import("node:child_process");
-    const raw = execFileSync("docker", ["info", "--format", "{{.NCPU}} {{.MemTotal}}"]).toString().trim();
+    const raw = execFileSync("docker", ["info", "--format", "{{.NCPU}} {{.MemTotal}}"])
+      .toString()
+      .trim();
     const [ncpu, memTotal] = raw.split(" ");
     dockerInfo = { dockerCpus: Number(ncpu), dockerMemTotalBytes: Number(memTotal) };
   } catch {
@@ -354,7 +403,9 @@ async function main() {
       );
       process.exitCode = 1;
     } else {
-      console.log(`Throughput floor check passed: ${achieved.toFixed(1)}/s >= ${args.minPersistedPerSec}/s floor.`);
+      console.log(
+        `Throughput floor check passed: ${achieved.toFixed(1)}/s >= ${args.minPersistedPerSec}/s floor.`,
+      );
     }
   }
 }

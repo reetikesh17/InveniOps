@@ -65,7 +65,10 @@ const SEVERITY_MIX: Readonly<Record<ComponentType, readonly (readonly [Severity,
  * above. `rng` is injectable (defaults to Math.random) so the distribution
  * is deterministically testable.
  */
-export function pickSeverityForComponentType(componentType: ComponentType, rng: () => number = Math.random): Severity {
+export function pickSeverityForComponentType(
+  componentType: ComponentType,
+  rng: () => number = Math.random,
+): Severity {
   const mix = SEVERITY_MIX[componentType];
   const roll = rng();
   let cumulative = 0;
@@ -81,6 +84,8 @@ export function pickSeverityForComponentType(componentType: ComponentType, rng: 
 }
 
 /** Exposed for tests to assert the mix stays coherent (weights sum to 1, modal severity = the strategy floor). */
-export function severityMixFor(componentType: ComponentType): readonly (readonly [Severity, number])[] {
+export function severityMixFor(
+  componentType: ComponentType,
+): readonly (readonly [Severity, number])[] {
   return SEVERITY_MIX[componentType];
 }

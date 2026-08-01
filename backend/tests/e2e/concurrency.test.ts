@@ -51,10 +51,16 @@ describe("E2E: concurrent transitions on one work item", () => {
         const count = await prisma.workItem.count({ where: { componentId: { in: componentIds } } });
         return count === ITERATIONS;
       },
-      { timeoutMs: 60_000, intervalMs: 1_000, description: `all ${ITERATIONS} seed work items to be created` },
+      {
+        timeoutMs: 60_000,
+        intervalMs: 1_000,
+        description: `all ${ITERATIONS} seed work items to be created`,
+      },
     );
 
-    const workItems = await prisma.workItem.findMany({ where: { componentId: { in: componentIds } } });
+    const workItems = await prisma.workItem.findMany({
+      where: { componentId: { in: componentIds } },
+    });
     for (const workItem of workItems) {
       workItemIdByComponentId.set(workItem.componentId, workItem.id);
     }
@@ -70,47 +76,48 @@ describe("E2E: concurrent transitions on one work item", () => {
     await closeMongo();
   }, 30_000);
 
-  it(
-    `exactly one of ${CONCURRENT_REQUESTS} simultaneous transitions succeeds, across ${ITERATIONS} independent iterations`,
-    async () => {
-      const perIterationResults: { successes: number; conflicts: number; other: number[] }[] = [];
+  it(`exactly one of ${CONCURRENT_REQUESTS} simultaneous transitions succeeds, across ${ITERATIONS} independent iterations`, async () => {
+    const perIterationResults: { successes: number; conflicts: number; other: number[] }[] = [];
 
-      for (const componentId of componentIds) {
-        const workItemId = workItemIdByComponentId.get(componentId)!;
+    for (const componentId of componentIds) {
+      const workItemId = workItemIdByComponentId.get(componentId)!;
 
-        const responses = await Promise.all(
-          Array.from({ length: CONCURRENT_REQUESTS }, (_, i) =>
-            transitionIncident(workItemId, "INVESTIGATING", `racer-${i}`),
-          ),
-        );
+      const responses = await Promise.all(
+        Array.from({ length: CONCURRENT_REQUESTS }, (_, i) =>
+          transitionIncident(workItemId, "INVESTIGATING", `racer-${i}`),
+        ),
+      );
 
-        const statuses = responses.map((r) => r.status);
-        const successes = statuses.filter((s) => s === 200).length;
-        const conflicts = statuses.filter((s) => s === 409).length;
-        const other = statuses.filter((s) => s !== 200 && s !== 409);
-        perIterationResults.push({ successes, conflicts, other });
-      }
+      const statuses = responses.map((r) => r.status);
+      const successes = statuses.filter((s) => s === 200).length;
+      const conflicts = statuses.filter((s) => s === 409).length;
+      const other = statuses.filter((s) => s !== 200 && s !== 409);
+      perIterationResults.push({ successes, conflicts, other });
+    }
 
-      // Asserted after collecting every iteration (not inside the loop) so
-      // a single failure reports the full picture across all iterations —
-      // a race that only shows up 1 time in 25 is exactly the failure mode
-      // this test exists to catch, and a single aggregate assertion makes
-      // that visible instead of stopping at the first failing iteration.
-      const failing = perIterationResults
-        .map((r, i) => ({ ...r, iteration: i, componentId: componentIds[i] }))
-        .filter((r) => r.successes !== 1 || r.conflicts !== CONCURRENT_REQUESTS - 1 || r.other.length > 0);
+    // Asserted after collecting every iteration (not inside the loop) so
+    // a single failure reports the full picture across all iterations —
+    // a race that only shows up 1 time in 25 is exactly the failure mode
+    // this test exists to catch, and a single aggregate assertion makes
+    // that visible instead of stopping at the first failing iteration.
+    const failing = perIterationResults
+      .map((r, i) => ({ ...r, iteration: i, componentId: componentIds[i] }))
+      .filter(
+        (r) => r.successes !== 1 || r.conflicts !== CONCURRENT_REQUESTS - 1 || r.other.length > 0,
+      );
 
-      expect(failing, `iterations where concurrency control didn't hold: ${JSON.stringify(failing)}`).toEqual([]);
+    expect(
+      failing,
+      `iterations where concurrency control didn't hold: ${JSON.stringify(failing)}`,
+    ).toEqual([]);
 
-      // Confirm the state itself, not just the HTTP responses: exactly one
-      // work item actually reached INVESTIGATING, and its state didn't
-      // regress or get corrupted by the losing 49 attempts.
-      const finalStates = await prisma.workItem.findMany({
-        where: { id: { in: [...workItemIdByComponentId.values()] } },
-        select: { state: true },
-      });
-      expect(finalStates.every((w) => w.state === "INVESTIGATING")).toBe(true);
-    },
-    120_000,
-  );
+    // Confirm the state itself, not just the HTTP responses: exactly one
+    // work item actually reached INVESTIGATING, and its state didn't
+    // regress or get corrupted by the losing 49 attempts.
+    const finalStates = await prisma.workItem.findMany({
+      where: { id: { in: [...workItemIdByComponentId.values()] } },
+      select: { state: true },
+    });
+    expect(finalStates.every((w) => w.state === "INVESTIGATING")).toBe(true);
+  }, 120_000);
 });

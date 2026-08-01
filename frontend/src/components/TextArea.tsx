@@ -8,7 +8,15 @@ export interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElemen
   readonly hint?: ReactNode;
 }
 
-export function TextArea({ label, error, hint, id, className = "", rows = 3, ...rest }: TextAreaProps): JSX.Element {
+export function TextArea({
+  label,
+  error,
+  hint,
+  id,
+  className = "",
+  rows = 3,
+  ...rest
+}: TextAreaProps): JSX.Element {
   const generatedId = useId();
   const textAreaId = id ?? generatedId;
   const errorId = error ? `${textAreaId}-error` : undefined;

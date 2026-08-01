@@ -23,7 +23,9 @@ export interface AgeDotProps {
 export function AgeDot({ severity, since, state }: AgeDotProps): JSX.Element {
   const sinceMs = new Date(since).getTime();
   const escalates = ESCALATING.includes(state);
-  const [aged, setAged] = useState<boolean>(() => escalates && Date.now() - sinceMs >= AGED_AFTER_MS);
+  const [aged, setAged] = useState<boolean>(
+    () => escalates && Date.now() - sinceMs >= AGED_AFTER_MS,
+  );
 
   useEffect(() => {
     if (!escalates || Number.isNaN(sinceMs)) {

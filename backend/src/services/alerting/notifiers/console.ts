@@ -15,7 +15,12 @@ export class ConsoleNotifier implements Notifier {
 
   send(alert: Alert, context: AlertContext): Promise<void> {
     this.logger.info(
-      { severity: alert.severity, title: alert.title, body: alert.body, componentId: context.componentId },
+      {
+        severity: alert.severity,
+        title: alert.title,
+        body: alert.body,
+        componentId: context.componentId,
+      },
       `ALERT [${alert.severity}] ${alert.title}`,
     );
     return Promise.resolve();

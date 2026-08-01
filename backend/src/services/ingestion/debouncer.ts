@@ -33,7 +33,10 @@ export interface DebounceResult {
 }
 
 /** Pure field mapping — shared by the debouncer's own persistence and the worker's bulk path. */
-export function signalToDocument(signal: IngestionSignal, workItemId: string | null): SignalDocument {
+export function signalToDocument(
+  signal: IngestionSignal,
+  workItemId: string | null,
+): SignalDocument {
   return {
     signalId: signal.signalId,
     componentId: signal.componentId,
@@ -134,7 +137,13 @@ export class SignalDebouncer {
   private async resolveViaLock(signal: IngestionSignal): Promise<DebounceResult> {
     const { componentId } = signal;
     const token = randomUUID();
-    const acquired = await this.redis.set(this.lockKey(componentId), token, "PX", this.options.lockTtlMs, "NX");
+    const acquired = await this.redis.set(
+      this.lockKey(componentId),
+      token,
+      "PX",
+      this.options.lockTtlMs,
+      "NX",
+    );
 
     if (acquired === "OK") {
       try {

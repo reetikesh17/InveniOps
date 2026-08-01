@@ -22,13 +22,20 @@ export function makeRedisClient(): Redis {
 }
 
 /** Minimal Prometheus text-exposition value lookup — just enough to read one gauge/counter sample by name+labels, not the full parser the load-test harness needs. */
-export function readMetricValue(metricsText: string, name: string, labels: Readonly<Record<string, string>> = {}): number {
+export function readMetricValue(
+  metricsText: string,
+  name: string,
+  labels: Readonly<Record<string, string>> = {},
+): number {
   const labelPattern = Object.entries(labels)
     .map(([k, v]) => `${k}="${v}"`)
     .join(",");
   const linePrefix = labels && Object.keys(labels).length > 0 ? `${name}{` : `${name} `;
   for (const line of metricsText.split("\n")) {
-    if (!line.startsWith(linePrefix) && !(Object.keys(labels).length === 0 && line.startsWith(`${name} `))) {
+    if (
+      !line.startsWith(linePrefix) &&
+      !(Object.keys(labels).length === 0 && line.startsWith(`${name} `))
+    ) {
       continue;
     }
     if (Object.keys(labels).length > 0 && !line.includes(labelPattern)) {

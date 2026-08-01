@@ -5,7 +5,10 @@ import { MongoClient, type Db } from "mongodb";
 import { Redis } from "ioredis";
 import { PostgresWorkItemRepository } from "../../../src/repositories/postgres/index.js";
 import { MongoSignalRepository } from "../../../src/repositories/mongo/index.js";
-import { SignalDebouncer, type SignalDebouncerOptions } from "../../../src/services/ingestion/debouncer.js";
+import {
+  SignalDebouncer,
+  type SignalDebouncerOptions,
+} from "../../../src/services/ingestion/debouncer.js";
 import type { IngestionSignal } from "../../../src/services/ingestion/buffer.js";
 import { TEST_DATABASE_URL, TEST_MONGODB_URI, TEST_REDIS_URL } from "../testEnv.js";
 
@@ -52,7 +55,10 @@ afterAll(async () => {
   await redis.quit();
 });
 
-function makeSignal(componentId: string, overrides: Partial<IngestionSignal> = {}): IngestionSignal {
+function makeSignal(
+  componentId: string,
+  overrides: Partial<IngestionSignal> = {},
+): IngestionSignal {
   const now = new Date();
   return {
     signalId: randomUUID(),
@@ -84,7 +90,9 @@ describe("SignalDebouncer", () => {
 
       expect(result.created).toBe(true);
 
-      const workItem = await prisma.workItem.findUniqueOrThrow({ where: { id: result.workItemId } });
+      const workItem = await prisma.workItem.findUniqueOrThrow({
+        where: { id: result.workItemId },
+      });
       expect(workItem.componentId).toBe(componentId);
       expect(workItem.componentType).toBe(signal.componentType);
       expect(workItem.severity).toBe(signal.severity);
@@ -120,7 +128,10 @@ describe("SignalDebouncer", () => {
       const componentId = freshComponentId("resolved");
 
       const first = await debouncer.processSignal(makeSignal(componentId));
-      await prisma.workItem.update({ where: { id: first.workItemId }, data: { state: "RESOLVED" } });
+      await prisma.workItem.update({
+        where: { id: first.workItemId },
+        data: { state: "RESOLVED" },
+      });
       await clearSession(componentId); // force a fresh Postgres lookup, not the cache
 
       const second = await debouncer.processSignal(makeSignal(componentId));
@@ -192,36 +203,32 @@ describe("SignalDebouncer", () => {
   });
 
   describe("concurrency", () => {
-    it(
-      "under heavy concurrent load, creates exactly one work item per component — verified across many iterations",
-      async () => {
-        const ITERATIONS = 8;
-        const CONCURRENT_SIGNALS = 60;
+    it("under heavy concurrent load, creates exactly one work item per component — verified across many iterations", async () => {
+      const ITERATIONS = 8;
+      const CONCURRENT_SIGNALS = 60;
 
-        for (let iteration = 0; iteration < ITERATIONS; iteration += 1) {
-          const componentId = freshComponentId(`race_${iteration}`);
-          const signals = Array.from({ length: CONCURRENT_SIGNALS }, () => makeSignal(componentId));
+      for (let iteration = 0; iteration < ITERATIONS; iteration += 1) {
+        const componentId = freshComponentId(`race_${iteration}`);
+        const signals = Array.from({ length: CONCURRENT_SIGNALS }, () => makeSignal(componentId));
 
-          const results = await Promise.all(signals.map((signal) => debouncer.processSignal(signal)));
+        const results = await Promise.all(signals.map((signal) => debouncer.processSignal(signal)));
 
-          const createdCount = results.filter((result) => result.created).length;
-          expect(createdCount).toBe(1);
+        const createdCount = results.filter((result) => result.created).length;
+        expect(createdCount).toBe(1);
 
-          const distinctWorkItemIds = new Set(results.map((result) => result.workItemId));
-          expect(distinctWorkItemIds.size).toBe(1);
+        const distinctWorkItemIds = new Set(results.map((result) => result.workItemId));
+        expect(distinctWorkItemIds.size).toBe(1);
 
-          const activeWorkItems = await prisma.workItem.findMany({ where: { componentId } });
-          expect(activeWorkItems).toHaveLength(1);
-          expect(activeWorkItems[0]?.signalCount).toBe(CONCURRENT_SIGNALS);
+        const activeWorkItems = await prisma.workItem.findMany({ where: { componentId } });
+        expect(activeWorkItems).toHaveLength(1);
+        expect(activeWorkItems[0]?.signalCount).toBe(CONCURRENT_SIGNALS);
 
-          const mongoDocs = await db.collection("signals").find({ componentId }).toArray();
-          expect(mongoDocs).toHaveLength(CONCURRENT_SIGNALS);
-          const mongoWorkItemIds = new Set(mongoDocs.map((doc): string => String(doc["workItemId"])));
-          expect(mongoWorkItemIds.size).toBe(1);
-          expect([...mongoWorkItemIds][0]).toBe(activeWorkItems[0]?.id);
-        }
-      },
-      60_000,
-    );
+        const mongoDocs = await db.collection("signals").find({ componentId }).toArray();
+        expect(mongoDocs).toHaveLength(CONCURRENT_SIGNALS);
+        const mongoWorkItemIds = new Set(mongoDocs.map((doc): string => String(doc["workItemId"])));
+        expect(mongoWorkItemIds.size).toBe(1);
+        expect([...mongoWorkItemIds][0]).toBe(activeWorkItems[0]?.id);
+      }
+    }, 60_000);
   });
 });

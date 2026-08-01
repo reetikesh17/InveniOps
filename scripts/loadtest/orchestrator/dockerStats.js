@@ -43,7 +43,9 @@ export async function snapshotContainerStats(containerName) {
       containerName,
     ]);
     const parsed = JSON.parse(stdout.trim());
-    const [usedToken, limitToken] = String(parsed.MemUsage || "").split("/").map((s) => s.trim());
+    const [usedToken, limitToken] = String(parsed.MemUsage || "")
+      .split("/")
+      .map((s) => s.trim());
     return {
       memUsedBytes: usedToken ? parseSize(usedToken) : null,
       memLimitBytes: limitToken ? parseSize(limitToken) : null,

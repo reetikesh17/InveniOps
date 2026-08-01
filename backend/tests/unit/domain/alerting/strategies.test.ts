@@ -7,7 +7,11 @@ import { McpHostAlertStrategy } from "../../../../src/domain/alerting/strategies
 import { QueueAlertStrategy } from "../../../../src/domain/alerting/strategies/queueStrategy.js";
 import { DefaultAlertStrategy } from "../../../../src/domain/alerting/strategies/defaultStrategy.js";
 import { getEscalationPolicy } from "../../../../src/domain/alerting/escalation.js";
-import type { AlertContext, AlertStrategy, Severity } from "../../../../src/domain/alerting/types.js";
+import type {
+  AlertContext,
+  AlertStrategy,
+  Severity,
+} from "../../../../src/domain/alerting/types.js";
 
 function makeContext(overrides: Partial<AlertContext> = {}): AlertContext {
   return {
@@ -68,22 +72,30 @@ describe("built-in strategy rendering", () => {
   });
 
   it("channels are strategy-specific, not a single shared default", () => {
-    const channelSets = ALL_STRATEGIES.map((strategy) => strategy.buildAlert(makeContext()).channels.join(","));
+    const channelSets = ALL_STRATEGIES.map((strategy) =>
+      strategy.buildAlert(makeContext()).channels.join(","),
+    );
     expect(new Set(channelSets).size).toBeGreaterThan(1);
   });
 });
 
 describe("DefaultAlertStrategy", () => {
   it("names the unrecognized component type in its output rather than silently guessing", () => {
-    const alert = new DefaultAlertStrategy().buildAlert(makeContext({ componentType: "SOME_NEW_THING" }));
+    const alert = new DefaultAlertStrategy().buildAlert(
+      makeContext({ componentType: "SOME_NEW_THING" }),
+    );
     expect(alert.title).toContain("SOME_NEW_THING");
     expect(alert.body).toContain("SOME_NEW_THING");
   });
 
   it("floor P2, same reconciliation rule as every other strategy", () => {
-    const upgraded = new DefaultAlertStrategy().buildAlert(makeContext({ reportedSeverity: "P0" satisfies Severity }));
+    const upgraded = new DefaultAlertStrategy().buildAlert(
+      makeContext({ reportedSeverity: "P0" satisfies Severity }),
+    );
     expect(upgraded.severity).toBe("P0");
-    const flooredAt = new DefaultAlertStrategy().buildAlert(makeContext({ reportedSeverity: "P3" satisfies Severity }));
+    const flooredAt = new DefaultAlertStrategy().buildAlert(
+      makeContext({ reportedSeverity: "P3" satisfies Severity }),
+    );
     expect(flooredAt.severity).toBe("P2");
   });
 });

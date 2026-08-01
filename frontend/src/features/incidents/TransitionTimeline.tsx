@@ -9,7 +9,11 @@ function toErrorInfo(error: unknown): ApiErrorInfo {
   if (error instanceof ApiRequestError) {
     return error.info;
   }
-  return { kind: "unknown", status: 0, message: error instanceof Error ? error.message : "unexpected error" };
+  return {
+    kind: "unknown",
+    status: 0,
+    message: error instanceof Error ? error.message : "unexpected error",
+  };
 }
 
 export interface TransitionTimelineProps {
@@ -35,7 +39,10 @@ export function TransitionTimeline({ incidentId }: TransitionTimelineProps): JSX
         }
       })
       .catch((err: unknown) => {
-        if (controller.signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+        if (
+          controller.signal.aborted ||
+          (err instanceof DOMException && err.name === "AbortError")
+        ) {
           return;
         }
         setError(toErrorInfo(err));
@@ -47,7 +54,10 @@ export function TransitionTimeline({ incidentId }: TransitionTimelineProps): JSX
 
   if (error) {
     return (
-      <ErrorState message={friendlyErrorMessage(error, "the transition history")} onRetry={() => setReloadNonce((n) => n + 1)} />
+      <ErrorState
+        message={friendlyErrorMessage(error, "the transition history")}
+        onRetry={() => setReloadNonce((n) => n + 1)}
+      />
     );
   }
 
@@ -61,7 +71,12 @@ export function TransitionTimeline({ incidentId }: TransitionTimelineProps): JSX
   }
 
   if (transitions.length === 0) {
-    return <EmptyState headline="No transitions yet" body="This incident hasn't changed state since it was opened." />;
+    return (
+      <EmptyState
+        headline="No transitions yet"
+        body="This incident hasn't changed state since it was opened."
+      />
+    );
   }
 
   return (
@@ -70,7 +85,10 @@ export function TransitionTimeline({ incidentId }: TransitionTimelineProps): JSX
         const isEscalation = transition.fromState === transition.toState;
         return (
           <li key={transition.id} className="flex items-start gap-3 text-sm">
-            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink-faint" aria-hidden="true" />
+            <span
+              className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink-faint"
+              aria-hidden="true"
+            />
             <div className="flex flex-col gap-1">
               <div className="flex flex-wrap items-center gap-1.5">
                 {isEscalation ? (
@@ -90,7 +108,10 @@ export function TransitionTimeline({ incidentId }: TransitionTimelineProps): JSX
               </div>
               <p className="text-xs text-ink-muted">
                 {transition.actor} ·{" "}
-                <RelativeTime value={transition.occurredAt} className="font-mono text-mono-micro tabular-nums" />
+                <RelativeTime
+                  value={transition.occurredAt}
+                  className="font-mono text-mono-micro tabular-nums"
+                />
               </p>
             </div>
           </li>

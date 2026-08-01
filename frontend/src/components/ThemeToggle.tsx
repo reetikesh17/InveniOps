@@ -18,7 +18,12 @@ function SunIcon(): JSX.Element {
 function MoonIcon(): JSX.Element {
   return (
     <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" aria-hidden="true">
-      <path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z" className="stroke-current" strokeWidth="1.3" strokeLinejoin="round" />
+      <path
+        d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z"
+        className="stroke-current"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

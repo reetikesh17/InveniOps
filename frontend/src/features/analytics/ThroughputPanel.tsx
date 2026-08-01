@@ -1,5 +1,13 @@
 import { useCallback, useMemo } from "react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { api } from "../../lib/api";
 import { ChartTooltipContent } from "./ChartTooltip";
 import { formatBucketFull, makeTimeTickFormatter, useChartColors } from "./chartTheme";
@@ -20,7 +28,11 @@ export function ThroughputPanel({ range }: ThroughputPanelProps): JSX.Element {
       api.getThroughput({ from: fromIso, to: toIso, interval: intervalSeconds }, opts),
     [fromIso, toIso, intervalSeconds],
   );
-  const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [fromIso, toIso, intervalSeconds]);
+  const { data, loading, error, refetch } = useAnalyticsResource(fetcher, [
+    fromIso,
+    toIso,
+    intervalSeconds,
+  ]);
 
   // Total signals per bucket. The server already owns the time bucketing;
   // this only sums the per-(component,severity) rows that share a bucket into
@@ -59,7 +71,12 @@ export function ThroughputPanel({ range }: ThroughputPanelProps): JSX.Element {
             tick={{ fill: c.inkMuted, fontSize: 11 }}
             minTickGap={28}
           />
-          <YAxis stroke={c.axis} tick={{ fill: c.inkMuted, fontSize: 11 }} width={36} allowDecimals={false} />
+          <YAxis
+            stroke={c.axis}
+            tick={{ fill: c.inkMuted, fontSize: 11 }}
+            width={36}
+            allowDecimals={false}
+          />
           <Tooltip
             content={
               <ChartTooltipContent

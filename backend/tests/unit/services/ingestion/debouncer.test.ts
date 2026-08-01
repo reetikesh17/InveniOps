@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { Redis } from "ioredis";
 import { ComponentType, Prisma, Severity, WorkItemStatus, type WorkItem } from "@prisma/client";
-import { SignalDebouncer, type SignalDebouncerOptions, type WorkItemStore, type SignalStore } from "../../../../src/services/ingestion/debouncer.js";
+import {
+  SignalDebouncer,
+  type SignalDebouncerOptions,
+  type WorkItemStore,
+  type SignalStore,
+} from "../../../../src/services/ingestion/debouncer.js";
 import type { CreateWorkItemInput } from "../../../../src/repositories/postgres/workItemRepository.js";
 import type { SignalDocument } from "../../../../src/repositories/mongo/signalRepository.js";
 import type { IngestionSignal } from "../../../../src/services/ingestion/buffer.js";
@@ -133,11 +138,15 @@ function fakeWorkItemStore(
     findActiveCalls,
     findActiveByComponentId(componentId: string): Promise<WorkItem[]> {
       findActiveCalls.push(componentId);
-      return overrides.findActiveByComponentId ? overrides.findActiveByComponentId(componentId) : Promise.resolve([]);
+      return overrides.findActiveByComponentId
+        ? overrides.findActiveByComponentId(componentId)
+        : Promise.resolve([]);
     },
     createWorkItem(input: CreateWorkItemInput): Promise<WorkItem> {
       createCalls.push(input);
-      return overrides.createWorkItem ? overrides.createWorkItem(input) : Promise.resolve(makeWorkItem());
+      return overrides.createWorkItem
+        ? overrides.createWorkItem(input)
+        : Promise.resolve(makeWorkItem());
     },
     incrementSignalCount(workItemId: string, by: number): Promise<WorkItem> {
       incrementCalls.push({ workItemId, by });
@@ -158,7 +167,9 @@ function fakeSignalStore(): SignalStore & { insertedBatches: SignalDocument[][] 
 }
 
 /** Returns a findActiveByComponentId override that answers `results[call number]`, clamped to the last entry once exhausted. */
-function sequencedFindActive(...results: WorkItem[][]): (componentId: string) => Promise<WorkItem[]> {
+function sequencedFindActive(
+  ...results: WorkItem[][]
+): (componentId: string) => Promise<WorkItem[]> {
   let call = 0;
   return () => {
     const result = results[Math.min(call, results.length - 1)] ?? [];
@@ -181,7 +192,12 @@ describe("SignalDebouncer", () => {
       const workItemStore = fakeWorkItemStore();
       const signalStore = fakeSignalStore();
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, signalStore, redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        signalStore,
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       const result = await debouncer.processSignal(makeSignal());
 
@@ -197,7 +213,12 @@ describe("SignalDebouncer", () => {
     it("builds the create input with signalCount 0 and the signal's receivedAt as firstSignalAt", async () => {
       const workItemStore = fakeWorkItemStore();
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
       const receivedAt = new Date("2026-03-01T00:00:00.000Z");
 
       await debouncer.processSignal(makeSignal({ receivedAt }));
@@ -215,9 +236,16 @@ describe("SignalDebouncer", () => {
   describe("resolve — cache miss, active work item already exists in the store", () => {
     it("links to the existing work item instead of creating one", async () => {
       const existing = makeWorkItem({ id: "wi-existing" });
-      const workItemStore = fakeWorkItemStore({ findActiveByComponentId: () => Promise.resolve([existing]) });
+      const workItemStore = fakeWorkItemStore({
+        findActiveByComponentId: () => Promise.resolve([existing]),
+      });
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       const result = await debouncer.processSignal(makeSignal());
 
@@ -230,8 +258,17 @@ describe("SignalDebouncer", () => {
     it("links via the cache without touching the work item store at all", async () => {
       const workItemStore = fakeWorkItemStore();
       const redis = new FakeRedis();
-      redis.seedSessionHash("CACHE_01", { workItemId: "wi-cached", count: "3", startedAtMs: String(Date.now()) });
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      redis.seedSessionHash("CACHE_01", {
+        workItemId: "wi-cached",
+        count: "3",
+        startedAtMs: String(Date.now()),
+      });
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       const result = await debouncer.processSignal(makeSignal());
 
@@ -245,13 +282,24 @@ describe("SignalDebouncer", () => {
 
     it("treats a session at or past the count threshold as invalid and re-verifies against the store", async () => {
       const existing = makeWorkItem({ id: "wi-existing" });
-      const workItemStore = fakeWorkItemStore({ findActiveByComponentId: () => Promise.resolve([existing]) });
-      const redis = new FakeRedis();
-      redis.seedSessionHash("CACHE_01", { workItemId: "wi-cached", count: "100", startedAtMs: String(Date.now()) });
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, {
-        ...BASE_OPTIONS,
-        threshold: 100,
+      const workItemStore = fakeWorkItemStore({
+        findActiveByComponentId: () => Promise.resolve([existing]),
       });
+      const redis = new FakeRedis();
+      redis.seedSessionHash("CACHE_01", {
+        workItemId: "wi-cached",
+        count: "100",
+        startedAtMs: String(Date.now()),
+      });
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        {
+          ...BASE_OPTIONS,
+          threshold: 100,
+        },
+      );
 
       const result = await debouncer.processSignal(makeSignal());
 
@@ -261,11 +309,22 @@ describe("SignalDebouncer", () => {
 
     it("treats a session whose window has elapsed as invalid and re-verifies against the store", async () => {
       const existing = makeWorkItem({ id: "wi-existing" });
-      const workItemStore = fakeWorkItemStore({ findActiveByComponentId: () => Promise.resolve([existing]) });
+      const workItemStore = fakeWorkItemStore({
+        findActiveByComponentId: () => Promise.resolve([existing]),
+      });
       const redis = new FakeRedis();
       const longAgo = Date.now() - 20_000; // older than windowSeconds(10) * 1000
-      redis.seedSessionHash("CACHE_01", { workItemId: "wi-cached", count: "1", startedAtMs: String(longAgo) });
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      redis.seedSessionHash("CACHE_01", {
+        workItemId: "wi-cached",
+        count: "1",
+        startedAtMs: String(longAgo),
+      });
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       const result = await debouncer.processSignal(makeSignal());
 
@@ -276,7 +335,12 @@ describe("SignalDebouncer", () => {
     it("treats a session with no workItemId field as a cache miss", async () => {
       const workItemStore = fakeWorkItemStore();
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       const result = await debouncer.processSignal(makeSignal());
 
@@ -294,7 +358,12 @@ describe("SignalDebouncer", () => {
         createWorkItem: () => Promise.reject(conflictError()),
       });
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       const result = await debouncer.processSignal(makeSignal());
 
@@ -305,7 +374,12 @@ describe("SignalDebouncer", () => {
       const boom = new Error("connection reset");
       const workItemStore = fakeWorkItemStore({ createWorkItem: () => Promise.reject(boom) });
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       await expect(debouncer.processSignal(makeSignal())).rejects.toBe(boom);
     });
@@ -316,7 +390,12 @@ describe("SignalDebouncer", () => {
         createWorkItem: () => Promise.reject(conflictError()),
       });
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       await expect(debouncer.processSignal(makeSignal())).rejects.toThrow(
         /conflicted for component .* but no active work item was found/,
@@ -331,10 +410,15 @@ describe("SignalDebouncer", () => {
         createWorkItem: () => Promise.reject(new CustomConflict("mock conflict")),
       });
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, {
-        ...BASE_OPTIONS,
-        isConflictError: (error: unknown): boolean => error instanceof CustomConflict,
-      });
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        {
+          ...BASE_OPTIONS,
+          isConflictError: (error: unknown): boolean => error instanceof CustomConflict,
+        },
+      );
 
       const result = await debouncer.processSignal(makeSignal());
       expect(result).toEqual({ workItemId: "wi-winner", created: false });
@@ -345,7 +429,12 @@ describe("SignalDebouncer", () => {
     it("releases the creation lock after resolving, even when the store call succeeds", async () => {
       const workItemStore = fakeWorkItemStore();
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       await debouncer.processSignal(makeSignal());
 
@@ -353,9 +442,16 @@ describe("SignalDebouncer", () => {
     });
 
     it("releases the creation lock even when the store call throws a non-conflict error", async () => {
-      const workItemStore = fakeWorkItemStore({ createWorkItem: () => Promise.reject(new Error("boom")) });
+      const workItemStore = fakeWorkItemStore({
+        createWorkItem: () => Promise.reject(new Error("boom")),
+      });
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
       await expect(debouncer.processSignal(makeSignal())).rejects.toThrow("boom");
 
@@ -367,16 +463,25 @@ describe("SignalDebouncer", () => {
       const redis = new FakeRedis();
       redis.holdLock("CACHE_01"); // simulate another worker mid-resolution
 
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, {
-        ...BASE_OPTIONS,
-        lockWaitTimeoutMs: 200,
-        lockPollIntervalMs: 10,
-      });
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        {
+          ...BASE_OPTIONS,
+          lockWaitTimeoutMs: 200,
+          lockPollIntervalMs: 10,
+        },
+      );
 
       // The "other worker" publishes its session shortly after — simulated
       // by seeding it on a short timer while pollForSession is looping.
       setTimeout(() => {
-        redis.seedSessionHash("CACHE_01", { workItemId: "wi-other-worker", count: "0", startedAtMs: String(Date.now()) });
+        redis.seedSessionHash("CACHE_01", {
+          workItemId: "wi-other-worker",
+          count: "0",
+          startedAtMs: String(Date.now()),
+        });
       }, 30);
 
       const result = await debouncer.processSignal(makeSignal());
@@ -390,11 +495,16 @@ describe("SignalDebouncer", () => {
       const redis = new FakeRedis();
       redis.holdLock("CACHE_01"); // held for the entire test — never released, never seeded
 
-      const debouncer = new SignalDebouncer(workItemStore, fakeSignalStore(), redis as unknown as Redis, {
-        ...BASE_OPTIONS,
-        lockWaitTimeoutMs: 40,
-        lockPollIntervalMs: 10,
-      });
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        fakeSignalStore(),
+        redis as unknown as Redis,
+        {
+          ...BASE_OPTIONS,
+          lockWaitTimeoutMs: 40,
+          lockPollIntervalMs: 10,
+        },
+      );
 
       const result = await debouncer.processSignal(makeSignal());
 
@@ -408,9 +518,18 @@ describe("SignalDebouncer", () => {
       const workItemStore = fakeWorkItemStore();
       const signalStore = fakeSignalStore();
       const redis = new FakeRedis();
-      const debouncer = new SignalDebouncer(workItemStore, signalStore, redis as unknown as Redis, BASE_OPTIONS);
+      const debouncer = new SignalDebouncer(
+        workItemStore,
+        signalStore,
+        redis as unknown as Redis,
+        BASE_OPTIONS,
+      );
 
-      const signals = [makeSignal({ signalId: "a" }), makeSignal({ signalId: "b" }), makeSignal({ signalId: "c" })];
+      const signals = [
+        makeSignal({ signalId: "a" }),
+        makeSignal({ signalId: "b" }),
+        makeSignal({ signalId: "c" }),
+      ];
       const results = await debouncer.resolveBatch(signals);
 
       expect(results).toHaveLength(3);
