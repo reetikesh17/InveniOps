@@ -23,6 +23,13 @@ let assertionDb: Db;
 let server: Server;
 let baseUrl: string;
 let workerSystem: WorkerSystem;
+// The incident routes this test exercises now sit behind requireAuth (see
+// app.ts) — signed up once here so postJson/getJson below can carry a
+// real token, same as any other authenticated client of this API. Not a
+// change to what this test verifies (it never asserted on the request
+// body's now-ignored `actor` field, only on server-computed response
+// state), just what it takes to reach those routes at all.
+let authToken: string;
 
 beforeAll(async () => {
   await connectClients();
@@ -40,6 +47,18 @@ beforeAll(async () => {
   });
   const address = server.address() as AddressInfo;
   baseUrl = `http://127.0.0.1:${address.port}`;
+
+  const signup = await fetch(`${baseUrl}/api/v1/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      email: `lifecycle-test-${randomUUID()}@example.com`,
+      password: "lifecycle-test-password",
+      name: "Lifecycle Test",
+    }),
+  });
+  const signupBody = (await signup.json()) as { token: string };
+  authToken = signupBody.token;
 }, 30_000);
 
 afterAll(async () => {
@@ -92,14 +111,16 @@ interface JsonResponse {
 async function postJson(path: string, body: unknown): Promise<JsonResponse> {
   const response = await fetch(`${baseUrl}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${authToken}` },
     body: JSON.stringify(body),
   });
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 
 async function getJson(path: string): Promise<JsonResponse> {
-  const response = await fetch(`${baseUrl}${path}`);
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: { Authorization: `Bearer ${authToken}` },
+  });
   return { status: response.status, body: (await response.json()) as Record<string, unknown> };
 }
 

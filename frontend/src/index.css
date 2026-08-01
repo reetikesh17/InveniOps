@@ -50,6 +50,31 @@
   --text-mono-micro: 0.6875rem;
   --text-mono-micro--line-height: 0.875rem;
 
+  /* Landing-only rungs — additive, not a replacement for the scale above.
+     Nothing in the console needs type larger than --text-wordmark (13px);
+     a scrolling marketing page read at arm's length does. Same two families,
+     same @theme mechanism, just two more named sizes.
+       hero  48/50, Archivo, uppercase — the equipment-nameplate treatment
+             (see Header.tsx's wordmark) scaled up, not a new display style.
+       lede  15/24, Plex Sans — section intros; --text-prose (12px) stays for
+             denser copy (footnotes, captions) same as it does in the console. */
+  --text-hero: 3rem;
+  --text-hero--line-height: 3.125rem;
+  --text-lede: 0.9375rem;
+  --text-lede--line-height: 1.5rem;
+  /* Big mono readouts — the measured-numbers panel's stat values. Smaller
+     than --text-hero on purpose: a stat card, not a second headline. */
+  --text-stat: 1.75rem;
+  --text-stat--line-height: 2rem;
+
+  /* Landing-only layout rhythm — the console has no notion of "a page," only
+     a fixed app shell (see App.tsx's RootLayout), so vertical section rhythm
+     and a reading-width column didn't exist as tokens until this page needed
+     them. Named for the same reason --spacing-row is: a real Tailwind
+     spacing/width token, not a bracket value repeated at every call site. */
+  --spacing-section: 5rem;
+  --max-width-content: 72rem;
+
   /* Density — the approved feed-row height (~1.7x the pre-redesign row),
      named so it's a real Tailwind spacing token (`min-h-row`, `h-row`), not
      a bracket value re-typed at every call site. */

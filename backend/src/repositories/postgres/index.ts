@@ -10,3 +10,4 @@ export {
   type Pagination,
   type WorkItemWithRca,
 } from "./workItemRepository.js";
+export { PostgresUserRepository, type CreateUserInput } from "./userRepository.js";

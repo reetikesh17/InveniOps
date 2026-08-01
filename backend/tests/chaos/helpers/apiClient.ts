@@ -73,6 +73,39 @@ export async function postSignals(
   }
 }
 
+// The incident routes below sit behind requireAuth (see api/app.ts) —
+// signed up once per test run and cached, same posture as
+// tests/e2e/helpers/apiClient.ts. Callers that deliberately trigger an
+// outage *before* calling one of these (postgresOutage.test.ts) must call
+// ensureAuthToken() first, while Postgres is still up — signup itself
+// needs Postgres — so the outage under test is the transition endpoint's,
+// not an incidental failure to sign up.
+let cachedToken: Promise<string> | undefined;
+
+export function ensureAuthToken(): Promise<string> {
+  cachedToken ??= (async (): Promise<string> => {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: `chaos-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`,
+        password: "chaos-test-password",
+        name: "Chaos Test",
+      }),
+    });
+    const body = (await res.json()) as { token?: string };
+    if (!body.token) {
+      throw new Error(`chaos auth signup failed: ${res.status} ${JSON.stringify(body)}`);
+    }
+    return body.token;
+  })();
+  return cachedToken;
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  return { Authorization: `Bearer ${await ensureAuthToken()}` };
+}
+
 export interface HealthResponse {
   readonly status: "healthy" | "degraded" | "unhealthy";
   readonly dependencies: Record<
@@ -105,7 +138,9 @@ export interface IncidentSummaryDto {
 export async function listActiveIncidents(
   limit = 50,
 ): Promise<{ status: number; items: IncidentSummaryDto[]; total: number }> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/incidents?limit=${limit}`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/incidents?limit=${limit}`, {
+    headers: await authHeaders(),
+  });
   const body = (await res.json().catch(() => ({ items: [], total: 0 }))) as {
     items?: IncidentSummaryDto[];
     total?: number;
@@ -116,17 +151,21 @@ export async function listActiveIncidents(
 export async function getIncident(
   id: string,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}`, {
+    headers: await authHeaders(),
+  });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   return { status: res.status, body };
 }
 
+/** `actor` is accepted for backward-compatible call sites but ignored by the server — the audit trail now records the authenticated caller's email (see api/routes/workitems.ts). */
 export async function transitionIncident(
   id: string,
   toState: string,
   actor: string,
   timeoutMs = 10_000,
 ): Promise<{ status: number; body: Record<string, unknown>; durationMs: number }> {
+  void actor;
   const startedAt = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -135,8 +174,8 @@ export async function transitionIncident(
       `${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/transition`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toState, actor }),
+        headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+        body: JSON.stringify({ toState }),
         signal: controller.signal,
       },
     );

@@ -6,7 +6,6 @@ import {
   EmptyState,
   ErrorState,
   IncidentDetailSkeleton,
-  Input,
   useToast,
 } from "../../components";
 import { XCircleIcon } from "../../components/icons";
@@ -19,7 +18,6 @@ import { RcaReadOnly } from "./RcaReadOnly";
 import { SignalsPanel } from "./SignalsPanel";
 import { StateMachineControl } from "./StateMachineControl";
 import { TransitionTimeline } from "./TransitionTimeline";
-import { useActorName } from "./useActorName";
 import { useIncidentDetail } from "./useIncidentDetail";
 
 const CONFLICT_BANNER_MS = 6_000;
@@ -37,7 +35,6 @@ export function IncidentDetailPage(): JSX.Element | null {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const [actor, setActor] = useActorName();
   const [conflictMessage, setConflictMessage] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
 
@@ -70,7 +67,7 @@ export function IncidentDetailPage(): JSX.Element | null {
         headline="Incident not found"
         body="It may have been removed, or the link might be wrong."
         action={
-          <Button variant="secondary" onClick={() => void navigate("/")}>
+          <Button variant="secondary" onClick={() => void navigate("/app")}>
             Back to Live Feed
           </Button>
         }
@@ -97,7 +94,7 @@ export function IncidentDetailPage(): JSX.Element | null {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/" className="w-fit text-sm text-ink-muted hover:text-ink">
+      <Link to="/app" className="w-fit text-sm text-ink-muted hover:text-ink">
         ← Back to Live Feed
       </Link>
 
@@ -114,18 +111,12 @@ export function IncidentDetailPage(): JSX.Element | null {
       <DetailHeader detail={detail} />
 
       <Card>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="w-48">
-            <Input label="Acting as" value={actor} onChange={(e) => setActor(e.target.value)} />
-          </div>
-          <StateMachineControl
-            incidentId={detail.id}
-            legalNextStates={detail.legalNextStates}
-            actor={actor}
-            onTransitioned={() => void handleRefresh()}
-            onConflict={handleConflict}
-          />
-        </div>
+        <StateMachineControl
+          incidentId={detail.id}
+          legalNextStates={detail.legalNextStates}
+          onTransitioned={() => void handleRefresh()}
+          onConflict={handleConflict}
+        />
       </Card>
 
       {detail.state === "RESOLVED" && (
@@ -133,7 +124,6 @@ export function IncidentDetailPage(): JSX.Element | null {
           <RcaForm
             incidentId={detail.id}
             firstSignalAt={detail.firstSignalAt}
-            actor={actor}
             onSubmitted={() => {
               void handleRefresh();
               showToast("success", "RCA submitted — incident closed.");

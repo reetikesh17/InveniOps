@@ -13,6 +13,7 @@
 process.env.DATABASE_URL ??= "postgresql://ims_user:ims_password@localhost:5432/ims";
 process.env.MONGODB_URI ??= "mongodb://localhost:27017/ims";
 process.env.REDIS_URL ??= "redis://localhost:6379";
+process.env.JWT_SECRET ??= "integration-test-placeholder-jwt-secret-not-real-0000";
 
 // The pipeline test pushes a 10,000-signal burst through the real HTTP
 // endpoint in a handful of large batches — comfortably past the default

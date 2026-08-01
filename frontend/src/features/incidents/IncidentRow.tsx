@@ -29,7 +29,7 @@ function FieldLabel({ children }: { children: string }): JSX.Element {
 function IncidentRowInner({ incident, isNew }: IncidentRowProps): JSX.Element {
   return (
     <Link
-      to={`/incidents/${encodeURIComponent(incident.id)}`}
+      to={`/app/incidents/${encodeURIComponent(incident.id)}`}
       role="row"
       // The rail is a left border so consecutive rows form one unbroken ribbon.
       style={{ borderLeftColor: severityColor(incident.severity) }}

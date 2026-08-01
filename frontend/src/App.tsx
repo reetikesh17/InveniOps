@@ -1,13 +1,30 @@
 import { lazy, Suspense, type ReactNode } from "react";
 import { createBrowserRouter, Outlet, RouterProvider } from "react-router-dom";
 import { Header } from "./components/Header";
-import { ErrorBoundary, IncidentListSkeleton, SystemBanner, ToastProvider } from "./components";
+import {
+  ErrorBoundary,
+  IncidentListSkeleton,
+  RequireAuth,
+  SystemBanner,
+  ToastProvider,
+} from "./components";
 import { HealthProvider } from "./hooks/useSystemHealth";
 import { IncidentsProvider } from "./hooks/useIncidents";
+import { AuthProvider } from "./hooks/useAuth";
+import { LandingPage } from "./features/landing/LandingPage";
 
 // Route-level code splitting: every page is its own chunk, so the initial
 // load ships only the shell + the landing route. Analytics in particular
-// pulls in recharts (~470 kB), which no other page needs.
+// pulls in recharts (~470 kB), which no other page needs. LoginPage/SignupPage
+// are included — a landing-page visitor who never clicks through to either
+// shouldn't pay for their bundle (Lighthouse flagged this as unused JS on
+// the landing route before these two were split out).
+const LoginPage = lazy(() =>
+  import("./features/auth/LoginPage").then((m) => ({ default: m.LoginPage })),
+);
+const SignupPage = lazy(() =>
+  import("./features/auth/SignupPage").then((m) => ({ default: m.SignupPage })),
+);
 const LiveFeedPage = lazy(() =>
   import("./features/incidents/LiveFeedPage").then((m) => ({ default: m.LiveFeedPage })),
 );
@@ -65,11 +82,50 @@ function RootLayout(): JSX.Element {
 // the RCA form's unsaved-changes guard relies on useBlocker, which only works
 // under a data router (see features/rca/useUnsavedChangesWarning.ts).
 const router = createBrowserRouter([
+  // The public marketing surface. Unprotected, no Header/IncidentsProvider —
+  // same reasoning as /login below, plus it's the one page an unauthenticated
+  // visitor is actually meant to land on.
   {
-    element: <RootLayout />,
+    path: "/",
+    element: (
+      <Route label="the landing page">
+        <LandingPage />
+      </Route>
+    ),
+  },
+  // Unprotected, deliberately outside RootLayout — no Header, no
+  // IncidentsProvider/HealthProvider fetching anything before there's a
+  // session to authenticate those requests with.
+  {
+    path: "/login",
+    element: (
+      <Route label="sign in">
+        <LoginPage />
+      </Route>
+    ),
+  },
+  {
+    path: "/signup",
+    element: (
+      <Route label="sign up">
+        <SignupPage />
+      </Route>
+    ),
+  },
+  {
+    element: (
+      <RequireAuth>
+        <RootLayout />
+      </RequireAuth>
+    ),
+    // The console lives under /app — "/" is the public landing page instead.
+    // Keeping the console on its own prefix means the two surfaces can never
+    // collide on a path, and an unauthenticated visitor to any /app/* URL
+    // still gets the ordinary RequireAuth redirect-and-return-here behavior.
+    path: "/app",
     children: [
       {
-        path: "/",
+        index: true,
         element: (
           <Route label="the live feed">
             <LiveFeedPage />
@@ -77,7 +133,7 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "/incidents/:id",
+        path: "incidents/:id",
         element: (
           <Route label="this incident">
             <IncidentDetailPage />
@@ -85,7 +141,7 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "/analytics",
+        path: "analytics",
         element: (
           <Route label="analytics">
             <AnalyticsPage />
@@ -93,7 +149,7 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "/styleguide",
+        path: "styleguide",
         element: (
           <Route label="the style guide">
             <StyleGuidePage />
@@ -105,5 +161,9 @@ const router = createBrowserRouter([
 ]);
 
 export function App(): JSX.Element {
-  return <RouterProvider router={router} />;
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  );
 }

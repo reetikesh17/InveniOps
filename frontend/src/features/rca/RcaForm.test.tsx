@@ -32,7 +32,6 @@ function renderForm(overrides: Partial<RcaFormProps> = {}): {
     incidentId: "wi-1",
     // A first-signal timestamp well in the past, so the prefilled start/end defaults are valid.
     firstSignalAt: "2026-06-01T00:00:00.000Z",
-    actor: "operator",
     onSubmitted,
     onConflict,
     ...overrides,

@@ -12,3 +12,4 @@
 process.env.DATABASE_URL ??= "postgresql://ims_user:ims_password@localhost:5432/ims";
 process.env.MONGODB_URI ??= "mongodb://localhost:27017/ims";
 process.env.REDIS_URL ??= "redis://localhost:6379";
+process.env.JWT_SECRET ??= "unit-test-placeholder-jwt-secret-not-real-0000";

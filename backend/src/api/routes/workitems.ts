@@ -19,6 +19,7 @@ import { WorkflowService } from "../../services/workitems/workflowService.js";
 import { alertDispatcher } from "../../services/alerting/alertingInstance.js";
 import { getMetricsWriter } from "../../services/aggregation/aggregationInstance.js";
 import { incidentEventPublisher } from "../../services/realtime/realtimeInstance.js";
+import type { AuthenticatedRequest } from "../middleware/requireAuth.js";
 
 interface Services {
   readonly dashboard: DashboardProjectionService;
@@ -81,13 +82,12 @@ const signalsQuerySchema = paginationQuerySchema.extend({
   order: z.enum(["asc", "desc"]).default("asc"),
 });
 
+// `actor` no longer comes from the request body — these routes sit behind
+// requireAuth (see app.ts), and the actor recorded in the audit trail is
+// the authenticated caller's own email (req.user.email), not anything the
+// client asserts. See docs/decisions/ for the reasoning.
 const transitionBodySchema = z.object({
   toState: z.enum(["OPEN", "INVESTIGATING", "RESOLVED", "CLOSED"]),
-  actor: z.string().min(1).max(200),
-});
-
-const rcaActorSchema = z.object({
-  actor: z.string().min(1).max(200),
 });
 
 interface ErrorResponseBody {
@@ -194,7 +194,10 @@ async function handleGetIncidentTransitions(
   res.status(200).json({ items: transitions });
 }
 
-async function handleTransition(req: Request, res: Response<IncidentResponseBody>): Promise<void> {
+async function handleTransition(
+  req: AuthenticatedRequest,
+  res: Response<IncidentResponseBody>,
+): Promise<void> {
   const { id } = req.params;
   if (!id) {
     res.status(400).json({ error: "validation_error", message: "incident id is required" });
@@ -217,7 +220,7 @@ async function handleTransition(req: Request, res: Response<IncidentResponseBody
   const outcome = await getServices().workflow.transitionWorkItem(
     id,
     parsedBody.data.toState,
-    parsedBody.data.actor,
+    req.user.email,
   );
 
   switch (outcome.outcome) {
@@ -236,16 +239,13 @@ async function handleTransition(req: Request, res: Response<IncidentResponseBody
   }
 }
 
-async function handleSubmitRca(req: Request, res: Response<RcaResponseBody>): Promise<void> {
+async function handleSubmitRca(
+  req: AuthenticatedRequest,
+  res: Response<RcaResponseBody>,
+): Promise<void> {
   const { id } = req.params;
   if (!id) {
     res.status(400).json({ error: "validation_error", message: "incident id is required" });
-    return;
-  }
-
-  const parsedActor = rcaActorSchema.safeParse(req.body);
-  if (!parsedActor.success) {
-    res.status(400).json({ error: "validation_error", message: "actor is required" });
     return;
   }
 
@@ -254,11 +254,7 @@ async function handleSubmitRca(req: Request, res: Response<RcaResponseBody>): Pr
   // what produces the field-level errors for the 422 response, and it's
   // deliberately the single source of truth for what makes an RCA valid,
   // not a second, possibly-drifting copy of the same rules at this layer.
-  const outcome = await getServices().workflow.submitIncidentRca(
-    id,
-    req.body,
-    parsedActor.data.actor,
-  );
+  const outcome = await getServices().workflow.submitIncidentRca(id, req.body, req.user.email);
 
   switch (outcome.outcome) {
     case "not_found":
@@ -313,13 +309,13 @@ workitemsRouter.get(
 workitemsRouter.post(
   "/:id/transition",
   (req: Request, res: Response<IncidentResponseBody>, next: NextFunction): void => {
-    handleTransition(req, res).catch(next);
+    handleTransition(req as AuthenticatedRequest, res).catch(next);
   },
 );
 
 workitemsRouter.post(
   "/:id/rca",
   (req: Request, res: Response<RcaResponseBody>, next: NextFunction): void => {
-    handleSubmitRca(req, res).catch(next);
+    handleSubmitRca(req as AuthenticatedRequest, res).catch(next);
   },
 );

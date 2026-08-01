@@ -49,6 +49,7 @@ export async function startEphemeralBackend(
     DATABASE_URL: "postgresql://ims_user:ims_password@postgres:5432/ims",
     MONGODB_URI: "mongodb://mongo:27017/ims",
     REDIS_URL: "redis://redis:6379",
+    JWT_SECRET: "ephemeral-chaos-backend-placeholder-jwt-secret-not-real",
     ...envOverrides,
   };
 

@@ -13,6 +13,7 @@ import type {
   StateTransition,
   ThroughputQuery,
   ThroughputResponse,
+  User,
   WorkItem,
   WorkItemState,
 } from "../types";
@@ -20,6 +21,35 @@ import type {
 export const API_BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
 const DEFAULT_TIMEOUT_MS = 10_000;
+
+// The access token lives here, in module memory only — never
+// localStorage/sessionStorage. Set by AuthContext (hooks/useAuth.tsx) on
+// login/signup and cleared on logout or a 401. See that file's own comment
+// for the full XSS/CSRF tradeoff this is making; the short version: no
+// token in persistent storage for any later script to read, and no
+// ambient cookie credential for CSRF to ride on — attaching it here, to
+// this one Authorization header, is the only way a request ever carries it.
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null): void {
+  authToken = token;
+}
+
+/** For the one caller that can't attach an Authorization header: the SSE connection (see hooks/useIncidents.tsx) sends this as a query param instead — the server verifies it the same way, just not through the shared requireAuth middleware (see backend/src/api/routes/incidentStream.ts). */
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
+// AuthContext registers this once, at app startup, so apiFetch can react
+// to a 401 from *any* call site without every caller having to check for
+// it individually — the alternative is every single api.* consumer
+// remembering to redirect to /login on 401, which is the kind of thing
+// that's fine 9 times out of 10 and silently wrong the 10th.
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null): void {
+  unauthorizedHandler = handler;
+}
 
 export interface FieldError {
   readonly field: string;
@@ -155,7 +185,10 @@ async function apiFetchRaw(path: string, options: RequestOptions = {}): Promise<
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
@@ -186,9 +219,25 @@ async function apiFetchRaw(path: string, options: RequestOptions = {}): Promise<
   return { status: response.status, data };
 }
 
+// login/signup's own 401s (wrong password) and 409s (duplicate email) are
+// ordinary, expected outcomes the auth pages handle inline — never the
+// "your session expired" case setUnauthorizedHandler exists for. Excluded
+// by path so a failed login attempt can never itself trigger a redirect
+// loop back to the page it's already on.
+const AUTH_PATHS_EXEMPT_FROM_UNAUTHORIZED_HANDLER = [
+  "/api/v1/auth/login",
+  "/api/v1/auth/signup",
+  // logout() clears local session state itself; a 401 on its own
+  // best-effort server call must not re-trigger the handler and loop.
+  "/api/v1/auth/logout",
+];
+
 /** Throws ApiRequestError for any non-2xx response — see apiFetchRaw for a variant that doesn't. */
 export async function apiFetch<T>(path: string, options?: RequestOptions): Promise<T> {
   const { status, data } = await apiFetchRaw(path, options);
+  if (status === 401 && !AUTH_PATHS_EXEMPT_FROM_UNAUTHORIZED_HANDLER.includes(path)) {
+    unauthorizedHandler?.();
+  }
   if (status < 200 || status >= 300) {
     throw new ApiRequestError(toErrorInfo(status, data));
   }
@@ -243,16 +292,14 @@ export const api = {
     return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/transitions`, opts);
   },
 
-  transitionIncident(
-    id: string,
-    toState: WorkItemState,
-    actor: string,
-    opts?: CallOptions,
-  ): Promise<WorkItem> {
+  // No `actor` parameter — the server sources it from the authenticated
+  // request (the Authorization header apiFetchRaw already attaches), not
+  // anything this client asserts. See docs/decisions/.
+  transitionIncident(id: string, toState: WorkItemState, opts?: CallOptions): Promise<WorkItem> {
     return apiFetch(`/api/v1/incidents/${encodeURIComponent(id)}/transition`, {
       ...opts,
       method: "POST",
-      body: { toState, actor },
+      body: { toState },
     });
   },
 
@@ -304,5 +351,28 @@ export const api = {
   async getHealth(opts?: CallOptions): Promise<HealthResponse> {
     const { data } = await apiFetchRaw("/health", opts);
     return data as HealthResponse;
+  },
+
+  signup(
+    input: { email: string; password: string; name: string },
+    opts?: CallOptions,
+  ): Promise<{ user: User; token: string }> {
+    return apiFetch("/api/v1/auth/signup", { ...opts, method: "POST", body: input });
+  },
+
+  login(
+    input: { email: string; password: string },
+    opts?: CallOptions,
+  ): Promise<{ user: User; token: string }> {
+    return apiFetch("/api/v1/auth/login", { ...opts, method: "POST", body: input });
+  },
+
+  me(opts?: CallOptions): Promise<User> {
+    return apiFetch("/api/v1/auth/me", opts);
+  },
+
+  /** With no server-side session, this is symmetry more than effect — see backend/src/api/routes/auth.ts's own comment. The real logout is AuthContext discarding the in-memory token. */
+  logout(opts?: CallOptions): Promise<{ ok: true }> {
+    return apiFetch("/api/v1/auth/logout", { ...opts, method: "POST" });
   },
 };

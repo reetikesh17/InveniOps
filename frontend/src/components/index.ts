@@ -17,6 +17,7 @@ export { RelativeTime, type RelativeTimeProps } from "./RelativeTime";
 export { ErrorBoundary } from "./ErrorBoundary";
 export { SystemBanner } from "./SystemBanner";
 export { ConnectionStatusIndicator } from "./ConnectionStatusIndicator";
+export { RequireAuth } from "./RequireAuth";
 export {
   EYEBROW_CLASSES,
   DISPLAY_HEADING_CLASSES,

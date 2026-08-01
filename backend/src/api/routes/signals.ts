@@ -120,13 +120,11 @@ async function handleIngest(
 
   if (!parsed.ok) {
     if (parsed.reason === "validation_failed") {
-      res
-        .status(400)
-        .json({
-          error: "validation_error",
-          message: "one or more signals failed validation",
-          details: parsed.errors,
-        });
+      res.status(400).json({
+        error: "validation_error",
+        message: "one or more signals failed validation",
+        details: parsed.errors,
+      });
       return;
     }
     res.status(400).json({ error: "validation_error", message: parsed.message, details: [] });

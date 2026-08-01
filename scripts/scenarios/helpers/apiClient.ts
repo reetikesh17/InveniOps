@@ -32,7 +32,37 @@ export interface ApiClientOptions {
 }
 
 export class ApiClient {
+  private authToken: string | undefined;
+
   constructor(private readonly options: ApiClientOptions) {}
+
+  /**
+   * The incident transition/RCA routes below sit behind requireAuth (see
+   * backend/src/api/app.ts) — signed up once per ApiClient instance and
+   * cached, same posture as backend/tests/{e2e,chaos}/helpers/apiClient.ts.
+   * Signal ingestion above stays unauthenticated on purpose (ingestion is
+   * machine-to-machine — see app.ts's own comment) and needs no token.
+   */
+  private async ensureAuthToken(): Promise<string> {
+    if (this.authToken) {
+      return this.authToken;
+    }
+    const res = await fetch(`${this.options.baseUrl}/api/v1/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: `scenario-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`,
+        password: "scenario-script-password",
+        name: "Scenario Script",
+      }),
+    });
+    const body = (await res.json()) as { token?: string };
+    if (!body.token) {
+      throw new Error(`scenario auth signup failed: ${res.status} ${JSON.stringify(body)}`);
+    }
+    this.authToken = body.token;
+    return body.token;
+  }
 
   /**
    * Posts a batch and retries on 429 honoring `Retry-After`, up to
@@ -83,17 +113,20 @@ export class ApiClient {
     return { httpStatus: res.status, body };
   }
 
+  /** `actor` is accepted for backward-compatible call sites but ignored by the server — the audit trail now records the authenticated caller's email (see backend/src/api/routes/workitems.ts). */
   async transition(
     workItemId: string,
     toState: "OPEN" | "INVESTIGATING" | "RESOLVED" | "CLOSED",
     actor: string,
   ): Promise<{ status: number; body: IncidentSummaryDto }> {
+    void actor;
+    const token = await this.ensureAuthToken();
     const res = await fetch(
       `${this.options.baseUrl}/api/v1/incidents/${encodeURIComponent(workItemId)}/transition`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toState, actor }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ toState }),
       },
     );
     const body = (await res.json()) as IncidentSummaryDto;
@@ -108,11 +141,12 @@ export class ApiClient {
     body: IncidentSummaryDto & { mttrSeconds?: number };
     raw: unknown;
   }> {
+    const token = await this.ensureAuthToken();
     const res = await fetch(
       `${this.options.baseUrl}/api/v1/incidents/${encodeURIComponent(workItemId)}/rca`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(rca),
       },
     );

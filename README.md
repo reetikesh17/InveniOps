@@ -11,6 +11,21 @@ a measured Mean Time To Repair.
 
 ## Demo
 
+**The console now lives at `/app`, not `/`** — `/` is a public landing page (`/login`
+and `/signup` are also public; everything else in the console is behind auth, see
+[Auth](#auth--backendsrcapiroutesauthts-mounted-at-apiv1auth) below). Signing in or
+signing up lands you in the console at `/app` automatically.
+
+![InveniOps landing page — the debounce mechanic animated live, not asserted in copy](docs/images/landing-page.png)
+**Landing page** (`/`) — the hero *is* the argument: a live, client-side demo of the
+same 100-signal / 10-second debounce rule the backend enforces, collapsing into a real
+`IncidentRow` (see [ADR 0013](docs/decisions/0013-landing-page-design-direction.md) for
+the design direction and what it deliberately doesn't claim). Entirely self-contained —
+no API call, so it renders identically with the backend stopped — and every number on
+the page below the fold (throughput, buffer capacity, debounce window) is quoted from
+this README's own [Performance](#performance) and [Backpressure](#backpressure-handling)
+sections, not restated from memory.
+
 45 seconds, full workflow: a signal arrives in the Live Feed, the incident opens, its
 linked raw signals expand, it transitions OPEN → INVESTIGATING → RESOLVED, closing it
 without an RCA is rejected in place, a valid RCA is submitted, and it closes with a
@@ -68,8 +83,10 @@ and the third installs and runs the sample-data scripts.
 docker compose up -d --build
 
 # 2. Apply the Postgres schema (the backend image doesn't run migrations on boot —
-#    see backend/Dockerfile — so this is a one-time, explicit step)
-cd backend && DATABASE_URL=postgresql://ims_user:ims_password@localhost:5432/ims npx prisma migrate deploy && cd ..
+#    see backend/Dockerfile — so this is a one-time, explicit step), then seed one
+#    demo login so you can sign in without signing up first
+cd backend && DATABASE_URL=postgresql://ims_user:ims_password@localhost:5432/ims npx prisma migrate deploy && \
+  DATABASE_URL=postgresql://ims_user:ims_password@localhost:5432/ims JWT_SECRET=local-dev-only-insecure-secret-do-not-use-in-production npx prisma db seed && cd ..
 
 # 3. Populate the dashboard: a narrated cascading-failure scenario (RDBMS outage → API
 #    timeouts → MCP host failure → cache miss storm → recovery), then walk half its
@@ -77,13 +94,18 @@ cd backend && DATABASE_URL=postgresql://ims_user:ims_password@localhost:5432/ims
 cd scripts/scenarios && npm install && npm run cascading-failure -- --speed 30 && npm run replay-lifecycle && cd ../..
 ```
 
-Open **http://localhost:5173** — the Live Feed shows a mix of active incidents and, on
-the Closed tab, resolved ones with real computed MTTR; Analytics has real throughput
-and MTTR data to chart. `curl http://localhost:3000/health` should report
-`"status":"healthy"` with all four dependencies `up`. Step 3's scenario runs in ~10
-seconds at `--speed 30`; drop the flag (`npm run cascading-failure`) to watch it narrate
-in real time over ~3 minutes instead — see [Sample Data](#sample-data) for what it
-verifies and why.
+Open **http://localhost:5173** — this is the landing page; click **Sign in** (or go
+straight to http://localhost:5173/login) and sign in with the seeded demo account —
+**`demo@inveniops.dev`** / **`Demo12345!`** (a fixed, publicly-known demo credential,
+not a real secret; sign up your own account instead if you'd rather). That lands you
+in the console at **http://localhost:5173/app**. The Live Feed shows a mix of active
+incidents and, on the Closed tab, resolved ones with real computed MTTR; Analytics has
+real throughput and MTTR data to chart.
+`curl http://localhost:3000/health` should report `"status":"healthy"` with all four
+dependencies `up` (no auth required for `/health` itself — see
+[API Reference](#api-reference)). Step 3's scenario runs in ~10 seconds at `--speed 30`;
+drop the flag (`npm run cascading-failure`) to watch it narrate in real time over ~3
+minutes instead — see [Sample Data](#sample-data) for what it verifies and why.
 
 **Other useful commands:** `make logs` (`docker compose logs -f`), `make down`,
 `make reset` (`docker compose down -v` — destructive, wipes volumes),
@@ -419,7 +441,27 @@ All bodies are JSON. `ComponentType` = `API | MCP_HOST | CACHE | QUEUE | RDBMS |
 Every response carries `RateLimit-Limit` / `RateLimit-Remaining` / `RateLimit-Reset`
 headers (per-IP token bucket, backed by Redis).
 
-### Incidents (workflow) — `backend/src/api/routes/workitems.ts`, mounted at `/api/v1/incidents`
+### Auth — `backend/src/api/routes/auth.ts`, mounted at `/api/v1/auth`
+
+Public — these are how a token is obtained in the first place, not gated behind
+themselves. Everything below this section (`/api/v1/incidents`, `/api/v1/analytics`)
+requires `Authorization: Bearer <token>` from a successful signup/login; `/health`,
+`/ready`, `/metrics`, and `/api/v1/signals` above stay public — see
+[ADR 0012](docs/decisions/0012-jwt-authentication.md) for why ingestion specifically is
+deliberately not behind the same gate.
+
+| Method & path | Request | Response |
+|---|---|---|
+| `POST /signup` | `{ email, password (min 8 chars), name }` | `201 { user, token }` · `409 duplicate_email` · `400 validation_error` |
+| `POST /login` | `{ email, password }` | `200 { user, token }` · `401 invalid_credentials` (same body for a wrong password and an unknown email — deliberately) · `429 rate_limited` (per-IP and per-email token buckets) |
+| `GET /me` | — (requires auth) | `200 User` |
+| `POST /logout` | — (requires auth) | `200 { ok: true }` — no server-side session to invalidate (stateless JWT); the client discarding its in-memory token is the actual logout |
+
+`User`: `{ id, email, name, role: "RESPONDER" \| "ADMIN", createdAt }`. Access tokens
+expire after 15 minutes (`JWT_ACCESS_TOKEN_TTL_SECONDS`) — there is no refresh-token
+flow yet, stated as scope in the ADR above, not a gap found later.
+
+### Incidents (workflow) — `backend/src/api/routes/workitems.ts`, mounted at `/api/v1/incidents` (requires auth)
 
 `IncidentSummary`: `{ id, componentId, componentType, severity, state, title, firstSignalAt, signalCount, updatedAt }`
 
@@ -429,14 +471,14 @@ headers (per-IP token bucket, backed by Redis).
 | `GET /:id` | — | `200` `IncidentSummary & { legalNextStates: WorkItemState[], rca: RcaSummaryDto \| null }` · `404 not_found` |
 | `GET /:id/signals` | query `limit`, `offset`, `order=asc\|desc` | `200 { items: SignalDto[], total, limit, offset }` — raw signals from Mongo · `404 not_found` |
 | `GET /:id/transitions` | — | `200 { items: StateTransitionDto[] }` — full audit trail, oldest first |
-| `POST /:id/transition` | `{ toState, actor }` | `200 IncidentSummary` · `404 not_found` · `409 invalid_transition` (illegal per the state machine) · `409 conflict` (optimistic-concurrency race) · `400 validation_error` |
-| `POST /:id/rca` | `{ actor, incidentStartTime, incidentEndTime, rootCauseCategory, rootCauseDescription, fixApplied, preventionSteps }` | `200` `IncidentSummary & { mttrSeconds }` · `404 not_found` · `422 { error: "invalid_rca", errors: [{field,message}] }` · `409 invalid_state` (not currently RESOLVED) · `400 validation_error` |
+| `POST /:id/transition` | `{ toState }` | `200 IncidentSummary` · `404 not_found` · `409 invalid_transition` (illegal per the state machine) · `409 conflict` (optimistic-concurrency race) · `400 validation_error` |
+| `POST /:id/rca` | `{ incidentStartTime, incidentEndTime, rootCauseCategory, rootCauseDescription, fixApplied, preventionSteps }` | `200` `IncidentSummary & { mttrSeconds }` · `404 not_found` · `422 { error: "invalid_rca", errors: [{field,message}] }` · `409 invalid_state` (not currently RESOLVED) · `400 validation_error` |
 | `GET /stream` | Server-Sent Events (`text/event-stream`) | Long-lived connection; `work_item_created` and `work_item_state_changed` events, each `{ type, incident: IncidentSummary, fromState?, toState? }`; a heartbeat comment keeps proxies from buffering the stream |
 
 `RcaSummaryDto`: `{ incidentStartTime, incidentEndTime, rootCauseCategory, rootCauseDescription, fixApplied, preventionSteps, mttrSeconds, submittedAt }`.
 `rootCauseCategory` is one of `CODE_DEFECT | INFRASTRUCTURE_FAILURE | CONFIGURATION_ERROR | CAPACITY_EXHAUSTION | EXTERNAL_DEPENDENCY | NETWORK | HUMAN_ERROR | UNKNOWN`.
 
-### Analytics — `backend/src/api/routes/analytics.ts`, mounted at `/api/v1/analytics`
+### Analytics — `backend/src/api/routes/analytics.ts`, mounted at `/api/v1/analytics` (requires auth)
 
 Full design: [docs/data-model.md](docs/data-model.md). Every response is bucketed
 server-side by a MongoDB aggregation pipeline — nothing is fetched raw and summed in
@@ -542,6 +584,8 @@ Every design document lives in [`docs/`](docs/):
 | [decisions/0009](docs/decisions/0009-state-pattern-for-work-item-lifecycle.md) | Why the State pattern for work item lifecycle transitions, specifically |
 | [decisions/0010](docs/decisions/0010-redis-fast-path-with-postgres-backstop-for-debouncing.md) | Why debouncing is a two-tier design — Redis fast path, Postgres unique index as the actual guarantee |
 | [decisions/0011](docs/decisions/0011-optimistic-concurrency-for-state-transitions.md) | Why optimistic concurrency (guarded `UPDATE`), not locking, protects state transitions |
+| [decisions/0012](docs/decisions/0012-jwt-authentication.md) | Stateless short-lived JWT, no refresh token yet, in-memory token storage, and why ingestion stays keyless — every auth tradeoff, stated |
+| [decisions/0013](docs/decisions/0013-landing-page-design-direction.md) | What the landing page optimises for, why it extends the console's tokens instead of inventing a brand, and the two hero directions rejected |
 
 Also relevant, outside `docs/`: [backend/tests/chaos/README.md](backend/tests/chaos/README.md)
 (what each chaos scenario asserts), [scripts/loadtest/README.md](scripts/loadtest/README.md)

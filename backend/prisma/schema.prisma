@@ -47,6 +47,26 @@ enum RootCauseCategory {
   UNKNOWN
 }
 
+enum UserRole {
+  RESPONDER
+  ADMIN
+}
+
+// Deliberately no relation to StateTransition/RcaRecord's `actor` field —
+// the audit trail records what the actor was *called* at the time (an
+// email string), not a live foreign key into a mutable user row. See
+// docs/decisions/ for the reasoning (auth ADR).
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         UserRole @default(RESPONDER)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
 model WorkItem {
   id            String         @id @default(uuid())
   componentId   String         @map("component_id")

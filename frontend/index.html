@@ -4,7 +4,44 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark light" />
-    <title>Incident Console</title>
+    <title>InveniOps — Incident Management Console</title>
+    <meta
+      name="description"
+      content="InveniOps ingests failure signals at high volume, collapses repeated noise into one accountable work item, and won't close it without a documented root cause."
+    />
+    <!-- %VITE_SITE_URL% is Vite's built-in HTML env-placeholder substitution
+         (see .env.example) — replaced with the real value at build/dev time,
+         not a literal token left in the shipped page. Defaults to
+         http://localhost:5173 when unset, so this is still correct for a
+         local checkout; override VITE_SITE_URL to the real origin at deploy
+         time so a shared link's canonical/OG URLs resolve there instead. -->
+    <link rel="canonical" href="%VITE_SITE_URL%/" />
+
+    <!-- Open Graph — so a link shared in Slack/iMessage/etc. renders a real
+         preview instead of a bare URL. og-image.png is a static 1200x630
+         asset (frontend/public/og-image.png), not a live screenshot, so it
+         renders identically regardless of what state the demo data is in. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="InveniOps" />
+    <meta property="og:title" content="InveniOps — Incident Management Console" />
+    <meta
+      property="og:description"
+      content="InveniOps ingests failure signals at high volume, collapses repeated noise into one accountable work item, and won't close it without a documented root cause."
+    />
+    <meta property="og:url" content="%VITE_SITE_URL%/" />
+    <meta property="og:image" content="%VITE_SITE_URL%/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="InveniOps — up to 100 signals collapse into one work item, every time." />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="InveniOps — Incident Management Console" />
+    <meta
+      name="twitter:description"
+      content="InveniOps ingests failure signals at high volume, collapses repeated noise into one accountable work item, and won't close it without a documented root cause."
+    />
+    <meta name="twitter:image" content="%VITE_SITE_URL%/og-image.png" />
+
     <!-- The favicon is the segmented urgency ribbon in miniature (the same
          four severity swatches as the header/feed spine), not a generic
          gear/bell/chart glyph — so it's recognizable as this app's tab even
@@ -42,13 +79,36 @@
     <!-- Three faces per the design system: Archivo (display/equipment labels),
          IBM Plex Sans (body prose), JetBrains Mono (machine values). Loaded
          over a <link>, not an npm dependency; strong system fallbacks in the
-         CSS stacks keep the app legible offline. -->
+         CSS stacks keep the app legible offline.
+
+         Loaded non-render-blocking: a plain synchronous <link rel="stylesheet">
+         to an external origin blocks first paint on that round trip (measured
+         ~1.1s of the landing page's LCP in a Lighthouse run) even with
+         preconnect and even with the font-face's own display=swap, because
+         it's the *stylesheet fetch itself*, not the font file, holding up
+         CSSOM construction. The preload+media=print/onload swap is the
+         standard fix: the browser fetches it in parallel with everything
+         else and applies it once ready, instead of gating first paint on it.
+         The <noscript> fallback covers the no-JS case. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    />
+    <link
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
   </head>
   <body>
     <div id="root"></div>

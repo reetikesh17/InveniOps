@@ -3,6 +3,6 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts", "*.ts", "*.cjs"],
+  "include": ["src/**/*.ts", "tests/**/*.ts", "prisma/**/*.ts", "*.ts", "*.cjs"],
   "exclude": ["node_modules", "dist"]
 }

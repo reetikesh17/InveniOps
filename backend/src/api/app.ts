@@ -9,6 +9,8 @@ import { signalsRouter } from "./routes/signals.js";
 import { workitemsRouter } from "./routes/workitems.js";
 import { incidentStreamRouter } from "./routes/incidentStream.js";
 import { analyticsRouter } from "./routes/analytics.js";
+import { authRouter } from "./routes/auth.js";
+import { requireAuth } from "./middleware/requireAuth.js";
 
 export function createApp(): Express {
   const app = express();
@@ -18,17 +20,29 @@ export function createApp(): Express {
   app.use(express.json({ limit: "1mb" }));
   app.use(httpLogger);
 
+  // Public, deliberately: /health, /ready, and /metrics are infrastructure
+  // endpoints (load balancer probes, scrapers), and signal ingestion is
+  // machine-to-machine (monitoring agents posting signals, not a logged-in
+  // human at a browser). If ingestion is ever locked down, the right
+  // mechanism is API keys/service credentials issued to those agents, not
+  // user JWTs — a different trust boundary from everything below this
+  // comment. That's a real design decision, not an oversight.
   app.use("/health", healthRouter);
   app.use("/ready", readyRouter);
   app.use("/metrics", metricsRouter);
   app.use("/api/v1/signals", signalsRouter);
+  app.use("/api/v1/auth", authRouter);
+
+  // Everything below serves a logged-in human at the dashboard — behind
+  // requireAuth. incidentStreamRouter verifies its own token instead (see
+  // its handler's comment): EventSource can't set an Authorization header.
   // Mounted before workitemsRouter: both share the "/api/v1/incidents"
   // base, and workitemsRouter's "GET /:id" would otherwise swallow
   // "GET /stream" as an :id of "stream" if it were checked first. Express
   // tries routers in registration order.
   app.use("/api/v1/incidents", incidentStreamRouter);
-  app.use("/api/v1/incidents", workitemsRouter);
-  app.use("/api/v1/analytics", analyticsRouter);
+  app.use("/api/v1/incidents", requireAuth, workitemsRouter);
+  app.use("/api/v1/analytics", requireAuth, analyticsRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

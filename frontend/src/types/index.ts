@@ -32,3 +32,4 @@ export type {
   WorkItemStateChangedEvent,
 } from "./events";
 export type { DependencyStatus, DependencyHealth, HealthResponse } from "./health";
+export type { User, UserRole } from "./auth";

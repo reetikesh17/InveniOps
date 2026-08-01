@@ -63,6 +63,44 @@ export async function postSignals(signals: readonly SignalInput[]): Promise<Inge
   }
 }
 
+// The incident/analytics routes below sit behind requireAuth (see
+// api/app.ts) — signed up once per test run (not per call) and reused,
+// same posture as a real dashboard client that logs in once and holds the
+// token in memory. /health and signal ingestion above stay unauthenticated
+// on purpose (see api/app.ts's comment) and need no token.
+interface AuthIdentity {
+  readonly email: string;
+  readonly token: string;
+}
+
+let cachedIdentity: Promise<AuthIdentity> | undefined;
+
+function getAuthIdentity(): Promise<AuthIdentity> {
+  cachedIdentity ??= (async (): Promise<AuthIdentity> => {
+    const email = `e2e-${Date.now()}-${Math.random().toString(36).slice(2)}@example.com`;
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: "e2e-test-password", name: "E2E Test" }),
+    });
+    const body = (await res.json()) as { token?: string };
+    if (!body.token) {
+      throw new Error(`e2e auth signup failed: ${res.status} ${JSON.stringify(body)}`);
+    }
+    return { email, token: body.token };
+  })();
+  return cachedIdentity;
+}
+
+/** The email every transition/RCA call below is actually authenticated as — what the server now records as `actor`, regardless of any actor string a caller passes in. */
+export async function getAuthenticatedEmail(): Promise<string> {
+  return (await getAuthIdentity()).email;
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  return { Authorization: `Bearer ${(await getAuthIdentity()).token}` };
+}
+
 export interface HealthResponse {
   readonly status: "healthy" | "degraded" | "unhealthy";
   readonly dependencies: Record<
@@ -96,20 +134,24 @@ export interface IncidentSummaryDto {
 export async function getIncident(
   id: string,
 ): Promise<{ status: number; body: IncidentSummaryDto & Record<string, unknown> }> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}`, {
+    headers: await authHeaders(),
+  });
   const body = (await res.json()) as IncidentSummaryDto & Record<string, unknown>;
   return { status: res.status, body };
 }
 
+/** `actor` is accepted for backward-compatible call sites but ignored by the server — the audit trail now records the authenticated caller's email (see api/routes/workitems.ts). */
 export async function transitionIncident(
   id: string,
   toState: WorkItemState,
   actor: string,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
+  void actor;
   const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/transition`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ toState, actor }),
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify({ toState }),
   });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   return { status: res.status, body };
@@ -131,7 +173,7 @@ export async function submitRca(
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/rca`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(rca),
   });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -150,7 +192,10 @@ export interface StateTransitionDto {
 export async function getTransitions(
   id: string,
 ): Promise<{ status: number; items: readonly StateTransitionDto[] }> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/transitions`);
+  const res = await fetch(
+    `${API_BASE_URL}/api/v1/incidents/${encodeURIComponent(id)}/transitions`,
+    { headers: await authHeaders() },
+  );
   const body = (await res.json().catch(() => ({ items: [] }))) as { items?: StateTransitionDto[] };
   return { status: res.status, items: body.items ?? [] };
 }
@@ -168,6 +213,7 @@ export async function getComponentHealth(
 ): Promise<{ status: number; body: ComponentHealthDto }> {
   const res = await fetch(
     `${API_BASE_URL}/api/v1/analytics/components/${encodeURIComponent(componentId)}`,
+    { headers: await authHeaders() },
   );
   const body = (await res.json()) as ComponentHealthDto;
   return { status: res.status, body };
@@ -193,7 +239,9 @@ export async function getMttrAnalytics(params: {
     interval: String(params.interval),
     groupBy: params.groupBy,
   });
-  const res = await fetch(`${API_BASE_URL}/api/v1/analytics/mttr?${query.toString()}`);
+  const res = await fetch(`${API_BASE_URL}/api/v1/analytics/mttr?${query.toString()}`, {
+    headers: await authHeaders(),
+  });
   const body = (await res.json().catch(() => ({ points: [] }))) as { points?: MttrPointDto[] };
   return { status: res.status, points: body.points ?? [] };
 }

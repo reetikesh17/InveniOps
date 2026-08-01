@@ -22,6 +22,7 @@ import {
   getTransitions,
   getComponentHealth,
   getMttrAnalytics,
+  getAuthenticatedEmail,
   type SignalInput,
   type Severity,
   type ComponentType,
@@ -285,6 +286,10 @@ describe("E2E: full incident lifecycle", () => {
   });
 
   // --- 7-11: full lifecycle on one work item (the RDBMS one) ---
+  // ACTOR is still passed to transitionIncident/submitRca below for
+  // call-site compatibility, but the server ignores it now — the audit
+  // trail records the authenticated caller's email instead (see
+  // getAuthenticatedEmail(), asserted against at the end of this block).
   const ACTOR = "e2e-responder";
   let incidentStartTime: string;
   let mttrSeconds: number;
@@ -368,7 +373,10 @@ describe("E2E: full incident lifecycle", () => {
     expect(transitions.status).toBe(200);
     const pairs = transitions.items.map((t) => `${t.fromState}->${t.toState}`);
     expect(pairs).toEqual(["OPEN->INVESTIGATING", "INVESTIGATING->RESOLVED", "RESOLVED->CLOSED"]);
-    expect(transitions.items.every((t) => t.actor === ACTOR)).toBe(true);
+    // Not ACTOR (the client-supplied, now-ignored value) — the audit trail
+    // records who was actually authenticated for these calls.
+    const authenticatedEmail = await getAuthenticatedEmail();
+    expect(transitions.items.every((t) => t.actor === authenticatedEmail)).toBe(true);
   });
 
   // --- 11: analytics endpoints reflect this incident's MTTR ---

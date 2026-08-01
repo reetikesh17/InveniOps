@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { config } from "../../config/index.js";
 import { incidentEventSubscriber } from "../../services/realtime/realtimeInstance.js";
 import type { IncidentEvent } from "../../services/realtime/incidentEvents.js";
+import { verifyAccessToken, InvalidTokenError } from "../../services/auth/jwt.js";
 
 function writeEvent(res: Response, event: IncidentEvent): void {
   res.write(`event: ${event.type}\n`);
@@ -17,7 +18,27 @@ function writeEvent(res: Response, event: IncidentEvent): void {
  * whichever replica handled the mutation) comes from that subscriber's own
  * design, not from anything in this handler.
  */
+/**
+ * Protected like every other incident route, but not via the shared
+ * requireAuth middleware: the browser's EventSource API cannot set an
+ * Authorization header, so the token travels as a query param instead
+ * (?token=...) and is verified here, the one place that's true. See
+ * frontend/src/lib/api.ts for the client side of this.
+ */
 function handleStream(req: Request, res: Response): void {
+  const token = typeof req.query["token"] === "string" ? req.query["token"] : undefined;
+  if (!token) {
+    res.status(401).json({ error: "unauthorized", message: "missing token query parameter" });
+    return;
+  }
+  try {
+    verifyAccessToken(token);
+  } catch (error) {
+    const message = error instanceof InvalidTokenError ? error.message : "invalid token";
+    res.status(401).json({ error: "unauthorized", message });
+    return;
+  }
+
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",

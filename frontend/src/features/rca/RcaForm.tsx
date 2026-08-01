@@ -105,7 +105,6 @@ function UnsavedChangesDialog({
 export interface RcaFormProps {
   readonly incidentId: string;
   readonly firstSignalAt: string;
-  readonly actor: string;
   readonly onSubmitted: () => void;
   readonly onConflict: (message: string) => void;
 }
@@ -121,7 +120,6 @@ export interface RcaFormProps {
 export function RcaForm({
   incidentId,
   firstSignalAt,
-  actor,
   onSubmitted,
   onConflict,
 }: RcaFormProps): JSX.Element {
@@ -224,7 +222,6 @@ export function RcaForm({
     setServerErrors({});
     try {
       await api.submitRca(incidentId, {
-        actor,
         incidentStartTime: new Date(values.incidentStartTime).toISOString(),
         incidentEndTime: new Date(values.incidentEndTime).toISOString(),
         rootCauseCategory: values.rootCauseCategory as RootCauseCategory,

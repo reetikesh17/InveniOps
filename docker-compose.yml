@@ -78,6 +78,12 @@ services:
       # enough to keep end-to-end latency reasonable under normal load.
       BUFFER_DRAIN_BATCH_SIZE: ${BUFFER_DRAIN_BATCH_SIZE:-500}
       BUFFER_DRAIN_INTERVAL_MS: ${BUFFER_DRAIN_INTERVAL_MS:-15}
+      # JWT_SECRET has no fallback inside the app itself (config/index.ts
+      # requires it, no default — boot fails loudly if it's ever truly
+      # unset). This default exists only so `docker compose up` keeps
+      # working with zero setup for local dev, exactly like DATABASE_URL
+      # above — override it with a real secret for anything beyond that.
+      JWT_SECRET: ${JWT_SECRET:-local-dev-only-insecure-secret-do-not-use-in-production}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
@@ -96,6 +102,7 @@ services:
       dockerfile: Dockerfile
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3000}
+      VITE_SITE_URL: ${VITE_SITE_URL:-http://localhost:5173}
     volumes:
       - ./frontend:/app
       - /app/node_modules

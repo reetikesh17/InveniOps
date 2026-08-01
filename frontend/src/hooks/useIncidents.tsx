@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { API_BASE_URL, api, ApiRequestError, type ApiErrorInfo } from "../lib/api";
+import { API_BASE_URL, api, ApiRequestError, getAuthToken, type ApiErrorInfo } from "../lib/api";
 import type { WorkItem } from "../types";
 
 // Describes the real-time transport only — "connecting" (initial attempt or
@@ -146,7 +146,16 @@ export function IncidentsProvider({ children }: { children: ReactNode }): JSX.El
     if (eventSourceRef.current) {
       return;
     }
-    const source = new EventSource(`${API_BASE_URL}/api/v1/incidents/stream`);
+    // EventSource can't set an Authorization header — the token travels as
+    // a query param instead, verified server-side the same way (see
+    // backend/src/api/routes/incidentStream.ts's own comment). Safe by
+    // construction here: this provider only ever mounts behind
+    // RequireAuth (see App.tsx), so a token is already set by the time
+    // this runs.
+    const token = getAuthToken();
+    const source = new EventSource(
+      `${API_BASE_URL}/api/v1/incidents/stream?token=${encodeURIComponent(token ?? "")}`,
+    );
     eventSourceRef.current = source;
 
     source.addEventListener("open", () => {

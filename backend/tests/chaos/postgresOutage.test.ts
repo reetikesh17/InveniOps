@@ -12,6 +12,7 @@ import {
   getHealth,
   postSignals,
   transitionIncident,
+  ensureAuthToken,
   type SignalInput,
 } from "./helpers/apiClient.js";
 import { makePrismaClient } from "./helpers/dataClients.js";
@@ -77,6 +78,12 @@ describe("chaos: Postgres outage", () => {
     expect(before.state).toBe("OPEN");
 
     const outageStartedAt = new Date().toISOString();
+
+    // Signup (needed to call the now-authenticated transition endpoint
+    // below) itself requires Postgres — get the token before it goes down,
+    // so the outage under test is the transition endpoint's, not an
+    // incidental failure to sign up.
+    await ensureAuthToken();
 
     try {
       await stop(CONTAINERS.postgres, 5);

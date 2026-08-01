@@ -64,6 +64,16 @@ const envSchema = z
     // intermediary proxies/load balancers that would otherwise time out an
     // idle long-lived HTTP response.
     SSE_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().positive().default(15_000),
+    // Authentication (src/services/auth/, src/api/routes/auth.ts). No
+    // default for JWT_SECRET, deliberately — same pattern as DATABASE_URL:
+    // boot must fail loudly, not sign tokens with a guessable fallback.
+    JWT_SECRET: z.string().min(32),
+    JWT_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    BCRYPT_COST: z.coerce.number().int().min(4).max(15).default(12),
+    RATE_LIMIT_LOGIN_IP_CAPACITY: z.coerce.number().int().positive().default(10),
+    RATE_LIMIT_LOGIN_IP_REFILL_PER_SECOND: z.coerce.number().positive().default(0.5),
+    RATE_LIMIT_LOGIN_EMAIL_CAPACITY: z.coerce.number().int().positive().default(5),
+    RATE_LIMIT_LOGIN_EMAIL_REFILL_PER_SECOND: z.coerce.number().positive().default(0.1),
   })
   .refine((env) => env.BUFFER_LOW_WATER_MARK_FRACTION < env.BUFFER_HIGH_WATER_MARK_FRACTION, {
     message: "BUFFER_LOW_WATER_MARK_FRACTION must be less than BUFFER_HIGH_WATER_MARK_FRACTION",
@@ -153,6 +163,15 @@ export interface AppConfig {
   readonly sse: {
     readonly heartbeatIntervalMs: number;
   };
+  readonly auth: {
+    readonly jwtSecret: string;
+    readonly accessTokenTtlSeconds: number;
+    readonly bcryptCost: number;
+    readonly rateLimit: {
+      readonly ip: { readonly capacity: number; readonly refillPerSecond: number };
+      readonly email: { readonly capacity: number; readonly refillPerSecond: number };
+    };
+  };
 }
 
 function loadConfig(): AppConfig {
@@ -241,6 +260,21 @@ function loadConfig(): AppConfig {
     }),
     sse: Object.freeze({
       heartbeatIntervalMs: env.SSE_HEARTBEAT_INTERVAL_MS,
+    }),
+    auth: Object.freeze({
+      jwtSecret: env.JWT_SECRET,
+      accessTokenTtlSeconds: env.JWT_ACCESS_TOKEN_TTL_SECONDS,
+      bcryptCost: env.BCRYPT_COST,
+      rateLimit: Object.freeze({
+        ip: Object.freeze({
+          capacity: env.RATE_LIMIT_LOGIN_IP_CAPACITY,
+          refillPerSecond: env.RATE_LIMIT_LOGIN_IP_REFILL_PER_SECOND,
+        }),
+        email: Object.freeze({
+          capacity: env.RATE_LIMIT_LOGIN_EMAIL_CAPACITY,
+          refillPerSecond: env.RATE_LIMIT_LOGIN_EMAIL_REFILL_PER_SECOND,
+        }),
+      }),
     }),
   });
 }

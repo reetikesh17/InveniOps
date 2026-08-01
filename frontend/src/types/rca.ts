@@ -14,9 +14,10 @@ export interface RcaRecord {
 }
 
 // What POST /api/v1/incidents/:id/rca expects as its body — see
-// backend/src/api/routes/workitems.ts's handleSubmitRca.
+// backend/src/api/routes/workitems.ts's handleSubmitRca. No `actor` field —
+// the server sources that from the authenticated request (see
+// hooks/useAuth.tsx), not anything the client asserts.
 export interface RcaSubmissionInput {
-  readonly actor: string;
   readonly incidentStartTime: string;
   readonly incidentEndTime: string;
   readonly rootCauseCategory: RootCauseCategory;

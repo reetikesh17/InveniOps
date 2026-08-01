@@ -27,7 +27,6 @@ function isDataCarryingTarget(target: WorkItemState): boolean {
 export interface StateMachineControlProps {
   readonly incidentId: string;
   readonly legalNextStates: readonly WorkItemState[];
-  readonly actor: string;
   readonly onTransitioned: () => void;
   readonly onConflict: (message: string) => void;
 }
@@ -35,7 +34,6 @@ export interface StateMachineControlProps {
 export function StateMachineControl({
   incidentId,
   legalNextStates,
-  actor,
   onTransitioned,
   onConflict,
 }: StateMachineControlProps): JSX.Element | null {
@@ -51,7 +49,7 @@ export function StateMachineControl({
     setPendingTarget(target);
     setGeneralError(null);
     try {
-      await api.transitionIncident(incidentId, target, actor);
+      await api.transitionIncident(incidentId, target);
       onTransitioned();
     } catch (err) {
       if (err instanceof ApiRequestError && err.info.kind === "conflict") {
